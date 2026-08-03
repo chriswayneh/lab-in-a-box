@@ -4,8 +4,9 @@
 
 **A complete self-hosted AI, infrastructure and identity lab. One command. Zero configuration.**
 
-Twenty-five containers — identity, secrets, observability, object storage, Git hosting and a local LLM —
-provisioned, wired together and hardened automatically.
+Twenty-five default containers — identity, secrets, observability, object storage, Git hosting and a
+local LLM — provisioned, wired together and hardened automatically. Two more services, Qdrant and
+Watchtower, are available through optional Compose profiles.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Docker Compose](https://img.shields.io/badge/Docker%20Compose-v2.20%2B-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
@@ -659,6 +660,7 @@ More, including how to read the init-job logs and what each provisioning script 
 | **v2** | Identity governance | Joiner/Mover/Leaver automation, RBAC simulator, access reviews, SCIM, audit pipeline |
 | **v3** | Infrastructure as code | Terraform and Ansible deployments, a Kubernetes edition, AWS/Azure/GCP targets |
 | **v4** | AI operations | Log analysis, incident response copilot, automatic infrastructure documentation, RAG over your own runbooks |
+| **v5** | Homelab operations | Backup verification, external uptime monitoring and resource presets |
 
 Full detail, including ready-to-file issues with acceptance criteria, is in
 [`roadmap/`](roadmap/README.md).
