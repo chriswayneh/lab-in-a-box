@@ -205,6 +205,10 @@
         card.className = optional ? "card optional" : "card";
         if (!optional) {
           card.href = href;
+          // Keep the portal open as the launchpad while each app runs in its
+          // own browser tab. `noopener` prevents the opened app from gaining
+          // access to the portal window.
+          card.target = "_blank";
           card.rel = "noopener";
         }
         card.innerHTML = `
