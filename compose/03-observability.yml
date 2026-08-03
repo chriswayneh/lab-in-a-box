@@ -219,7 +219,9 @@ services:
       socket-proxy:
         condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:9080/ready"]
+      # The Promtail image does not ship wget or curl. Its own syntax check is
+      # available in every supported image and confirms the active config.
+      test: ["CMD", "/usr/bin/promtail", "-config.file=/etc/promtail/promtail-config.yml", "-check-syntax"]
       interval: 30s
       timeout: 5s
       retries: 5

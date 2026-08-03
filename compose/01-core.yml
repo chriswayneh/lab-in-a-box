@@ -93,7 +93,7 @@ services:
   # ---------------------------------------------------------------------------
   traefik:
     <<: [*defaults, *hardened]
-    image: traefik:v3.3
+    image: traefik:v3.6.17
     container_name: ${COMPOSE_PROJECT_NAME:-lab}-traefik
     # Runs unprivileged. That is why the entrypoints below bind 8000/8443
     # instead of 80/443 — an unprivileged process cannot bind a low port — and
@@ -159,14 +159,6 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=${COMPOSE_PROJECT_NAME:-lab}_edge
-
-      # --- Rate limiting -----------------------------------------------------
-      # Defined as a label rather than in the dynamic file because the file
-      # provider does not interpolate environment variables, and these limits
-      # need to be tunable from .env.
-      - traefik.http.middlewares.lab-ratelimit.ratelimit.average=${TRAEFIK_RATE_LIMIT_AVERAGE:-100}
-      - traefik.http.middlewares.lab-ratelimit.ratelimit.burst=${TRAEFIK_RATE_LIMIT_BURST:-200}
-      - traefik.http.middlewares.lab-ratelimit.ratelimit.period=1s
 
       # --- Dashboard router --------------------------------------------------
       - traefik.http.routers.traefik.rule=Host(`traefik.${LAB_DOMAIN:-lab.localhost}`)
@@ -296,6 +288,14 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=${COMPOSE_PROJECT_NAME:-lab}_edge
+      # Define the shared middleware on an application container. Traefik does
+      # not publish middleware labels from its own container on all Docker API
+      # versions, which otherwise leaves every router without this dependency.
+      # Labels keep the limits configurable through .env; the file provider
+      # cannot interpolate those variables.
+      - traefik.http.middlewares.lab-ratelimit.ratelimit.average=${TRAEFIK_RATE_LIMIT_AVERAGE:-100}
+      - traefik.http.middlewares.lab-ratelimit.ratelimit.burst=${TRAEFIK_RATE_LIMIT_BURST:-200}
+      - traefik.http.middlewares.lab-ratelimit.ratelimit.period=1s
       - traefik.http.routers.landing.rule=Host(`${LAB_DOMAIN:-lab.localhost}`)
       - traefik.http.routers.landing.entrypoints=web,websecure
       - traefik.http.routers.landing.tls=true

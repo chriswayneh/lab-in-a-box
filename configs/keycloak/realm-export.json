@@ -1,23 +1,4 @@
 {
-  "_comment": [
-    "Lab realm — imported automatically by Keycloak on first boot via --import-realm.",
-    "",
-    "This file declares STRUCTURE ONLY: clients, roles, groups and user identities.",
-    "It contains no passwords and no client secrets. Those are injected afterwards",
-    "by scripts/init-keycloak.sh from .env, so that nothing sensitive is ever",
-    "committed to the repository.",
-    "",
-    "Redirect URIs below assume the default LAB_DOMAIN of lab.localhost. If you",
-    "change LAB_DOMAIN, init-keycloak.sh rewrites them to match — no manual edit.",
-    "",
-    "The group and role model is a deliberately small but realistic RBAC example:",
-    "  - Realm roles describe what someone may DO   (platform-admin, developer, ...)",
-    "  - Groups describe who someone IS             (Engineering, Security, ...)",
-    "  - Groups grant roles, users join groups, nobody gets a role directly.",
-    "That indirection is the whole point of role-based access control, and it is",
-    "what the Joiner/Mover/Leaver demo on the roadmap will automate."
-  ],
-
   "realm": "lab",
   "displayName": "Lab-in-a-Box",
   "displayNameHtml": "<strong>Lab</strong>-in-a-Box",

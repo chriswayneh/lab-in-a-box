@@ -64,7 +64,9 @@ services:
       # container's, or every `git clone ssh://` the UI suggests will fail.
       GITEA__server__SSH_PORT: ${GITEA_SSH_PORT:-2222}
       GITEA__server__SSH_LISTEN_PORT: "22"
-      GITEA__server__START_SSH_SERVER: "true"
+      # The official image already runs OpenSSH on container port 22. Let it
+      # own that port; enabling Gitea's embedded SSH server would bind it twice.
+      GITEA__server__START_SSH_SERVER: "false"
       GITEA__server__OFFLINE_MODE: "true"
       GITEA__server__LFS_START_SERVER: "true"
 
