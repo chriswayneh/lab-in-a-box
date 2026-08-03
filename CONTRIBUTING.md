@@ -4,6 +4,7 @@ Contributions are welcome — particularly dashboards, hardening, platform-speci
 documentation corrections where something was unclear or wrong.
 
 - [Before you start](#before-you-start)
+- [Roadmap work](#roadmap-work)
 - [Development setup](#development-setup)
 - [The bar for a change](#the-bar-for-a-change)
 - [Adding a service](#adding-a-service)
@@ -25,6 +26,30 @@ that can break on a platform you do not have. The
 exactly this reason.
 
 **For documentation**, no ceremony required. If something was confusing, fixing it is a real contribution.
+
+---
+
+## Roadmap work
+
+The [roadmap](roadmap/README.md) is a commitment to depth over a growing list of containers. If your
+idea belongs to an existing roadmap item, open or comment on that issue before implementation so the
+scope and acceptance criteria stay shared.
+
+For a new roadmap proposal, open a feature request first. Explain the user problem, resource cost,
+cross-platform impact and why the existing services do not already solve it. New default services are
+the exception: profile-gated services are preferred when a capability is optional or expensive.
+
+`roadmap/issues.yml` is the source of truth for planned work. A roadmap pull request must update both
+that file and the matching summary in `roadmap/README.md`, and include:
+
+- a milestone and stable issue ID (for example, `v5-1`)
+- clear acceptance criteria that can be verified
+- the effect on the one-command default, resource budget and supported platforms
+- dependencies on existing roadmap items, if any
+
+Implementation pull requests should reference their roadmap issue and keep the scope to that issue's
+acceptance criteria. If implementation changes the service graph, run `make docs` and commit the
+generated catalogue and dependency graph as part of the same pull request.
 
 ---
 
