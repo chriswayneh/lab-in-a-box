@@ -329,7 +329,7 @@ Full generated catalogue, including images, networks and privileges:
 | **Ollama** | <https://ollama.lab.localhost> | Local LLM runtime and API |
 | **Gitea** | <https://git.lab.localhost> | Git hosting with issues, pull requests and CI |
 | **MinIO** | <https://minio.lab.localhost> | Object storage console (S3 API at `s3.lab.localhost`) |
-| **Portainer** | <https://portainer.lab.localhost> | Container management and troubleshooting |
+| **Portainer** | <https://portainer.lab.localhost> | Container management and troubleshooting — `admin` / `portainer-insecure-dev-only` |
 | **pgAdmin** | <https://pgadmin.lab.localhost> | PostgreSQL console, pre-connected to all three databases |
 | **Adminer** | <https://adminer.lab.localhost> | Lightweight database client |
 | **Qdrant** | <https://qdrant.lab.localhost> | Vector database — optional, `COMPOSE_PROFILES=qdrant` |
@@ -494,7 +494,8 @@ docker compose up -d --force-recreate traefik
 ```
 
 Refresh <https://lab.localhost>. The browser should no longer warn, and the landing page should report
-**12/13 services reachable**: Qdrant is the optional thirteenth service and is off by default.
+**12/12 enabled services reachable**. Qdrant is shown separately as an optional disabled service; enable
+the `qdrant` profile when you want to use it.
 
 This script installs a local development CA only for the current computer, creates a certificate for
 `lab.localhost` and `*.lab.localhost`, and writes its certificate, private key, and Traefik configuration

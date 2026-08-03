@@ -41,7 +41,13 @@ services:
     <<: [*defaults, *hardened]
     image: portainer/portainer-ce:lts
     container_name: ${COMPOSE_PROJECT_NAME:-lab}-portainer
-    command: -H unix:///var/run/docker.sock
+    command:
+      - -H
+      - unix:///var/run/docker.sock
+      # Bcrypt hash for the documented local-only password
+      # `portainer-insecure-dev-only`. Dollar signs are doubled so Compose
+      # passes the hash through literally rather than treating it as a variable.
+      - --admin-password=$$2y$$05$$/0fTkGja8Teoucm8JRu.GeylevRgVt7rCBYt9ALE5y/GkTTH8GhNq
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_data:/data
