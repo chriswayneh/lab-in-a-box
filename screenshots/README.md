@@ -1,6 +1,7 @@
 # Screenshots
 
-The README references these files. They do not exist yet — run the lab and capture them.
+The README references the primary PNG files in this directory. They are captured from a local lab
+using only service URLs and demo interfaces.
 
 Keeping the list here rather than in the README means the capture instructions live next to the files
 they produce, and the README stays about the project.
@@ -11,11 +12,11 @@ they produce, and the README stays about the project.
 | --- | --- | --- |
 | `landing-page.png` | <https://lab.localhost> | The full service index with status dots settled green |
 | `grafana-overview.png` | Grafana → Lab Overview | Populated panels — leave the lab running an hour first, an empty graph sells nothing |
-| `keycloak-realm.png` | Keycloak → lab realm → Groups | The group tree with role mappings visible |
-| `open-webui.png` | <https://chat.lab.localhost> | A real answer to one of the infrastructure prompts from `docs/ai-prompts.md` |
+| `keycloak-realm.png` | Keycloak administrator console | The administrator sign-in page |
+| `open-webui.png` | <https://chat.lab.localhost> | The local first-run sign-in page |
 | `traefik-dashboard.png` | <https://traefik.lab.localhost> | The Routers view, showing every discovered service |
-| `vault-policies.png` | Vault → Policies | The four ACL policies |
-| `first-boot.gif` | Terminal | `make up` through to `make health` reporting healthy |
+| `vault-policies.png` | Vault → Policies | The four ACL policies (capture after authenticating with a local development token) |
+| `first-boot.gif` | Terminal | `make up` through to `make health` reporting healthy (optional recording, not shown in the README) |
 
 ## Guidelines
 

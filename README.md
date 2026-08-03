@@ -71,25 +71,20 @@ trade-offs that a lab makes against production are stated plainly rather than hi
 
 ## Screenshots
 
-> **Note**
-> These are placeholders. Run the lab and replace them — `screenshots/README.md` lists exactly
-> what each image should show and at what size.
+> Screenshots below were captured from the local development lab. They use only the project's
+> local service names and demo interfaces.
 
 <div align="center">
 
 | Landing page | Grafana overview |
 | :---: | :---: |
 | ![Landing page](screenshots/landing-page.png) | ![Grafana](screenshots/grafana-overview.png) |
-| Every service, with live reachability | Container CPU, memory, network, disk and restarts |
+| Every active service, with live reachability | The provisioned Lab Overview dashboard |
 
 | Keycloak realm | Open WebUI |
 | :---: | :---: |
 | ![Keycloak](screenshots/keycloak-realm.png) | ![Open WebUI](screenshots/open-webui.png) |
-| Seeded users, groups and role mappings | Chatting with a local model about your own infrastructure |
-
-![First boot](screenshots/first-boot.gif)
-
-*`make up` from nothing to a healthy lab.*
+| Keycloak administrator sign-in | Open WebUI's local first-run sign-in |
 
 </div>
 
