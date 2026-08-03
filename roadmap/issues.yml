@@ -1,0 +1,481 @@
+# =============================================================================
+# Roadmap — issue definitions
+# =============================================================================
+# The source of truth for planned work. roadmap/README.md summarises this file;
+# scripts/create-roadmap-issues.sh files it against a GitHub repository.
+#
+#   bash scripts/create-roadmap-issues.sh              # dry run
+#   bash scripts/create-roadmap-issues.sh --apply
+#
+# Each issue carries acceptance criteria, because "add Terraform support" is a
+# wish and "these five things are true" is a task.
+# =============================================================================
+
+milestones:
+  - title: v2.0
+    description: >-
+      Identity governance. Turn the seeded realm into a working demonstration of
+      identity lifecycle, access review and audit.
+  - title: v3.0
+    description: >-
+      Infrastructure as code. The same lab expressed in Terraform, Ansible,
+      Kubernetes and three cloud targets, without configuration drift.
+  - title: v4.0
+    description: >-
+      AI operations. Use the local model for operational work — log analysis,
+      incident context, documentation — and be honest about its limits.
+
+issues:
+
+  # ===========================================================================
+  # v2 — Identity governance
+  # ===========================================================================
+
+  - id: v2-1
+    title: "Joiner/Mover/Leaver lifecycle automation"
+    milestone: v2.0
+    labels: [enhancement, identity, v2]
+    body: |
+      Demonstrate the full identity lifecycle against the existing Keycloak realm.
+      The realm already models RBAC correctly — roles granted to groups, users
+      joining groups. What it does not show is what happens over time.
+
+      Three flows, each runnable as a single command:
+
+      - **Joiner** — create the user, assign group membership from a role profile,
+        provision a Vault userpass identity, create a Gitea account, send a
+        welcome summary
+      - **Mover** — change group membership and prove that access changed:
+        old entitlements gone, new ones present, with a before/after diff
+      - **Leaver** — disable the account, revoke active sessions and tokens, revoke
+        the Vault identity, transfer owned Gitea repositories, produce an
+        offboarding record
+
+      The interesting part is the leaver flow. Disabling an account is the easy
+      half; revoking live sessions, refresh tokens and machine credentials is the
+      half that gets missed in real deployments.
+
+      **Acceptance criteria**
+
+      - `make jml-join USER=erin ROLE=developer` provisions across all services
+      - `make jml-move USER=erin FROM=contractors TO=engineering` shows an
+        access diff
+      - `make jml-leave USER=erin` revokes access everywhere, including active
+        sessions
+      - Each command is idempotent and prints what it changed
+      - A test proves that a leaver's existing access token stops working
+      - `docs/identity-governance.md` explains the model and what it deliberately
+        does not cover
+
+  - id: v2-2
+    title: "RBAC simulator — what can this person actually reach?"
+    milestone: v2.0
+    labels: [enhancement, identity, v2]
+    body: |
+      Given a user, produce the effective access they have across every service in
+      the lab. Answering this by reading four admin UIs is exactly the problem real
+      access reviews run into.
+
+      Resolve the full chain: user → groups → realm roles → client roles → what
+      that grants in Grafana, Vault, Gitea and MinIO.
+
+      **Acceptance criteria**
+
+      - `make rbac-show USER=alice` prints effective access grouped by service
+      - `make rbac-diff USER=alice OTHER=bob` shows what one has that the other
+        does not
+      - `make rbac-who-can PERMISSION=vault:secret/security/*` lists every user
+        who can reach a resource
+      - Group-inherited grants are distinguished from direct ones
+      - Output is available as JSON for scripting
+      - Correctness is tested against the seeded realm, not just eyeballed
+
+  - id: v2-3
+    title: "Access review campaign with approve/revoke workflow"
+    milestone: v2.0
+    labels: [enhancement, identity, v2]
+    body: |
+      Periodic recertification: a reviewer is shown who has what, and approves or
+      revokes each grant. This is the compliance workflow that identity governance
+      products exist to sell, and it is worth understanding at this scale.
+
+      **Acceptance criteria**
+
+      - A campaign can be started for a scope (a group, a role, or everyone)
+      - Each entitlement is presented with who granted it, when, and when it was
+        last used
+      - Approve and revoke decisions are recorded with reviewer and timestamp
+      - Revocations are applied to Keycloak, not just logged
+      - The campaign produces a signed-off report as an artefact in MinIO
+      - Contractors are flagged automatically using the `contractEndDate`
+        attribute already in the realm
+
+  - id: v2-4
+    title: "SCIM provisioning endpoint"
+    milestone: v2.0
+    labels: [enhancement, identity, v2]
+    body: |
+      Expose a SCIM 2.0 endpoint so identity changes propagate to downstream
+      services automatically, rather than by the scripts in `v2-1` calling each
+      service's own API.
+
+      SCIM is what real identity providers speak to real applications. Implementing
+      the server side is a good way to understand why it is shaped the way it is.
+
+      **Acceptance criteria**
+
+      - `/scim/v2/Users` and `/scim/v2/Groups` support create, read, update,
+        delete and PATCH
+      - Keycloak is configured to push changes to it
+      - Changes propagate to at least Gitea and Grafana
+      - Failed propagation is retried and surfaced, not silently dropped
+      - The endpoint requires authentication and is rate limited
+      - Conformance is verified against a published SCIM test suite
+
+  - id: v2-5
+    title: "Audit event pipeline into Loki"
+    milestone: v2.0
+    labels: [enhancement, identity, observability, v2]
+    body: |
+      Keycloak has user and admin events enabled, and Vault writes an audit log to
+      a file. Neither is currently queryable alongside everything else.
+
+      Ship both into Loki as structured events with a dedicated dashboard, so
+      "who changed that role, and when" is one query rather than an archaeology
+      exercise.
+
+      **Acceptance criteria**
+
+      - Keycloak user and admin events reach Loki as parsed, labelled fields
+      - Vault's audit log reaches Loki with sensitive values still hashed
+      - A Grafana dashboard shows authentication activity, failures by source,
+        admin changes and secret access
+      - Alert rules fire on brute-force patterns and on privileged policy changes
+      - Retention for audit events is configured separately from application logs
+      - `docs/observability.md` documents the queries and what each field means
+
+  - id: v2-6
+    title: "Alertmanager — route the alerts that currently go nowhere"
+    milestone: v2.0
+    labels: [enhancement, observability, v2]
+    body: |
+      Nine alert rules evaluate today and route to nothing. Add Alertmanager with
+      sensible grouping, inhibition and at least one working notification path.
+
+      Inhibition matters more than notification here: when the host runs out of
+      memory, half the lab goes unhealthy at once, and a good configuration sends
+      one alert rather than twelve.
+
+      **Acceptance criteria**
+
+      - Alertmanager is wired to Prometheus and routed through Traefik
+      - Alerts are grouped by category and severity
+      - `HostMemoryPressure` inhibits the per-container alerts it causes
+      - At least one notification receiver works out of the box without an
+        external account (a local webhook sink is fine)
+      - Optional receivers for email, Slack and Discord are documented but off
+      - The alert rules gain `runbook_url` annotations pointing at the docs
+
+  - id: v2-7
+    title: "Forward-auth for unauthenticated services"
+    milestone: v2.0
+    labels: [enhancement, security, identity, v2]
+    body: |
+      Prometheus and the Traefik dashboard currently have no authentication —
+      documented as a known gap in `docs/security.md`. Put them behind Keycloak
+      with a Traefik forward-auth middleware.
+
+      This also removes the most awkward item from the hardening checklist, which
+      currently tells the reader to go and build this themselves.
+
+      **Acceptance criteria**
+
+      - A forward-auth middleware validates a Keycloak session
+      - Prometheus, Alertmanager and the Traefik dashboard require login
+      - Access is restricted by realm role, not merely by being authenticated
+      - Unauthenticated API access still works for Grafana's datasource calls
+      - It can be turned off with one variable, for anyone who does not want it
+      - The known-gaps table in `docs/security.md` is updated
+
+  # ===========================================================================
+  # v3 — Infrastructure as code
+  # ===========================================================================
+
+  - id: v3-1
+    title: "Terraform module for the whole lab"
+    milestone: v3.0
+    labels: [enhancement, iac, v3]
+    body: |
+      Express the lab as Terraform using the Docker provider, so it can be
+      deployed, versioned and destroyed declaratively.
+
+      The value is not that Terraform is better than Compose for local containers
+      — it is not. The value is that it becomes the foundation for the cloud
+      targets in this milestone.
+
+      **Acceptance criteria**
+
+      - `terraform apply` produces the same running lab as `make up`
+      - Networks, volumes, secrets and services are all managed
+      - Variables mirror `.env`, with the same names
+      - `terraform plan` on an unchanged lab reports no drift
+      - `terraform destroy` removes everything, including volumes
+      - Module documentation is generated with `terraform-docs` and checked in CI
+
+  - id: v3-2
+    title: "Ansible playbook for provisioning onto a host"
+    milestone: v3.0
+    labels: [enhancement, iac, v3]
+    body: |
+      Provision the lab onto a fresh Linux host: install Docker, lay down the
+      configuration, generate credentials, start the stack, verify health.
+
+      This is the realistic path for anyone running the lab on a home server or a
+      VPS rather than a laptop.
+
+      **Acceptance criteria**
+
+      - A single playbook takes a bare Debian or Ubuntu host to a healthy lab
+      - Roles are separated: docker, lab-config, lab-secrets, lab-deploy
+      - Credentials are generated on the target and never written to the control
+        node
+      - The playbook is idempotent — a second run reports no changes
+      - Verified in CI against a container or VM
+      - An inventory example covers both a local and a remote host
+
+  - id: v3-3
+    title: "Kubernetes edition"
+    milestone: v3.0
+    labels: [enhancement, kubernetes, v3]
+    body: |
+      The same service graph on Kubernetes, targeting a local cluster (kind, k3d or
+      minikube) first.
+
+      Several things do not translate directly, and the interesting work is in
+      those: the Docker socket proxy has no equivalent, cAdvisor is built into the
+      kubelet, and Traefik's Docker provider becomes an Ingress controller.
+
+      **Acceptance criteria**
+
+      - `helm install` or `kubectl apply -k` produces a working lab on kind
+      - Ingress replaces the Traefik Docker provider, with the same hostnames
+      - Secrets use Kubernetes Secrets, generated by a job, not committed
+      - NetworkPolicies reproduce the five-network segmentation model
+      - Provisioning jobs become Kubernetes Jobs with the same idempotency
+      - `docs/kubernetes.md` explains what changed and why
+      - Resource requests and limits are set for every workload
+
+  - id: v3-4
+    title: "AWS deployment"
+    milestone: v3.0
+    labels: [enhancement, iac, cloud, v3]
+    body: |
+      Deploy to AWS with managed services replacing the containers that should not
+      run as containers in production: RDS for PostgreSQL, ElastiCache for Redis,
+      S3 for object storage.
+
+      **Acceptance criteria**
+
+      - Terraform provisions VPC, subnets, security groups, ECS or EKS, RDS,
+        ElastiCache and S3
+      - Application Load Balancer replaces Traefik's edge role, with ACM
+        certificates
+      - Secrets come from AWS Secrets Manager, not environment variables
+      - The stack passes `make health` equivalent checks after deployment
+      - A cost estimate is documented, including what a month of idle costs
+      - `terraform destroy` leaves nothing billable behind — verified, not assumed
+
+  - id: v3-5
+    title: "Azure deployment"
+    milestone: v3.0
+    labels: [enhancement, iac, cloud, v3]
+    body: |
+      Azure equivalent of `v3-4`: Container Apps or AKS, Azure Database for
+      PostgreSQL, Azure Cache for Redis, Blob Storage.
+
+      Azure is the natural fit for the identity half of this lab, since Entra ID
+      federation with Keycloak is a genuinely common enterprise pattern worth
+      demonstrating.
+
+      **Acceptance criteria**
+
+      - Terraform or Bicep provisions the full environment
+      - Managed identity is used instead of connection strings wherever possible
+      - Key Vault holds secrets
+      - Optional Entra ID federation with the Keycloak realm is documented
+      - A cost estimate is documented
+      - Teardown is verified to leave nothing billable
+
+  - id: v3-6
+    title: "GCP deployment"
+    milestone: v3.0
+    labels: [enhancement, iac, cloud, v3]
+    body: |
+      GCP equivalent: Cloud Run or GKE Autopilot, Cloud SQL, Memorystore, Cloud
+      Storage.
+
+      Cloud Run is the interesting target — it forces a genuine reckoning with
+      which parts of this lab are actually stateless.
+
+      **Acceptance criteria**
+
+      - Terraform provisions the full environment
+      - Secret Manager holds secrets, with workload identity for access
+      - Cloud Armor or an equivalent provides the rate limiting Traefik does locally
+      - A cost estimate is documented
+      - Teardown is verified
+
+  - id: v3-7
+    title: "Shared configuration model across deployment targets"
+    milestone: v3.0
+    labels: [enhancement, iac, architecture, v3]
+    body: |
+      **This should land before or alongside the first cloud target, not after.**
+
+      Six deployment targets each with their own copy of the service definitions
+      will drift within one release, and the drift will be discovered by a user
+      rather than by CI. Decide now where the single source of truth lives and how
+      each target derives from it.
+
+      Options worth evaluating explicitly, with the trade-offs written down:
+
+      - Compose as source, generating the others (Kompose, custom generators)
+      - A neutral service definition — YAML or CUE — that all targets render from
+      - Terraform as source, with Compose generated for local development
+      - Accept duplication, and enforce consistency with conformance tests
+
+      **Acceptance criteria**
+
+      - An ADR records the decision and the alternatives rejected
+      - Adding a service requires editing exactly one definition
+      - CI fails if any target drifts from the source
+      - A conformance test asserts every target exposes the same services,
+        hostnames and health endpoints
+      - The chosen approach is documented well enough for a contributor to add a
+        service without reading the generator
+
+  # ===========================================================================
+  # v4 — AI operations
+  # ===========================================================================
+
+  - id: v4-1
+    title: "Scheduled log analysis"
+    milestone: v4.0
+    labels: [enhancement, ai, observability, v4]
+    body: |
+      Query Loki on a schedule, feed anomalies to the local model, and produce a
+      readable summary of what changed.
+
+      The realistic scope is summarisation and clustering, not detection. Detection
+      wants statistics; the model's contribution is turning "these 400 lines are
+      unusual" into a paragraph someone will actually read.
+
+      **Acceptance criteria**
+
+      - A scheduled job queries Loki over a configurable window
+      - Novel and elevated-rate patterns are identified statistically, before the
+        model is involved
+      - The model summarises what changed and why it might matter
+      - Summaries are written to a Grafana annotation and to MinIO
+      - It works with the default small model, with quality caveats documented
+      - The prompt is a file, not a string in code, so it can be iterated on
+
+  - id: v4-2
+    title: "Incident response copilot"
+    milestone: v4.0
+    labels: [enhancement, ai, observability, v4]
+    body: |
+      When an alert fires, assemble the context a human would gather — the firing
+      rule, related metrics, logs from the affected container around the trigger
+      time, recent configuration changes, the service's dependencies — and produce
+      a first-pass triage note.
+
+      Context assembly is the valuable part, and it is deterministic. The model
+      writes the summary; it should not decide what to look at.
+
+      **Acceptance criteria**
+
+      - Triggered by an Alertmanager webhook (depends on `v2-6`)
+      - Context assembly is deterministic and testable without the model
+      - The note states what fired, what correlates, and what to check first
+      - It says when it does not have enough information, rather than guessing
+      - Output goes to the alert thread and to a Grafana annotation
+      - Tested against deliberately induced failures — OOM, restart loop, 5xx spike
+
+  - id: v4-3
+    title: "Automatic infrastructure documentation"
+    milestone: v4.0
+    labels: [enhancement, ai, documentation, v4]
+    body: |
+      `make docs` already generates the service catalogue and dependency graph from
+      the compose project. Extend it: have the model write the prose — what each
+      service does, what it depends on, how it fails — from the live configuration.
+
+      **Acceptance criteria**
+
+      - `make docs-ai` produces per-service documentation from live state
+      - Generated prose is clearly marked as generated, and reviewable in a diff
+      - Facts (images, ports, networks, volumes) come from the compose project,
+        never from the model
+      - Regenerating with no infrastructure change produces a stable result
+      - A human-written override for any service takes precedence
+      - Honest evaluation of quality, including where it produced something wrong
+
+  - id: v4-4
+    title: "RAG over runbooks and operational history"
+    milestone: v4.0
+    labels: [enhancement, ai, v4]
+    body: |
+      Index `docs/`, the architecture decision records, and past incident notes into
+      Qdrant so the chat interface can answer questions about *this* lab rather than
+      about infrastructure in general.
+
+      **Acceptance criteria**
+
+      - An indexing job ingests `docs/`, `roadmap/` and any `runbooks/` directory
+      - Re-indexing is incremental, not a full rebuild
+      - Answers cite which document they came from
+      - Retrieval quality is evaluated against a fixed question set, with results
+        published
+      - Works with the small default model, with quality caveats documented
+      - Indexing runs entirely locally — no document leaves the host
+
+  - id: v4-5
+    title: "Security review agent for configuration changes"
+    milestone: v4.0
+    labels: [enhancement, ai, security, v4]
+    body: |
+      On a pull request touching compose files, Vault policies or the Keycloak
+      realm, analyse the diff for weakened security posture and comment.
+
+      Deterministic checks first — a new privileged container, a removed
+      `no-new-privileges`, a service added to `lab_data`, a widened Vault path. The
+      model explains *why* each finding matters, which is the part a linter cannot do.
+
+      **Acceptance criteria**
+
+      - Runs as a GitHub Action on relevant paths
+      - Deterministic rules catch the known-bad patterns without the model
+      - The model explains impact and suggests a fix
+      - It distinguishes new findings from pre-existing ones
+      - False positives are measured against a corpus of real past changes and
+        the rate is published
+      - It never blocks a merge — advisory only, because a wrong security veto
+        trains people to bypass it
+
+  - id: v4-6
+    title: "Grafana LLM panel"
+    milestone: v4.0
+    labels: [enhancement, ai, observability, v4]
+    body: |
+      Ask questions about a dashboard from inside it: "why did memory spike at
+      14:20", "which container caused this", "is this normal for a Tuesday".
+
+      **Acceptance criteria**
+
+      - A panel or app plugin sends the current dashboard context to Ollama
+      - Context includes the visible panels, time range and template variables
+      - Answers reference specific series and timestamps, not generalities
+      - Queries run against the local model only
+      - Latency is acceptable, or streaming makes it feel so
+      - Documented limits: what it answers well, and what it cannot answer at all

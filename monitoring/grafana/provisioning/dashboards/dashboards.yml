@@ -1,0 +1,28 @@
+# =============================================================================
+# Grafana — dashboard provisioning
+# =============================================================================
+# Loads every dashboard JSON under /var/lib/grafana/dashboards on start, and
+# re-reads the directory periodically so an edit on disk shows up without a
+# restart.
+#
+# `allowUiUpdates: false` makes provisioned dashboards read-only in the UI.
+# That is intentional: the files in monitoring/grafana/dashboards/ are the
+# source of truth, and a change made in the browser that vanishes on the next
+# deploy is worse than one the UI refused to let you make.
+# =============================================================================
+
+apiVersion: 1
+
+providers:
+  - name: lab-dashboards
+    orgId: 1
+    folder: Lab-in-a-Box
+    folderUid: lab-in-a-box
+    type: file
+    disableDeletion: false
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
+      # Recreate the on-disk directory layout as Grafana folders.
+      foldersFromFilesStructure: false

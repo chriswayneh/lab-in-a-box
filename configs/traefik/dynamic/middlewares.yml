@@ -1,0 +1,53 @@
+# =============================================================================
+# Traefik dynamic configuration — reusable middlewares
+# =============================================================================
+# Hot-reloaded: edits here take effect without restarting Traefik.
+#
+# Middlewares defined in this file are referenced as `<name>@file`.
+# Middlewares that need values from .env are defined as labels on the Traefik
+# container instead (see compose/01-core.yml), because the file provider does
+# not perform environment variable interpolation.
+# =============================================================================
+
+http:
+  middlewares:
+    # Baseline hardening applied to every routed service.
+    lab-security-headers:
+      headers:
+        # Stop browsers from MIME-sniffing a response away from the declared type.
+        contentTypeNosniff: true
+        # Legacy XSS filter — harmless on modern browsers, useful on old ones.
+        browserXssFilter: true
+        # Deny framing outright; the lab has no legitimate cross-site embeds.
+        frameDeny: true
+        referrerPolicy: strict-origin-when-cross-origin
+        permissionsPolicy: "camera=(), microphone=(), geolocation=(), payment=()"
+        # HSTS is set but deliberately short and non-preloaded: the default
+        # certificate is self-signed, and a long max-age would poison the
+        # browser's cache for localhost long after the lab is gone.
+        stsSeconds: 300
+        stsIncludeSubdomains: false
+        stsPreload: false
+        customResponseHeaders:
+          X-Powered-By: ""
+          Server: ""
+
+    # Strips the /metrics path from public exposure on services that publish
+    # internal telemetry alongside their UI.
+    lab-block-metrics:
+      replacePathRegex:
+        regex: "^/metrics$"
+        replacement: "/404"
+
+    # Compression — cheap win for the dashboard-heavy services in this lab.
+    lab-compress:
+      compress:
+        excludedContentTypes:
+          - text/event-stream
+
+    # Convenience chain: the default treatment for a browser-facing service.
+    lab-default:
+      chain:
+        middlewares:
+          - lab-security-headers
+          - lab-compress

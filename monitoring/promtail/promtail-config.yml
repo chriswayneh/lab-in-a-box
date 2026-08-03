@@ -1,0 +1,114 @@
+# =============================================================================
+# Promtail — log collection
+# =============================================================================
+# Logs are collected through the Docker API rather than by tailing
+# /var/lib/docker/containers on the host. Two reasons:
+#
+#   1. Portability. That path exists on Linux hosts but lives inside a VM on
+#      Docker Desktop for macOS and Windows, where the bind mount either fails
+#      or silently yields nothing.
+#   2. Least privilege. The API is reached through the same read-only socket
+#      proxy Traefik uses, so Promtail never touches the real Docker socket.
+#
+# Started with `-config.expand-env=true`, so ${VAR} is substituted from the
+# container environment.
+# =============================================================================
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: warn
+
+positions:
+  # Records how far into each container's log stream Promtail has read, so a
+  # restart resumes instead of re-shipping everything.
+  filename: /promtail/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    # Batch aggressively: many small pushes are the main source of Loki write
+    # amplification on a single-node deployment.
+    batchwait: 1s
+    batchsize: 1048576
+    backoff_config:
+      min_period: 500ms
+      max_period: 5m
+      max_retries: 10
+
+scrape_configs:
+  # ---------------------------------------------------------------------------
+  # Every container in this Compose project.
+  #
+  # Discovery is dynamic: a container started five minutes from now is picked
+  # up on the next refresh with no configuration change.
+  # ---------------------------------------------------------------------------
+  - job_name: lab-containers
+    docker_sd_configs:
+      - host: tcp://socket-proxy:2375
+        refresh_interval: 15s
+        filters:
+          # Only this lab's containers. Anything else running on the same
+          # Docker host is somebody else's business.
+          - name: label
+            values: ["com.docker.compose.project=${COMPOSE_PROJECT_NAME:-lab}"]
+
+    relabel_configs:
+      # Docker prefixes container names with a slash. Strip it so queries read
+      # `{container="lab-grafana"}` rather than `{container="/lab-grafana"}`.
+      - source_labels: ["__meta_docker_container_name"]
+        regex: "/?(.*)"
+        target_label: container
+
+      # The compose service name is the stable identity across recreations;
+      # the container name changes if the project is renamed.
+      - source_labels: ["__meta_docker_container_label_com_docker_compose_service"]
+        target_label: service
+
+      - source_labels: ["__meta_docker_container_label_com_docker_compose_project"]
+        target_label: project
+
+      # stdout vs stderr — the single most useful filter when triaging.
+      - source_labels: ["__meta_docker_container_log_stream"]
+        target_label: stream
+
+      # Carry the lab's own component taxonomy through, when a service declares
+      # one. Lets a dashboard ask for "all identity logs" without listing them.
+      - source_labels: ["__meta_docker_container_label_lab_component"]
+        target_label: component
+        regex: "(.+)"
+
+      - target_label: job
+        replacement: lab-containers
+
+    pipeline_stages:
+      # Drop Promtail's own output. Without this, every shipped line generates
+      # a log line about shipping a line, which generates another.
+      - match:
+          selector: '{container=~".*promtail.*"}'
+          action: drop
+
+      # Health probes run every 15 seconds against every service. They are
+      # noise in a log explorer and they dominate ingestion volume.
+      - match:
+          selector: '{job="lab-containers"}'
+          stages:
+            - drop:
+                expression: ".*(GET /healthz|GET /health/ready|GET /-/healthy|pg_isready).*"
+                drop_counter_reason: healthcheck_noise
+
+      # Promote a detected level to a label so Grafana can colour-code rows and
+      # dashboards can chart error rates without a full-text search.
+      - match:
+          selector: '{job="lab-containers"}'
+          stages:
+            - regex:
+                expression: "(?i)(?P<detected_level>\\b(trace|debug|info|warn|warning|error|fatal|critical)\\b)"
+            - labels:
+                detected_level:
+
+      # Cap label cardinality. A label with unbounded values (a request id, a
+      # timestamp) turns every log line into its own stream and is the classic
+      # way to bring Loki down.
+      - labeldrop:
+          - filename
+          - __meta_docker_container_id

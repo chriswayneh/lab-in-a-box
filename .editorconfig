@@ -1,0 +1,40 @@
+# =============================================================================
+# EditorConfig — https://editorconfig.org
+# =============================================================================
+# Keeps whitespace consistent regardless of which editor a contributor uses.
+# Most editors support this natively; a few need a plugin.
+# =============================================================================
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Tabs are syntactically significant in a Makefile. A recipe line indented with
+# spaces produces "missing separator", which is one of the least helpful error
+# messages in computing.
+[Makefile]
+indent_style = tab
+
+[*.{md,markdown}]
+# Two trailing spaces is Markdown's hard line break.
+trim_trailing_whitespace = false
+
+[*.py]
+indent_size = 4
+
+[*.{sh,bash}]
+indent_size = 2
+
+[*.{yml,yaml}]
+indent_size = 2
+
+# Shipped placeholder credentials. These are read verbatim by the containers
+# that consume them, so a trailing newline would become part of the password.
+[secrets/*.txt]
+insert_final_newline = false

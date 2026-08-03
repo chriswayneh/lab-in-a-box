@@ -1,0 +1,57 @@
+{
+  "_comment": [
+    "Pre-registered server definitions, imported by pgAdmin on first start.",
+    "",
+    "The password is deliberately absent. pgAdmin can only pre-fill one from a",
+    "pgpass file, which would mean writing the database password to a second",
+    "location in plaintext purely for convenience. It is one paste from",
+    "`make creds` instead.",
+    "",
+    "Host is `postgres`, not localhost: pgAdmin reaches the database over the",
+    "isolated lab_data network by container name."
+  ],
+  "Servers": {
+    "1": {
+      "Name": "Lab PostgreSQL",
+      "Group": "Lab-in-a-Box",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "lab",
+      "Username": "lab",
+      "SSLMode": "prefer",
+      "Comment": "Shared lab database. Service schemas live in the keycloak and gitea databases.",
+      "ConnectionParameters": {
+        "sslmode": "prefer",
+        "connect_timeout": 10
+      }
+    },
+    "2": {
+      "Name": "Keycloak",
+      "Group": "Lab-in-a-Box",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "keycloak",
+      "Username": "keycloak",
+      "SSLMode": "prefer",
+      "Comment": "Identity provider schema. Read it to see how realms, clients and role mappings are stored.",
+      "ConnectionParameters": {
+        "sslmode": "prefer",
+        "connect_timeout": 10
+      }
+    },
+    "3": {
+      "Name": "Gitea",
+      "Group": "Lab-in-a-Box",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "gitea",
+      "Username": "gitea",
+      "SSLMode": "prefer",
+      "Comment": "Git service schema: repositories, issues, pull requests and actions.",
+      "ConnectionParameters": {
+        "sslmode": "prefer",
+        "connect_timeout": 10
+      }
+    }
+  }
+}

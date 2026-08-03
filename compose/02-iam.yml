@@ -1,0 +1,229 @@
+# =============================================================================
+# Identity & secrets — Keycloak, Vault
+# =============================================================================
+# The lab's answer to "who are you" and "what are you allowed to know".
+#
+# Both services are provisioned by one-shot init containers that run as part of
+# the normal `docker compose up`, wait for their dependency to report healthy,
+# do their work, and exit. They are idempotent: bringing the lab up a second
+# time re-runs them harmlessly.
+# =============================================================================
+
+x-defaults: &defaults
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+  environment:
+    TZ: ${LAB_TZ:-UTC}
+
+x-hardened: &hardened
+  security_opt:
+    - no-new-privileges:true
+
+# One-shot provisioning jobs. `restart: "no"` matters — without it Compose
+# would treat the clean exit as a crash and restart the job forever.
+x-init-job: &init-job
+  restart: "no"
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "5m"
+      max-file: "2"
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Keycloak — identity provider
+  #
+  # Runs in dev mode, which relaxes the hostname and TLS requirements that
+  # would otherwise make a localhost lab a multi-step certificate exercise.
+  # Persistence is real, though: the database is PostgreSQL, not the in-memory
+  # H2 that `start-dev` defaults to, so realms and users survive restarts.
+  #
+  # docs/security.md covers exactly what changes for a production deployment.
+  # ---------------------------------------------------------------------------
+  keycloak:
+    <<: [*defaults, *hardened]
+    image: quay.io/keycloak/keycloak:26.1
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-keycloak
+    command:
+      - start-dev
+      # Reads every *.json under /opt/keycloak/data/import on boot. An existing
+      # realm is left untouched, so this is safe on every start.
+      - --import-realm
+    environment:
+      TZ: ${LAB_TZ:-UTC}
+
+      # --- Database ---------------------------------------------------------
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak-insecure-dev-only}
+
+      # --- Initial admin ----------------------------------------------------
+      # Renamed from KEYCLOAK_ADMIN in Keycloak 26. Only consulted the first
+      # time the database is initialised.
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin-insecure-dev-only}
+
+      # --- Reverse proxy ----------------------------------------------------
+      # Keycloak derives redirect URIs and token issuers from the request host.
+      # Behind Traefik it must trust X-Forwarded-* headers, or it will hand out
+      # internal container hostnames in OIDC discovery documents.
+      KC_PROXY_HEADERS: xforwarded
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME: https://keycloak.${LAB_DOMAIN:-lab.localhost}
+      KC_HOSTNAME_STRICT: "false"
+
+      # --- Telemetry --------------------------------------------------------
+      # Publishes /health/* and /metrics on the management port (9000), which
+      # is separate from the traffic port and is never routed by Traefik.
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+    volumes:
+      - ./configs/keycloak/realm-export.json:/opt/keycloak/data/import/lab-realm.json:ro
+      - keycloak_data:/opt/keycloak/data/h2
+    networks:
+      - lab_edge
+      - lab_data
+      - lab_observability
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # The Keycloak image is built on ubi9-micro and ships neither curl nor
+      # wget. Bash's /dev/tcp pseudo-device is the one HTTP client guaranteed
+      # to be present, so the probe speaks HTTP/1.1 by hand.
+      test:
+        - CMD-SHELL
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000 &&
+          printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 &&
+          grep -q '"status": "UP"' <&3
+      interval: 15s
+      timeout: 10s
+      # Keycloak's first boot runs database migrations and imports the realm;
+      # 90s of grace plus 20 retries covers a cold start on slow disks.
+      retries: 20
+      start_period: 90s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${COMPOSE_PROJECT_NAME:-lab}_edge
+      - traefik.http.routers.keycloak.rule=Host(`keycloak.${LAB_DOMAIN:-lab.localhost}`)
+      - traefik.http.routers.keycloak.entrypoints=web,websecure
+      - traefik.http.routers.keycloak.tls=true
+      - traefik.http.routers.keycloak.middlewares=lab-default@file,lab-ratelimit@docker
+      - traefik.http.services.keycloak.loadbalancer.server.port=8080
+
+  # ---------------------------------------------------------------------------
+  # Keycloak provisioning
+  #
+  # The realm JSON declares structure: clients, roles, groups, users. It
+  # deliberately contains no secrets. This job fills those in afterwards with
+  # the admin CLI, so credentials come from .env and never sit in a file that
+  # git tracks.
+  # ---------------------------------------------------------------------------
+  keycloak-init:
+    <<: *init-job
+    image: quay.io/keycloak/keycloak:26.1
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-keycloak-init
+    entrypoint: ["/bin/bash", "/scripts/init-keycloak.sh"]
+    environment:
+      TZ: ${LAB_TZ:-UTC}
+      KC_URL: http://keycloak:8080
+      KC_REALM: ${KEYCLOAK_REALM:-lab}
+      KC_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KC_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin-insecure-dev-only}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-demo-insecure-dev-only}
+      GRAFANA_CLIENT_SECRET: ${KEYCLOAK_GRAFANA_CLIENT_SECRET:-grafana-insecure-dev-only}
+      LAB_DOMAIN: ${LAB_DOMAIN:-lab.localhost}
+    volumes:
+      - ./scripts/init-keycloak.sh:/scripts/init-keycloak.sh:ro
+    networks:
+      - lab_edge
+    depends_on:
+      keycloak:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # HashiCorp Vault — secrets management
+  #
+  # Dev mode: storage is in-memory, the vault auto-unseals on boot, and a
+  # single root token is issued from .env. That is the right trade for a lab
+  # you tear down daily and the wrong one for anything else — a production
+  # Vault needs durable storage, real unseal key shares, and no root token in
+  # circulation. See docs/security.md.
+  # ---------------------------------------------------------------------------
+  vault:
+    <<: *defaults
+    image: hashicorp/vault:1.18
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-vault
+    environment:
+      TZ: ${LAB_TZ:-UTC}
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_DEV_ROOT_TOKEN:-vault-root-insecure-dev-only}
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      VAULT_ADDR: http://127.0.0.1:8200
+      VAULT_API_ADDR: http://vault:8200
+    cap_add:
+      # Lets Vault mlock() its memory so secret material is never written to
+      # swap. This is the only capability added anywhere in the lab, and it
+      # exists specifically to protect secrets.
+      - IPC_LOCK
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - vault_data:/vault/file
+      - vault_logs:/vault/logs
+    networks:
+      - lab_edge
+      - lab_observability
+    healthcheck:
+      # `vault status` exits non-zero while sealed or uninitialised — exactly
+      # the semantics a healthcheck wants.
+      test: ["CMD", "vault", "status"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${COMPOSE_PROJECT_NAME:-lab}_edge
+      - traefik.http.routers.vault.rule=Host(`vault.${LAB_DOMAIN:-lab.localhost}`)
+      - traefik.http.routers.vault.entrypoints=web,websecure
+      - traefik.http.routers.vault.tls=true
+      - traefik.http.routers.vault.middlewares=lab-default@file,lab-ratelimit@docker
+      - traefik.http.services.vault.loadbalancer.server.port=8200
+
+  # ---------------------------------------------------------------------------
+  # Vault provisioning
+  #
+  # Seeds the engines, policies and auth methods that make the Vault UI worth
+  # opening: a KV store with realistic example secrets, least-privilege
+  # policies, AppRole for machines, userpass for humans, and the transit engine
+  # for encryption as a service.
+  # ---------------------------------------------------------------------------
+  vault-init:
+    <<: *init-job
+    image: hashicorp/vault:1.18
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-vault-init
+    entrypoint: ["/bin/sh", "/scripts/init-vault.sh"]
+    environment:
+      TZ: ${LAB_TZ:-UTC}
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN:-vault-root-insecure-dev-only}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-demo-insecure-dev-only}
+      POSTGRES_USER: ${POSTGRES_USER:-lab}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-labadmin}
+    volumes:
+      - ./scripts/init-vault.sh:/scripts/init-vault.sh:ro
+      - ./configs/vault/policies:/policies:ro
+    networks:
+      - lab_edge
+    depends_on:
+      vault:
+        condition: service_healthy

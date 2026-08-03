@@ -1,0 +1,117 @@
+# =============================================================================
+# Security scanning
+# =============================================================================
+# Three questions, asked on every change and again every week:
+#
+#   1. Is there a credential committed to this repository?
+#   2. Does any container image we pin have a known critical vulnerability?
+#   3. Is any infrastructure configuration insecure by default?
+#
+# The weekly schedule matters as much as the per-PR run: a vulnerability
+# disclosed after a merge would otherwise never be noticed.
+# =============================================================================
+
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Mondays at 06:00 UTC.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Gitleaks needs the full history: a secret that was committed and
+          # then removed is still in the repository and still compromised.
+          fetch-depth: 0
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  images:
+    name: Image vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collect the pinned images
+        id: images
+        run: |
+          docker compose -f docker-compose.yml --profile qdrant --profile watchtower \
+            config --format json \
+          | python3 -c '
+          import json, sys
+          cfg = json.load(sys.stdin)
+          images = sorted({s["image"] for s in cfg["services"].values() if s.get("image")})
+          print("\n".join(images))
+          ' > images.txt
+          echo "Scanning:"; cat images.txt
+
+      - name: Trivy
+        run: |
+          status=0
+          while IFS= read -r image; do
+            echo "::group::$image"
+            # Only unfixed-elsewhere, actionable findings fail the build.
+            # Reporting a critical CVE with no available patch just teaches
+            # people to ignore the scanner.
+            docker run --rm \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "${HOME}/.cache/trivy:/root/.cache/trivy" \
+              aquasec/trivy:latest image \
+              --severity CRITICAL \
+              --ignore-unfixed \
+              --exit-code 1 \
+              --no-progress \
+              "$image" || status=1
+            echo "::endgroup::"
+          done < images.txt
+          exit $status
+        # Informational rather than blocking: the lab pins upstream images it
+        # does not build, so a critical CVE is a signal to bump a tag, not a
+        # reason to block an unrelated documentation fix.
+        continue-on-error: true
+
+  # ---------------------------------------------------------------------------
+  config:
+    name: Configuration hardening
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trivy config scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: .
+          format: sarif
+          output: trivy-config.sarif
+          severity: HIGH,CRITICAL
+          # cAdvisor genuinely requires privileged mode to read cgroup state,
+          # and Portainer genuinely requires the Docker socket. Both are
+          # documented in docs/security.md; suppressing them here keeps the
+          # report focused on findings that are actually actionable.
+          trivyignores: .trivyignore
+
+      - name: Upload to code scanning
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-config.sarif

@@ -1,0 +1,103 @@
+# =============================================================================
+# Loki — single-binary configuration
+# =============================================================================
+# Loki is started with `-config.expand-env=true`, so ${VAR} placeholders below
+# are substituted from the container environment. That is what makes retention
+# tunable from .env without templating this file.
+#
+# Storage is the local filesystem. A distributed Loki would put chunks in
+# object storage — MinIO is already running and the `loki-chunks` bucket is
+# already created, which is the upgrade path documented in
+# docs/observability.md.
+# =============================================================================
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+  # Loki is extremely chatty at info level; its own logs would dominate the
+  # logs it is collecting.
+  log_level: warn
+  # Grafana can request large time ranges; the defaults truncate them.
+  grpc_server_max_recv_msg_size: 8388608
+  grpc_server_max_send_msg_size: 8388608
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+storage_config:
+  tsdb_shipper:
+    active_index_directory: /loki/tsdb-index
+    cache_location: /loki/tsdb-cache
+  filesystem:
+    directory: /loki/chunks
+
+limits_config:
+  retention_period: ${LOKI_RETENTION_PERIOD:-168h}
+  # A laptop lab does not need to defend against a firehose, but an unbounded
+  # ingestion rate turns a runaway container into a full disk.
+  ingestion_rate_mb: 8
+  ingestion_burst_size_mb: 16
+  max_streams_per_user: 5000
+  max_entries_limit_per_query: 10000
+  max_query_series: 5000
+  # Reject anything older than the retention window — accepting it would only
+  # create chunks the compactor deletes on its next pass.
+  reject_old_samples: true
+  reject_old_samples_max_age: ${LOKI_RETENTION_PERIOD:-168h}
+  allow_structured_metadata: true
+  volume_enabled: true
+
+compactor:
+  working_directory: /loki/compactor
+  compaction_interval: 10m
+  # Without this, retention_period above is advisory and nothing is ever
+  # actually deleted.
+  retention_enabled: true
+  retention_delete_delay: 2h
+  delete_request_store: filesystem
+
+ruler:
+  storage:
+    type: local
+    local:
+      directory: /loki/rules
+  rule_path: /loki/rules-temp
+  ring:
+    kvstore:
+      store: inmemory
+  enable_api: true
+
+query_range:
+  align_queries_with_step: true
+  cache_results: true
+  results_cache:
+    cache:
+      embedded_cache:
+        enabled: true
+        max_size_mb: 100
+
+# Loki phones home with usage statistics unless told not to. A lab that claims
+# to be self-hosted should actually be self-hosted.
+analytics:
+  reporting_enabled: false

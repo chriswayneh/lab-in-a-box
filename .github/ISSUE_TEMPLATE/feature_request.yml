@@ -1,0 +1,91 @@
+name: Feature request
+description: Suggest a service, integration or improvement
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Every service added to this lab costs something: memory on a
+        contributor's laptop, a longer first boot, another image to keep
+        patched, and another thing that can be broken on someone's machine.
+
+        The best proposals are explicit about what that cost buys.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Start with the need, not the tool.
+      placeholder: |
+        There is no way to see distributed traces, so debugging a request that
+        crosses Traefik, Keycloak and an application means correlating three
+        sets of logs by timestamp.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      placeholder: |
+        Add Grafana Tempo, with OTLP receivers, and wire Traefik's tracing
+        exporter to it. Add a Tempo datasource to Grafana and link trace ids
+        from the existing Loki panels.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - New service
+        - Integration between existing services
+        - Observability (dashboards, alerts, tracing)
+        - Security hardening
+        - Identity and access management
+        - AI capability
+        - Developer experience (Makefile, scripts, docs)
+        - Deployment target (Kubernetes, Terraform, cloud)
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: cost
+    attributes:
+      label: Resource cost
+      description: |
+        Roughly how much memory and disk does this add, and how much longer is
+        a cold `make up`? An estimate is fine — the point is to have thought
+        about it.
+      placeholder: "~300 MB RAM idle, ~150 MB image, adds ~20s to first boot"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Does it fit the project's constraints?
+      options:
+        - label: Works with `docker compose up -d` and no manual configuration
+        - label: Runs fully offline once images are pulled (or the network dependency is explained above)
+        - label: Free and open source, self-hostable, no account required
+        - label: Has a healthcheck, or one can be written for it
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other tools you weighed, and why this one.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Would you like to implement it?
+      options:
+        - label: I am willing to open a pull request for this

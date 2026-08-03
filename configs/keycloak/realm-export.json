@@ -1,0 +1,321 @@
+{
+  "_comment": [
+    "Lab realm — imported automatically by Keycloak on first boot via --import-realm.",
+    "",
+    "This file declares STRUCTURE ONLY: clients, roles, groups and user identities.",
+    "It contains no passwords and no client secrets. Those are injected afterwards",
+    "by scripts/init-keycloak.sh from .env, so that nothing sensitive is ever",
+    "committed to the repository.",
+    "",
+    "Redirect URIs below assume the default LAB_DOMAIN of lab.localhost. If you",
+    "change LAB_DOMAIN, init-keycloak.sh rewrites them to match — no manual edit.",
+    "",
+    "The group and role model is a deliberately small but realistic RBAC example:",
+    "  - Realm roles describe what someone may DO   (platform-admin, developer, ...)",
+    "  - Groups describe who someone IS             (Engineering, Security, ...)",
+    "  - Groups grant roles, users join groups, nobody gets a role directly.",
+    "That indirection is the whole point of role-based access control, and it is",
+    "what the Joiner/Mover/Leaver demo on the roadmap will automate."
+  ],
+
+  "realm": "lab",
+  "displayName": "Lab-in-a-Box",
+  "displayNameHtml": "<strong>Lab</strong>-in-a-Box",
+  "enabled": true,
+
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "editUsernameAllowed": false,
+
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "waitIncrementSeconds": 60,
+  "failureFactor": 5,
+
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "offlineSessionIdleTimeout": 2592000,
+
+  "passwordPolicy": "length(12) and upperCase(1) and lowerCase(1) and digits(1) and notUsername(undefined) and passwordHistory(3)",
+
+  "eventsEnabled": true,
+  "eventsExpiration": 604800,
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": true,
+
+  "roles": {
+    "realm": [
+      {
+        "name": "platform-admin",
+        "description": "Full administrative control over lab infrastructure and identity.",
+        "composite": false
+      },
+      {
+        "name": "developer",
+        "description": "Read/write access to source control, artifacts and non-production data.",
+        "composite": false
+      },
+      {
+        "name": "security-analyst",
+        "description": "Read access to logs, metrics, audit events and security dashboards.",
+        "composite": false
+      },
+      {
+        "name": "auditor",
+        "description": "Read-only access to audit trails. Intentionally cannot mutate anything.",
+        "composite": false
+      },
+      {
+        "name": "ai-user",
+        "description": "May use the chat interface and query the local models.",
+        "composite": false
+      },
+      {
+        "name": "contractor",
+        "description": "Time-boxed external collaborator. Deliberately minimal grants.",
+        "composite": false
+      }
+    ]
+  },
+
+  "groups": [
+    {
+      "name": "Platform Engineering",
+      "path": "/Platform Engineering",
+      "attributes": {
+        "costCenter": ["CC-1000"],
+        "department": ["Engineering"]
+      },
+      "realmRoles": ["platform-admin", "developer", "ai-user"]
+    },
+    {
+      "name": "Application Engineering",
+      "path": "/Application Engineering",
+      "attributes": {
+        "costCenter": ["CC-1010"],
+        "department": ["Engineering"]
+      },
+      "realmRoles": ["developer", "ai-user"]
+    },
+    {
+      "name": "Security",
+      "path": "/Security",
+      "attributes": {
+        "costCenter": ["CC-2000"],
+        "department": ["Risk & Security"]
+      },
+      "realmRoles": ["security-analyst", "auditor", "ai-user"]
+    },
+    {
+      "name": "Contractors",
+      "path": "/Contractors",
+      "attributes": {
+        "costCenter": ["CC-9000"],
+        "department": ["External"],
+        "reviewCadenceDays": ["30"]
+      },
+      "realmRoles": ["contractor"]
+    }
+  ],
+
+  "users": [
+    {
+      "username": "alice",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Alice",
+      "lastName": "Nakamura",
+      "email": "alice@lab.local",
+      "attributes": {
+        "title": ["Staff Platform Engineer"],
+        "employeeId": ["E-0001"]
+      },
+      "groups": ["/Platform Engineering"],
+      "requiredActions": []
+    },
+    {
+      "username": "bob",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Bob",
+      "lastName": "Okonkwo",
+      "email": "bob@lab.local",
+      "attributes": {
+        "title": ["Senior Software Engineer"],
+        "employeeId": ["E-0002"]
+      },
+      "groups": ["/Application Engineering"],
+      "requiredActions": []
+    },
+    {
+      "username": "carol",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Carol",
+      "lastName": "Lindqvist",
+      "email": "carol@lab.local",
+      "attributes": {
+        "title": ["Security Analyst"],
+        "employeeId": ["E-0003"]
+      },
+      "groups": ["/Security"],
+      "requiredActions": []
+    },
+    {
+      "username": "dave",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Dave",
+      "lastName": "Ferreira",
+      "email": "dave@contractor.example",
+      "attributes": {
+        "title": ["Contract Developer"],
+        "employeeId": ["C-0101"],
+        "contractEndDate": ["2026-12-31"]
+      },
+      "groups": ["/Contractors"],
+      "requiredActions": []
+    }
+  ],
+
+  "clients": [
+    {
+      "clientId": "grafana",
+      "name": "Grafana",
+      "description": "Observability dashboards. Confidential client using the authorization code flow.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "rootUrl": "https://grafana.lab.localhost",
+      "baseUrl": "/",
+      "redirectUris": ["https://grafana.lab.localhost/*", "http://grafana.lab.localhost/*"],
+      "webOrigins": ["https://grafana.lab.localhost", "http://grafana.lab.localhost"],
+      "attributes": {
+        "post.logout.redirect.uris": "+"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm-roles-in-token",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "full.path": "false",
+            "claim.name": "groups",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "openwebui",
+      "name": "Open WebUI",
+      "description": "Chat interface. Wired for OIDC so the AI stack can share the lab's identity.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "rootUrl": "https://chat.lab.localhost",
+      "baseUrl": "/",
+      "redirectUris": ["https://chat.lab.localhost/*", "http://chat.lab.localhost/*"],
+      "webOrigins": ["https://chat.lab.localhost", "http://chat.lab.localhost"],
+      "protocolMappers": [
+        {
+          "name": "realm-roles-in-token",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "lab-cli",
+      "name": "Lab CLI",
+      "description": "Public client demonstrating the device authorization grant for headless tools.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["http://localhost:8000/callback", "http://127.0.0.1:8000/callback"],
+      "webOrigins": ["+"],
+      "attributes": {
+        "oauth2.device.authorization.grant.enabled": "true",
+        "pkce.code.challenge.method": "S256"
+      }
+    },
+    {
+      "clientId": "lab-service",
+      "name": "Lab Service Account",
+      "description": "Confidential client for machine-to-machine calls via the client credentials grant.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "redirectUris": [],
+      "webOrigins": []
+    }
+  ],
+
+  "clientScopes": [],
+  "defaultDefaultClientScopes": [
+    "role_list",
+    "profile",
+    "email",
+    "roles",
+    "web-origins",
+    "acr",
+    "basic"
+  ],
+
+  "smtpServer": {},
+  "internationalizationEnabled": false,
+  "supportedLocales": ["en"],
+  "defaultLocale": "en",
+
+  "browserSecurityHeaders": {
+    "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self'; object-src 'none';",
+    "xContentTypeOptions": "nosniff",
+    "xFrameOptions": "SAMEORIGIN",
+    "referrerPolicy": "no-referrer",
+    "strictTransportSecurity": "max-age=31536000; includeSubDomains"
+  }
+}

@@ -1,0 +1,170 @@
+{
+  "uid": "lab-logs",
+  "title": "Lab Logs — Loki Explorer",
+  "description": "Every container log in one place, filterable by service and level. The volume panels answer 'when did it start', the log panel answers 'what happened'.",
+  "tags": ["lab-in-a-box", "logs", "loki"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "30s",
+  "time": { "from": "now-30m", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": { "label": "service", "refId": "LokiVariableQueryEditor-VariableQuery", "stream": "", "type": 1 },
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".+",
+        "current": { "text": "All", "value": "$__all" },
+        "sort": 1
+      },
+      {
+        "name": "level",
+        "label": "Level",
+        "type": "custom",
+        "query": "trace,debug,info,warn,warning,error,fatal,critical",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".+",
+        "current": { "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "search",
+        "label": "Contains",
+        "type": "textbox",
+        "query": "",
+        "current": { "text": "", "value": "" },
+        "description": "Free-text filter applied to the log line. Leave empty to match everything."
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Log volume by service",
+      "description": "Lines per second. A sudden step change is usually more informative than the content of any single line.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 7, "w": 16, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service) (rate({job=\"lab-containers\", service=~\"$service\"} |~ \"(?i)$search\" [$__auto]))",
+          "legendFormat": "{{service}}",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"], "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "logs/sec",
+          "min": 0,
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 0,
+            "fillOpacity": 70,
+            "showPoints": "never",
+            "stacking": { "mode": "normal" }
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "piechart",
+      "title": "Share of log volume",
+      "description": "Which service is doing the most talking over the selected window.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service) (count_over_time({job=\"lab-containers\", service=~\"$service\"} |~ \"(?i)$search\" [$__range]))",
+          "legendFormat": "{{service}}",
+          "instant": true
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "list", "placement": "right", "showLegend": true, "values": ["percent"] },
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Errors and warnings",
+      "description": "Isolated from the volume panel above, because a 2% error rate is invisible next to total traffic.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 7 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service) (rate({job=\"lab-containers\", service=~\"$service\"} |~ \"(?i)(error|fatal|panic|exception)\" [$__auto]))",
+          "legendFormat": "{{service}} errors",
+          "queryType": "range"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate({job=\"lab-containers\", service=~\"$service\"} |~ \"(?i)(warn|warning)\" [$__auto]))",
+          "legendFormat": "warnings (all services)",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "logs/sec",
+          "min": 0,
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15, "showPoints": "never" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": ".*warnings.*" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }]
+          }
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "type": "logs",
+      "title": "Logs",
+      "description": "Filtered by the Service, Level and Contains variables at the top of the dashboard.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 18, "w": 24, "x": 0, "y": 13 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{job=\"lab-containers\", service=~\"$service\", detected_level=~\"$level\"} |~ \"(?i)$search\"",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": true,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      }
+    }
+  ]
+}

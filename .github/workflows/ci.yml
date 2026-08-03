@@ -1,0 +1,255 @@
+# =============================================================================
+# CI
+# =============================================================================
+# Everything here can also be run locally with `make validate`. A contributor
+# should never learn about a failure first from a red X on their pull request.
+#
+# Jobs run in parallel and are deliberately small: when something breaks, the
+# job name should already tell you what kind of thing broke.
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Lets a maintainer re-run the full suite without pushing an empty commit.
+  workflow_dispatch:
+
+# A new push to the same branch makes the previous run irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # Runs first and fastest. secrets/*.txt has to be tracked — Compose resolves
+  # secret file paths before any container starts — so .gitignore cannot
+  # protect it, and `make secrets` overwrites those same tracked files with
+  # real credentials. This is the check that catches the resulting mistake.
+  # ---------------------------------------------------------------------------
+  secrets:
+    name: No committed credentials
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Secret guard
+        run: bash scripts/check-secrets.sh
+
+  # ---------------------------------------------------------------------------
+  compose:
+    name: Compose project
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve the compose project
+        run: docker compose -f docker-compose.yml config --quiet
+
+      - name: Resolve with optional profiles
+        run: |
+          docker compose -f docker-compose.yml \
+            --profile qdrant --profile watchtower config --quiet
+
+      - name: Resolve with the GPU override
+        run: |
+          docker compose -f docker-compose.yml \
+            -f compose/overrides/gpu.yml config --quiet
+
+      - name: Every long-running service must define a healthcheck
+        run: |
+          missing=$(docker compose -f docker-compose.yml config --format json \
+            | python3 -c '
+          import json, sys
+          cfg = json.load(sys.stdin)
+          print(" ".join(
+              n for n, s in sorted(cfg["services"].items())
+              if not s.get("healthcheck") and not n.endswith("-init")
+          ))')
+          if [ -n "$missing" ]; then
+            echo "::error::services without a healthcheck: $missing"
+            exit 1
+          fi
+          echo "All long-running services define a healthcheck."
+
+      - name: No image may be untagged
+        # `image: foo` with no tag silently means `:latest` and makes a build
+        # unreproducible without saying so. Explicit `:latest` is allowed —
+        # it is a documented decision for three fast-moving images.
+        run: |
+          untagged=$(docker compose -f docker-compose.yml config --format json \
+            | python3 -c '
+          import json, sys
+          cfg = json.load(sys.stdin)
+          print(" ".join(
+              f"{n}={s[\"image\"]}" for n, s in sorted(cfg["services"].items())
+              if ":" not in s.get("image", ":").rsplit("/", 1)[-1]
+          ))')
+          if [ -n "$untagged" ]; then
+            echo "::error::images without an explicit tag: $untagged"
+            exit 1
+          fi
+          echo "Every image carries an explicit tag."
+
+  # ---------------------------------------------------------------------------
+  yaml:
+    name: YAML
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install yamllint
+        run: pip install --disable-pip-version-check yamllint
+
+      - name: Lint
+        run: yamllint --strict .
+
+  # ---------------------------------------------------------------------------
+  json:
+    name: JSON
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse every JSON document
+        run: |
+          status=0
+          while IFS= read -r file; do
+            if python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$file"; then
+              echo "  ok   $file"
+            else
+              echo "::error file=$file::invalid JSON"
+              status=1
+            fi
+          done < <(find . -name '*.json' -not -path './.git/*')
+          exit $status
+
+      - name: Grafana dashboards must declare a stable uid
+        # Provisioned dashboards are referenced by uid from the home-dashboard
+        # setting and from cross-dashboard links. A generated uid breaks both.
+        run: |
+          status=0
+          for file in monitoring/grafana/dashboards/*.json; do
+            uid=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('uid',''))" "$file")
+            if [ -z "$uid" ]; then
+              echo "::error file=$file::dashboard has no uid"
+              status=1
+            else
+              echo "  ok   $file (uid: $uid)"
+            fi
+          done
+          exit $status
+
+  # ---------------------------------------------------------------------------
+  shell:
+    name: Shell
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syntax check
+        # The init scripts target POSIX sh because they run inside Alpine-based
+        # images with no bash. Checking those with bash would accept bashisms
+        # that fail at runtime, so each file is checked with its own shebang.
+        run: |
+          status=0
+          while IFS= read -r file; do
+            interpreter=bash
+            head -1 "$file" | grep -q '^#!/bin/sh' && interpreter=sh
+            if $interpreter -n "$file"; then
+              echo "  ok   $file ($interpreter)"
+            else
+              echo "::error file=$file::syntax error"
+              status=1
+            fi
+          done < <(find scripts configs -name '*.sh')
+          exit $status
+
+      - name: ShellCheck
+        uses: ludeeus/action-shellcheck@v2.0.0
+        env:
+          # SC1091: sourced files are resolved at runtime, not by the linter.
+          SHELLCHECK_OPTS: --severity=warning --exclude=SC1091
+        with:
+          scandir: ./scripts
+
+  # ---------------------------------------------------------------------------
+  markdown:
+    name: Markdown
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint
+        uses: DavidAnson/markdownlint-cli2-action@v19
+        with:
+          globs: |
+            **/*.md
+            !docs/SERVICES.md
+
+      - name: Check links
+        uses: lycheeverse/lychee-action@v2
+        with:
+          # Localhost URLs in this repo are documentation of the lab's routes,
+          # not links that a crawler can resolve.
+          args: >-
+            --no-progress
+            --exclude '^https?://([a-z0-9-]+\.)*lab\.localhost'
+            --exclude '^https?://localhost'
+            --exclude '^https?://127\.0\.0\.1'
+            --exclude-path ./screenshots
+            --accept 200,204,206,301,302,403,429
+            .
+          fail: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  monitoring:
+    name: Monitoring config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: promtool — Prometheus configuration
+        run: |
+          docker run --rm --entrypoint promtool \
+            -v "${{ github.workspace }}/monitoring/prometheus:/cfg:ro" \
+            prom/prometheus:v3.1.0 check config /cfg/prometheus.yml
+
+      - name: promtool — alert rules
+        # Parses every PromQL expression, so a typo in an alert is caught here
+        # rather than at 3am when the rule silently never fires.
+        run: |
+          docker run --rm --entrypoint promtool \
+            -v "${{ github.workspace }}/monitoring/prometheus:/cfg:ro" \
+            prom/prometheus:v3.1.0 check rules /cfg/rules/lab-alerts.yml
+
+  # ---------------------------------------------------------------------------
+  docs:
+    name: Generated docs are current
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Regenerate
+        run: bash scripts/generate-docs.sh
+
+      - name: Fail if the committed copy is stale
+        run: |
+          if ! git diff --quiet -- docs/SERVICES.md architecture/dependency-graph.mmd; then
+            echo "::error::generated documentation is out of date. Run 'make docs' and commit the result."
+            git diff -- docs/SERVICES.md architecture/dependency-graph.mmd
+            exit 1
+          fi
+          echo "Generated documentation matches the compose project."

@@ -1,0 +1,63 @@
+%% GENERATED FILE — do not edit by hand. Regenerate with: make docs
+%% Renders natively on GitHub inside a ```mermaid fence.
+graph TD
+    subgraph Core["Core"]
+        traefik["traefik"]
+        socket_proxy["socket-proxy"]
+        postgres["postgres"]
+        redis["redis"]
+        landing["landing"]
+    end
+    subgraph Identity_and_Secrets["Identity & Secrets"]
+        keycloak["keycloak"]
+        keycloak_init(["keycloak-init"])
+        vault["vault"]
+        vault_init(["vault-init"])
+    end
+    subgraph Observability["Observability"]
+        prometheus["prometheus"]
+        grafana["grafana"]
+        loki["loki"]
+        promtail["promtail"]
+        cadvisor["cadvisor"]
+        node_exporter["node-exporter"]
+    end
+    subgraph AI["AI"]
+        ollama["ollama"]
+        ollama_init(["ollama-init"])
+        open_webui["open-webui"]
+        qdrant["qdrant"]
+    end
+    subgraph Platform["Platform"]
+        gitea["gitea"]
+        gitea_init(["gitea-init"])
+        minio["minio"]
+        minio_init(["minio-init"])
+    end
+    subgraph Tools["Tools"]
+        portainer["portainer"]
+        pgadmin["pgadmin"]
+        adminer["adminer"]
+        watchtower["watchtower"]
+    end
+
+    postgres --> adminer
+    postgres --> gitea
+    redis --> gitea
+    gitea --> gitea_init
+    loki --> grafana
+    prometheus --> grafana
+    postgres --> keycloak
+    keycloak --> keycloak_init
+    minio --> minio_init
+    ollama --> ollama_init
+    ollama --> open_webui
+    postgres --> pgadmin
+    cadvisor --> prometheus
+    loki --> promtail
+    socket_proxy --> promtail
+    socket_proxy --> traefik
+    vault --> vault_init
+
+    classDef initJob fill:#1e293b,stroke:#64748b,stroke-width:1px,color:#cbd5e1;
+    class gitea_init,keycloak_init,minio_init,ollama_init,vault_init initJob;

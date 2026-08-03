@@ -1,0 +1,17 @@
+# Forces every issue through a template. The templates exist because "it does
+# not work" is unactionable, and asking for the same five details by hand on
+# every issue wastes everyone's time.
+blank_issues_enabled: false
+
+contact_links:
+  - name: Question or idea
+    url: https://github.com/OWNER/lab-in-a-box/discussions
+    about: Ask how something works, or float an idea before writing it up as a feature request.
+
+  - name: Documentation
+    url: https://github.com/OWNER/lab-in-a-box/tree/main/docs
+    about: Architecture, security model, observability, AI prompts and troubleshooting.
+
+  - name: Security vulnerability
+    url: https://github.com/OWNER/lab-in-a-box/security/advisories/new
+    about: Report privately. Please do not open a public issue for a security problem.

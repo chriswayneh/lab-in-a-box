@@ -1,0 +1,67 @@
+# =============================================================================
+# Line endings
+# =============================================================================
+# This is not a style preference — it is a correctness requirement.
+#
+# Every shell script in this repository is mounted into a Linux container and
+# executed there. If git checks one out with CRLF endings on a Windows machine,
+# the kernel reads the shebang as `/bin/sh\r` and the container fails with
+#
+#     exec /scripts/init-vault.sh: no such file or directory
+#
+# which points at the file rather than at the invisible carriage return that is
+# actually to blame. Forcing LF for everything the containers read removes an
+# entire class of "works on my machine" bug.
+# =============================================================================
+
+# Normalise text files in the repository, and let git decide per-file.
+* text=auto eol=lf
+
+# -----------------------------------------------------------------------------
+# Must be LF — executed inside containers.
+# -----------------------------------------------------------------------------
+*.sh            text eol=lf
+*.bash          text eol=lf
+Makefile        text eol=lf
+*.mk            text eol=lf
+
+# -----------------------------------------------------------------------------
+# Must be LF — parsed by Linux tooling that treats CR as part of the value.
+# -----------------------------------------------------------------------------
+*.yml           text eol=lf
+*.yaml          text eol=lf
+*.json          text eol=lf
+*.jsonc         text eol=lf
+*.conf          text eol=lf
+*.hcl           text eol=lf
+.env.example    text eol=lf
+Dockerfile      text eol=lf
+*.dockerfile    text eol=lf
+
+# Read verbatim by container entrypoints — a stray CR becomes part of the
+# password and every login fails with no useful error.
+secrets/*.txt   text eol=lf
+
+# -----------------------------------------------------------------------------
+# Binary — never normalise, never diff as text.
+# -----------------------------------------------------------------------------
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.gif           binary
+*.ico           binary
+*.woff2         binary
+*.gz            binary
+*.tar           binary
+*.zip           binary
+
+# -----------------------------------------------------------------------------
+# GitHub linguist
+#
+# Without this, GitHub reports the repository as majority HTML because of the
+# landing page, and majority-language badges are the first thing people look at.
+# -----------------------------------------------------------------------------
+configs/nginx/html/*.html   linguist-vendored
+monitoring/grafana/dashboards/*.json linguist-generated
+docs/SERVICES.md            linguist-generated
+architecture/dependency-graph.mmd linguist-generated

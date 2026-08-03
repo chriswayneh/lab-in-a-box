@@ -1,0 +1,140 @@
+# =============================================================================
+# Lab-in-a-Box
+# =============================================================================
+#
+#   docker compose up -d
+#
+# That is the whole installation procedure. Everything below is wiring.
+#
+# -----------------------------------------------------------------------------
+# Why this file is (almost) empty
+# -----------------------------------------------------------------------------
+# A single 1,500-line compose file is unreviewable and unmergeable. Instead the
+# stack is split into six focused fragments pulled in with the Compose Spec
+# `include:` directive. They still form ONE project — one network namespace, one
+# dependency graph, one `docker compose up` — but each fragment can be read,
+# diffed and reasoned about on its own.
+#
+#   compose/01-core.yml           edge routing, database, cache, landing page
+#   compose/02-iam.yml            Keycloak, Vault
+#   compose/03-observability.yml  Prometheus, Grafana, Loki, Promtail, exporters
+#   compose/04-ai.yml             Ollama, Open WebUI, Qdrant
+#   compose/05-platform.yml       Gitea, MinIO
+#   compose/06-tools.yml          Portainer, pgAdmin, Adminer, Watchtower
+#
+# `project_directory: .` makes every relative path inside a fragment resolve
+# from the repository root, so a fragment reads the same whether you run the
+# whole lab or just that fragment.
+#
+# -----------------------------------------------------------------------------
+# Shared declarations
+# -----------------------------------------------------------------------------
+# Networks, volumes and secrets are declared here, once, because they are the
+# contract between fragments. A service in 04-ai.yml can join `lab_data`
+# without 04-ai.yml needing to know how `lab_data` is built.
+# =============================================================================
+
+name: ${COMPOSE_PROJECT_NAME:-lab}
+
+include:
+  - path: compose/01-core.yml
+    project_directory: .
+  - path: compose/02-iam.yml
+    project_directory: .
+  - path: compose/03-observability.yml
+    project_directory: .
+  - path: compose/04-ai.yml
+    project_directory: .
+  - path: compose/05-platform.yml
+    project_directory: .
+  - path: compose/06-tools.yml
+    project_directory: .
+
+# -----------------------------------------------------------------------------
+# Networks
+#
+# Segmentation is the cheapest security control in this entire stack. A service
+# can only reach what it shares a network with, so a compromised chat UI has no
+# route to the identity provider's database.
+#
+# `internal: true` additionally severs the network from the host and the
+# internet: containers on it can talk to each other and nothing else.
+# -----------------------------------------------------------------------------
+networks:
+  # Public-facing: Traefik plus anything with an HTTP route. This is the only
+  # network reachable from outside the lab.
+  lab_edge:
+    name: ${COMPOSE_PROJECT_NAME:-lab}_edge
+    driver: bridge
+
+  # Data plane: PostgreSQL and Redis plus their clients. Fully isolated — the
+  # database has no route to the internet, inbound or outbound.
+  lab_data:
+    name: ${COMPOSE_PROJECT_NAME:-lab}_data
+    driver: bridge
+    internal: true
+
+  # Telemetry: scrape targets, log shippers and their backends.
+  lab_observability:
+    name: ${COMPOSE_PROJECT_NAME:-lab}_observability
+    driver: bridge
+
+  # Model serving. Not internal — Ollama must reach the registry to pull models.
+  lab_ai:
+    name: ${COMPOSE_PROJECT_NAME:-lab}_ai
+    driver: bridge
+
+  # Docker API access, mediated by a read-only socket proxy. Isolated so that a
+  # compromise elsewhere in the lab cannot reach the proxy.
+  lab_socket:
+    name: ${COMPOSE_PROJECT_NAME:-lab}_socket
+    driver: bridge
+    internal: true
+
+# -----------------------------------------------------------------------------
+# Volumes
+#
+# Every stateful service writes to a named volume. `make down` stops the lab
+# and keeps all of it; only `make clean` deletes data, and it asks first.
+# -----------------------------------------------------------------------------
+volumes:
+  postgres_data:
+  redis_data:
+  vault_data:
+  vault_logs:
+  keycloak_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+  promtail_positions:
+  ollama_models:
+  openwebui_data:
+  qdrant_data:
+  gitea_data:
+  minio_data:
+  portainer_data:
+  pgadmin_data:
+
+# -----------------------------------------------------------------------------
+# Secrets
+#
+# File-backed Docker secrets are mounted at /run/secrets/<name> and never
+# appear in `docker inspect`, in the process table, or in shell history — which
+# is exactly what happens to a password passed as an environment variable.
+#
+# Only images with first-class `_FILE` support are wired this way; using it
+# elsewhere would mean shipping a wrapper entrypoint whose only job is to read
+# a file and re-export it as an env var, which gives up the benefit entirely.
+# docs/security.md lists which services get which treatment, and why.
+#
+# The tracked files contain obvious development defaults for a zero-setup
+# `docker compose up`. `make secrets` writes real credentials to the ignored
+# `secrets/local/` directory and `.env` selects that directory instead.
+# -----------------------------------------------------------------------------
+secrets:
+  postgres_password:
+    file: ${LAB_SECRETS_DIR:-./secrets}/postgres_password.txt
+  minio_root_password:
+    file: ${LAB_SECRETS_DIR:-./secrets}/minio_root_password.txt
+  grafana_admin_password:
+    file: ${LAB_SECRETS_DIR:-./secrets}/grafana_admin_password.txt

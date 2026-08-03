@@ -1,0 +1,131 @@
+name: Bug report
+description: Something in the lab does not work as documented
+title: "[Bug]: "
+labels: ["bug", "triage"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file this.
+
+        **Before you start:** most first-run problems are one of three things —
+        a service still starting up, a port already in use, or stale volumes
+        from an earlier version. Running `make health` usually says which.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: I ran `make health` and included the output below
+          required: true
+        - label: I waited for the first boot to finish (image pulls and the model download take several minutes)
+          required: true
+        - label: I searched existing issues for this problem
+          required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you expect, and what did you get instead?
+      placeholder: |
+        Expected: Grafana to load at https://grafana.lab.localhost
+        Actual:   Traefik returns 502 Bad Gateway
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: The exact commands, starting from a known state.
+      placeholder: |
+        1. make clean
+        2. make secrets
+        3. make up
+        4. Wait 5 minutes
+        5. Open https://grafana.lab.localhost
+    validations:
+      required: true
+
+  - type: textarea
+    id: health
+    attributes:
+      label: Output of `make health`
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: |
+        `docker compose logs --tail 50 <service>` for whatever is failing.
+
+        Please skim these before pasting — container logs can contain tokens,
+        and this is a public issue tracker.
+      render: shell
+    validations:
+      required: false
+
+  - type: dropdown
+    id: service
+    attributes:
+      label: Which service
+      multiple: true
+      options:
+        - Traefik (routing / TLS)
+        - PostgreSQL
+        - Redis
+        - Keycloak
+        - Vault
+        - Prometheus
+        - Grafana
+        - Loki / Promtail
+        - Ollama
+        - Open WebUI
+        - Qdrant
+        - Gitea
+        - MinIO
+        - Portainer
+        - pgAdmin / Adminer
+        - Landing page
+        - Makefile / scripts
+        - Documentation
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "macOS 15.2 / Ubuntu 24.04 / Windows 11 + WSL2"
+    validations:
+      required: true
+
+  - type: textarea
+    id: versions
+    attributes:
+      label: Output of `make version`
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Non-default configuration
+      description: |
+        Anything you changed in `.env`, plus any profiles or overrides in use.
+
+        **Do not paste `.env` itself** — it contains every credential in your lab.
+      placeholder: |
+        LAB_DOMAIN=lab.internal
+        COMPOSE_PROFILES=qdrant
+        Started with: make up GPU=1
+    validations:
+      required: false

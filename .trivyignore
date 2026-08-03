@@ -1,0 +1,45 @@
+# =============================================================================
+# Trivy suppressions
+# =============================================================================
+# Each entry below is a finding that Trivy is right to raise in general and
+# that this project has consciously accepted. Nothing is suppressed because it
+# was inconvenient; every line says what the risk is and why it stands.
+#
+# Review this file whenever the stack changes. A suppression that outlives its
+# justification is worse than no scanning at all.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# AVD-DS-0001 — image tag is ':latest'
+#
+# Three images float deliberately:
+#   ollama/ollama          runtime and model formats move in lockstep; pinning
+#                          an old runtime breaks new models
+#   ghcr.io/open-webui     upstream publishes ':main' as its release channel
+#   minio/minio, minio/mc  date-stamped release tags only, no stable minor tag
+#
+# Every other image in the lab is pinned. CI enforces that separately, by
+# failing on any image with no tag at all.
+# -----------------------------------------------------------------------------
+AVD-DS-0001
+
+# -----------------------------------------------------------------------------
+# AVD-DS-0026 — no HEALTHCHECK instruction
+#
+# Healthchecks are defined in compose rather than baked into images the project
+# does not build. CI verifies that every long-running service has one.
+# -----------------------------------------------------------------------------
+AVD-DS-0026
+
+# -----------------------------------------------------------------------------
+# AVD-DS-0002 — container runs as root
+#
+# Applies to the images this lab consumes but does not build. Where the
+# upstream image supports it, the lab overrides the user explicitly: Traefik
+# (1000), Prometheus (65534), Grafana (472), Loki (10001), Gitea (1000),
+# Redis (redis), and nginx via the unprivileged variant.
+#
+# The remainder — Keycloak, Vault, PostgreSQL — already drop to a non-root user
+# in their own entrypoints.
+# -----------------------------------------------------------------------------
+AVD-DS-0002

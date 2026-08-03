@@ -1,0 +1,175 @@
+# =============================================================================
+# Alert rules
+# =============================================================================
+# Tuned for a laptop lab, not a production fleet: thresholds are generous and
+# `for` windows are long enough that a container restart or a model download
+# does not page anyone.
+#
+# Rules are grouped by what they protect, and each carries a runbook-style
+# description — an alert that does not tell you what to do is just a noise
+# generator.
+# =============================================================================
+
+groups:
+
+  # ---------------------------------------------------------------------------
+  - name: availability
+    interval: 30s
+    rules:
+      - alert: TargetDown
+        expr: up == 0
+        for: 3m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "Scrape target {{ $labels.job }} is down"
+          description: >-
+            Prometheus has been unable to scrape {{ $labels.job }} at
+            {{ $labels.instance }} for 3 minutes. Check the container with
+            `docker compose ps` and `docker compose logs {{ $labels.job }}`.
+
+      - alert: ContainerUnhealthy
+        # cAdvisor does not export Docker's healthcheck state, so this infers
+        # unhealthiness from the container having no CPU series at all — the
+        # signature of a container that has stopped or is stuck restarting.
+        expr: |
+          count by (container) (
+            container_last_seen{container!="", container!~"POD|"}
+          ) unless
+          count by (container) (
+            rate(container_cpu_usage_seconds_total{container!=""}[5m])
+          )
+        for: 5m
+        labels:
+          severity: warning
+          category: availability
+        annotations:
+          summary: "Container {{ $labels.container }} is not reporting CPU activity"
+          description: >-
+            {{ $labels.container }} is registered with Docker but has produced
+            no CPU samples for 5 minutes. It is most likely crash-looping.
+
+      - alert: ContainerRestartLoop
+        expr: |
+          increase(container_start_time_seconds{container!=""}[15m]) > 3
+        for: 5m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "Container {{ $labels.container }} is restarting repeatedly"
+          description: >-
+            {{ $labels.container }} has restarted more than three times in
+            fifteen minutes. Read the last exit reason with
+            `docker inspect --format '{{ "{{ .State }}" }}' {{ $labels.container }}`.
+
+  # ---------------------------------------------------------------------------
+  - name: saturation
+    interval: 30s
+    rules:
+      - alert: ContainerHighCPU
+        expr: |
+          sum by (container) (
+            rate(container_cpu_usage_seconds_total{container!=""}[5m])
+          ) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+          category: saturation
+        annotations:
+          summary: "{{ $labels.container }} is using {{ $value | printf \"%.0f\" }}% of a CPU core"
+          description: >-
+            Sustained for ten minutes. Expected for Ollama during inference or
+            a model pull; investigate for anything else.
+
+      - alert: ContainerHighMemory
+        # Only fires when a memory limit is actually set — dividing by a zero
+        # limit would otherwise produce +Inf for every unlimited container.
+        expr: |
+          (
+            container_memory_working_set_bytes{container!=""}
+            / container_spec_memory_limit_bytes{container!=""}
+          ) * 100 > 90
+          and container_spec_memory_limit_bytes{container!=""} > 0
+        for: 10m
+        labels:
+          severity: warning
+          category: saturation
+        annotations:
+          summary: "{{ $labels.container }} is near its memory limit"
+          description: >-
+            Working set is above 90% of the configured limit. The next
+            allocation spike will get the process OOM-killed.
+
+      - alert: HostMemoryPressure
+        expr: |
+          (
+            1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)
+          ) * 100 > 90
+        for: 10m
+        labels:
+          severity: warning
+          category: saturation
+        annotations:
+          summary: "Host memory is {{ $value | printf \"%.0f\" }}% used"
+          description: >-
+            The whole lab is competing for the last 10% of RAM. Stop the AI
+            stack with `docker compose stop ollama open-webui` to reclaim the
+            largest consumer.
+
+      - alert: HostDiskFillingUp
+        expr: |
+          (
+            1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"}
+                 / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"})
+          ) * 100 > 85
+        for: 15m
+        labels:
+          severity: warning
+          category: saturation
+        annotations:
+          summary: "Filesystem {{ $labels.mountpoint }} is {{ $value | printf \"%.0f\" }}% full"
+          description: >-
+            Model weights, container images and Prometheus data are the usual
+            culprits. `docker system df` breaks it down; `make clean` reclaims
+            the lab's own volumes.
+
+  # ---------------------------------------------------------------------------
+  - name: edge
+    interval: 30s
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          sum by (service) (
+            rate(traefik_service_requests_total{code=~"5.."}[5m])
+          )
+          /
+          sum by (service) (
+            rate(traefik_service_requests_total[5m])
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          category: edge
+        annotations:
+          summary: "{{ $labels.service }} is returning 5xx for more than 5% of requests"
+          description: >-
+            Measured at the edge, so this counts failures the service itself
+            may not be logging. Correlate with its logs in Grafana's Explore.
+
+      - alert: EdgeLatencyHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, service) (rate(traefik_service_request_duration_seconds_bucket[5m]))
+          ) > 2
+        for: 10m
+        labels:
+          severity: info
+          category: edge
+        annotations:
+          summary: "p95 latency for {{ $labels.service }} is above 2s"
+          description: >-
+            Normal for chat completions from Ollama, which stream slowly by
+            design. Worth investigating for any other service.

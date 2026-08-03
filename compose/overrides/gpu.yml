@@ -1,0 +1,36 @@
+# =============================================================================
+# Override — NVIDIA GPU passthrough for Ollama
+# =============================================================================
+#   make up GPU=1
+#
+# or directly:
+#
+#   docker compose -f docker-compose.yml -f compose/overrides/gpu.yml up -d
+#
+# Requirements on the host:
+#   - an NVIDIA GPU with a current driver
+#   - the NVIDIA Container Toolkit installed and the Docker daemon restarted
+#   - verify with:  docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi
+#
+# This is an override rather than a profile because a profile would mean
+# maintaining a second, near-identical copy of the whole Ollama service.
+# =============================================================================
+
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: ["gpu"]
+    environment:
+      # Which physical GPUs Ollama may use. "all" is right for a workstation;
+      # set an index list like "0,1" to share a multi-GPU machine.
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      # With a GPU, keeping the model resident is cheap and reloading is the
+      # expensive part — the opposite of the CPU trade-off.
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-30m}
+      OLLAMA_MAX_LOADED_MODELS: "2"

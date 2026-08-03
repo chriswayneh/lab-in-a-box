@@ -1,0 +1,51 @@
+# =============================================================================
+# Grafana — datasource provisioning
+# =============================================================================
+# Applied on every Grafana start. `uid` values are pinned deliberately: the
+# dashboard JSON files reference datasources by uid, and letting Grafana
+# generate random ones would break every panel on a fresh volume.
+#
+# Grafana expands $VARIABLE from the container environment in this file.
+# =============================================================================
+
+apiVersion: 1
+
+datasources:
+  # ---------------------------------------------------------------------------
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      # Must match global.scrape_interval in prometheus.yml, or Grafana will
+      # pick step values that produce gappy graphs.
+      timeInterval: 15s
+      httpMethod: POST
+      manageAlerts: true
+      prometheusType: Prometheus
+      # Enables the "explain this query" and code-mode features that assume a
+      # reasonably modern server.
+      prometheusVersion: 3.1.0
+      # Jump straight from a Prometheus exemplar to the matching logs.
+      exemplarTraceIdDestinations: []
+
+  # ---------------------------------------------------------------------------
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+    jsonData:
+      maxLines: 1000
+      timeout: 60
+      # Turns a container name in a log line into a link that pivots to that
+      # container's metrics — the "logs to metrics" half of correlation.
+      derivedFields:
+        - name: TraceID
+          matcherRegex: "trace_id=(\\w+)"
+          url: "$${__value.raw}"
+          datasourceUid: ""

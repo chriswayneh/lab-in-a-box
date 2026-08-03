@@ -1,0 +1,43 @@
+# =============================================================================
+# Optional — force HTTPS
+# =============================================================================
+# NOT loaded by default. This file lives outside the watched dynamic directory
+# and is copied into it by:
+#
+#   make https-on        (and removed again by `make https-off`)
+#
+# which is also what `make up` does when LAB_FORCE_HTTPS=true in .env.
+#
+# Why this is a dynamic router rather than the usual entrypoint-level
+# redirection: entrypoint redirection is *static* configuration, so toggling it
+# would mean restarting Traefik and duplicating its entire flag list in an
+# override file. A catch-all router on the `web` entrypoint achieves the same
+# thing, is hot-reloaded, and stays in one place.
+#
+# The redirect is deliberately temporary (307/302) rather than permanent (308/
+# 301). A permanent redirect is cached by the browser essentially forever, and
+# on `localhost` that cache outlives the lab — leaving developers unable to
+# reach plain HTTP on their own machine long after they have moved on.
+# =============================================================================
+
+http:
+  routers:
+    lab-force-https:
+      # Matches every request on the plain-HTTP entrypoint. The very high
+      # priority guarantees it wins against any service's own router, which
+      # would otherwise serve the request over HTTP before the redirect fires.
+      rule: "PathPrefix(`/`)"
+      entryPoints:
+        - web
+      middlewares:
+        - lab-https-scheme
+      # `noop@internal` is Traefik's built-in null backend. The middleware
+      # answers with a redirect, so no request ever reaches a real service.
+      service: noop@internal
+      priority: 100000
+
+  middlewares:
+    lab-https-scheme:
+      redirectScheme:
+        scheme: https
+        permanent: false

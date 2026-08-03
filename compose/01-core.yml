@@ -1,0 +1,303 @@
+# =============================================================================
+# Core — edge routing, relational store, cache, landing page
+# =============================================================================
+# Everything else in the lab depends on something in this file. If core is
+# healthy and the rest is not, the fault is in the rest.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Reusable fragments. `x-` keys are ignored by Compose and exist purely so the
+# same six lines are not repeated thirty times.
+# -----------------------------------------------------------------------------
+x-defaults: &defaults
+  restart: unless-stopped
+  # Cap log growth. Without this a chatty container will happily fill the disk.
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+  environment:
+    TZ: ${LAB_TZ:-UTC}
+
+x-hardened: &hardened
+  # Block privilege escalation via setuid binaries — nothing here needs it.
+  security_opt:
+    - no-new-privileges:true
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Docker socket proxy
+  #
+  # Traefik needs the Docker API to discover routes. Handing it the raw socket
+  # would hand it root on the host: anyone who can talk to /var/run/docker.sock
+  # can start a privileged container that mounts /.
+  #
+  # This proxy sits in front of the socket and allows exactly the endpoints the
+  # discovery loop uses, read-only. POST is denied, so even a fully compromised
+  # Traefik cannot create, modify or exec into a container.
+  # ---------------------------------------------------------------------------
+  socket-proxy:
+    <<: [*defaults, *hardened]
+    image: tecnativa/docker-socket-proxy:0.2.0
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-socket-proxy
+    environment:
+      TZ: ${LAB_TZ:-UTC}
+      # Endpoints Traefik's Docker provider actually calls.
+      CONTAINERS: 1
+      NETWORKS: 1
+      EVENTS: 1
+      PING: 1
+      VERSION: 1
+      # Everything else stays off. POST=0 makes the whole API read-only.
+      POST: 0
+      BUILD: 0
+      COMMIT: 0
+      CONFIGS: 0
+      DISTRIBUTION: 0
+      EXEC: 0
+      IMAGES: 0
+      INFO: 0
+      NODES: 0
+      PLUGINS: 0
+      SECRETS: 0
+      SERVICES: 0
+      SESSION: 0
+      SWARM: 0
+      SYSTEM: 0
+      TASKS: 0
+      VOLUMES: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - lab_socket
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:2375/_ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # Traefik — edge router
+  #
+  # The only container that binds a host port for HTTP. Every other service is
+  # reachable only through it, at <service>.${LAB_DOMAIN}.
+  #
+  # Static configuration lives here as CLI flags rather than in a traefik.yml,
+  # because Traefik treats file / flag / env static config as mutually
+  # exclusive sources — flags are the only form that can read from .env.
+  # Dynamic configuration (middlewares, TLS) does live in a file, at
+  # configs/traefik/dynamic/, and is hot-reloaded.
+  # ---------------------------------------------------------------------------
+  traefik:
+    <<: [*defaults, *hardened]
+    image: traefik:v3.3
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-traefik
+    # Runs unprivileged. That is why the entrypoints below bind 8000/8443
+    # instead of 80/443 — an unprivileged process cannot bind a low port — and
+    # why the published port mapping does the translation.
+    user: "1000:1000"
+    command:
+      - --global.checknewversion=false
+      - --global.sendanonymoususage=false
+      - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
+      - --accesslog=true
+      - --accesslog.format=json
+      # Only log requests that failed — success at this volume is just noise.
+      - --accesslog.filters.statuscodes=400-599
+      - --api.dashboard=${TRAEFIK_DASHBOARD_ENABLED:-true}
+      # `api.insecure` would expose the dashboard on a raw port with no auth.
+      # The dashboard is instead routed like any other service, through the
+      # middleware chain, so it inherits the same headers and rate limits.
+      - --api.insecure=false
+      - --ping=true
+      - --ping.entrypoint=ping
+      - --entrypoints.web.address=:8000
+      - --entrypoints.websecure.address=:8443
+      - --entrypoints.websecure.http.tls=true
+      - --entrypoints.ping.address=:8082
+      - --entrypoints.metrics.address=:8083
+      - --metrics.prometheus=true
+      - --metrics.prometheus.entrypoint=metrics
+      - --metrics.prometheus.addentrypointslabels=true
+      - --metrics.prometheus.addserviceslabels=true
+      - --providers.docker=true
+      - --providers.docker.endpoint=tcp://socket-proxy:2375
+      # Opt-in routing: a container is exposed only if it says so explicitly.
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=${COMPOSE_PROJECT_NAME:-lab}_edge
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
+    ports:
+      - "${LAB_HTTP_PORT:-80}:8000"
+      - "${LAB_HTTPS_PORT:-443}:8443"
+    volumes:
+      - ./configs/traefik/dynamic:/etc/traefik/dynamic:ro
+      - ./configs/traefik/certs:/etc/traefik/certs:ro
+    networks:
+      - lab_edge
+      - lab_socket
+    depends_on:
+      # Deliberately not `service_healthy`: if the proxy's healthcheck tooling
+      # is unavailable in some future base image, Traefik should still start
+      # and simply retry discovery rather than block the entire lab.
+      socket-proxy:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - traefik
+        - healthcheck
+        - --ping.entrypoint=ping
+        - --entrypoints.ping.address=:8082
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${COMPOSE_PROJECT_NAME:-lab}_edge
+
+      # --- Rate limiting -----------------------------------------------------
+      # Defined as a label rather than in the dynamic file because the file
+      # provider does not interpolate environment variables, and these limits
+      # need to be tunable from .env.
+      - traefik.http.middlewares.lab-ratelimit.ratelimit.average=${TRAEFIK_RATE_LIMIT_AVERAGE:-100}
+      - traefik.http.middlewares.lab-ratelimit.ratelimit.burst=${TRAEFIK_RATE_LIMIT_BURST:-200}
+      - traefik.http.middlewares.lab-ratelimit.ratelimit.period=1s
+
+      # --- Dashboard router --------------------------------------------------
+      - traefik.http.routers.traefik.rule=Host(`traefik.${LAB_DOMAIN:-lab.localhost}`)
+      - traefik.http.routers.traefik.entrypoints=web,websecure
+      - traefik.http.routers.traefik.tls=true
+      - traefik.http.routers.traefik.service=api@internal
+      - traefik.http.routers.traefik.middlewares=lab-default@file,lab-ratelimit@docker
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — shared relational store
+  #
+  # One engine, one database per service, one role per database. See
+  # configs/postgres/init/ for the provisioning that runs on first boot.
+  # ---------------------------------------------------------------------------
+  postgres:
+    <<: [*defaults, *hardened]
+    image: postgres:17-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-postgres
+    command:
+      - postgres
+      # Required for the pg_stat_statements extension, which records per-query
+      # execution statistics for analysis in pgAdmin.
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - pg_stat_statements.track=all
+      - -c
+      - max_connections=200
+      # Log anything slower than a second — enough signal to be useful, not so
+      # much that Loki fills up with routine chatter.
+      - -c
+      - log_min_duration_statement=1000
+    environment:
+      TZ: ${LAB_TZ:-UTC}
+      POSTGRES_USER: ${POSTGRES_USER:-lab}
+      POSTGRES_DB: ${POSTGRES_DB:-lab}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      # Scrypt beats the default md5 for stored password hashes.
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      # Consumed by 01-create-service-databases.sh to provision per-service roles.
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak-insecure-dev-only}
+      GITEA_DB_PASSWORD: ${GITEA_DB_PASSWORD:-gitea-insecure-dev-only}
+    secrets:
+      - postgres_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./configs/postgres/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - lab_data
+    ports:
+      # Exposed for local tooling (psql, DataGrip, migrations). Comment out to
+      # confine PostgreSQL entirely to the isolated lab_data network.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lab} -d ${POSTGRES_DB:-lab}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Redis — cache and session store
+  # ---------------------------------------------------------------------------
+  redis:
+    <<: [*defaults, *hardened]
+    image: redis:7.4-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-redis
+    # `redis` user, not root. The official image ships the account already.
+    user: redis
+    command:
+      - redis-server
+      - /usr/local/etc/redis/redis.conf
+      # Overrides the config file, because this is the one setting that has to
+      # come from .env. Everything static lives in the file — notably the
+      # `rename-command X ""` directives, whose empty second argument cannot be
+      # expressed reliably as a compose command argument.
+      - --requirepass
+      - ${REDIS_PASSWORD:-redis-insecure-dev-only}
+    volumes:
+      - redis_data:/data
+      - ./configs/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - lab_data
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD:-redis-insecure-dev-only}\" ping | grep -q PONG"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    environment:
+      TZ: ${LAB_TZ:-UTC}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis-insecure-dev-only}
+
+  # ---------------------------------------------------------------------------
+  # Landing page — the front door at http://${LAB_DOMAIN}
+  #
+  # A static index of every service with live reachability dots, plus the
+  # /healthz endpoint that `make health` and external monitors probe.
+  # ---------------------------------------------------------------------------
+  landing:
+    <<: [*defaults, *hardened]
+    # The unprivileged variant: runs as UID 101 with no root master process,
+    # which is why it serves on 8080 rather than 80.
+    image: nginxinc/nginx-unprivileged:1.27-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-landing
+    volumes:
+      - ./configs/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./configs/nginx/html:/usr/share/nginx/html:ro
+    networks:
+      - lab_edge
+    # Nothing is written to disk at runtime; nginx keeps its scratch state in
+    # tmpfs, so the container's own filesystem can be immutable.
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${COMPOSE_PROJECT_NAME:-lab}_edge
+      - traefik.http.routers.landing.rule=Host(`${LAB_DOMAIN:-lab.localhost}`)
+      - traefik.http.routers.landing.entrypoints=web,websecure
+      - traefik.http.routers.landing.tls=true
+      - traefik.http.routers.landing.middlewares=lab-default@file,lab-ratelimit@docker
+      - traefik.http.services.landing.loadbalancer.server.port=8080

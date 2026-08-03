@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab-in-a-Box</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #0b0f19;
+    --bg-soft: #121826;
+    --border: #1f2937;
+    --fg: #e6edf7;
+    --fg-muted: #94a3b8;
+    --accent: #38bdf8;
+    --ok: #34d399;
+    --down: #f87171;
+    --pending: #64748b;
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f6f8fc; --bg-soft: #ffffff; --border: #e2e8f0;
+      --fg: #0f172a; --fg-muted: #64748b; --accent: #0284c7;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 48px 24px 72px; }
+
+  header { margin-bottom: 40px; }
+  .logo {
+    display: inline-flex; align-items: center; gap: 12px;
+    font-size: 13px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--fg-muted); margin-bottom: 18px;
+  }
+  .logo span.box {
+    width: 26px; height: 26px; border-radius: 7px;
+    background: linear-gradient(135deg, var(--accent), #818cf8);
+  }
+  h1 { margin: 0 0 10px; font-size: clamp(30px, 5vw, 44px); letter-spacing: -.02em; }
+  .tagline { margin: 0; color: var(--fg-muted); max-width: 62ch; }
+
+  .meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+  .pill {
+    font-size: 12.5px; padding: 5px 11px; border-radius: 999px;
+    border: 1px solid var(--border); color: var(--fg-muted); background: var(--bg-soft);
+  }
+
+  h2 {
+    font-size: 12px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--fg-muted); margin: 44px 0 14px; font-weight: 600;
+  }
+
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); }
+  a.card {
+    display: block; text-decoration: none; color: inherit;
+    background: var(--bg-soft); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px 18px 16px;
+    transition: border-color .15s ease, transform .15s ease;
+  }
+  a.card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .card-name { font-weight: 620; letter-spacing: -.01em; }
+  .card-desc { margin: 7px 0 0; font-size: 13.5px; color: var(--fg-muted); }
+  .card-host { margin-top: 12px; font-size: 12px; font-family: ui-monospace, "SF Mono", Menlo, monospace; color: var(--accent); word-break: break-all; }
+
+  .dot {
+    width: 9px; height: 9px; border-radius: 50%; flex: none;
+    background: var(--pending); box-shadow: 0 0 0 3px color-mix(in srgb, var(--pending) 22%, transparent);
+  }
+  .dot.up { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent); }
+  .dot.down { background: var(--down); box-shadow: 0 0 0 3px color-mix(in srgb, var(--down) 22%, transparent); }
+
+  .note {
+    margin-top: 40px; padding: 16px 18px; border-radius: var(--radius);
+    border: 1px solid var(--border); background: var(--bg-soft);
+    color: var(--fg-muted); font-size: 13.5px;
+  }
+  .note code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px;
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    color: var(--accent); padding: 2px 6px; border-radius: 5px;
+  }
+  footer { margin-top: 44px; color: var(--fg-muted); font-size: 12.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo"><span class="box"></span> Lab-in-a-Box</div>
+    <h1>Your lab is running.</h1>
+    <p class="tagline">
+      A self-hosted AI, infrastructure and identity environment — every service below was
+      provisioned, wired together and secured automatically when the stack came up.
+    </p>
+    <div class="meta">
+      <span class="pill" id="pill-domain">domain: &hellip;</span>
+      <span class="pill" id="pill-up">checking services&hellip;</span>
+      <span class="pill">credentials: <code>make creds</code></span>
+    </div>
+  </header>
+
+  <h2>Identity &amp; Secrets</h2>
+  <div class="grid" id="group-iam"></div>
+
+  <h2>AI</h2>
+  <div class="grid" id="group-ai"></div>
+
+  <h2>Observability</h2>
+  <div class="grid" id="group-observability"></div>
+
+  <h2>Platform</h2>
+  <div class="grid" id="group-platform"></div>
+
+  <h2>Operations</h2>
+  <div class="grid" id="group-ops"></div>
+
+  <div class="note">
+    Status dots are a best-effort reachability probe made from your browser. A red dot can
+    also mean a service is still starting up — first boot pulls container images and an LLM,
+    so give it a few minutes. For authoritative status run <code>make health</code>.
+  </div>
+
+  <footer>
+    Lab-in-a-Box &middot; MIT licensed &middot; <code>make help</code> lists every command.
+  </footer>
+
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // Derive the lab's base domain from wherever this page is being served.
+  // Visiting http://lab.localhost yields "lab.localhost"; visiting a real
+  // deployment at https://lab.example.com yields "lab.example.com". No
+  // templating and no rebuild required when LAB_DOMAIN changes.
+  const origin = new URL(window.location.href);
+  const baseDomain = origin.hostname;
+  const scheme = origin.protocol;
+  const port = origin.port && !["80", "443"].includes(origin.port) ? ":" + origin.port : "";
+  const url = (sub) => `${scheme}//${sub}.${baseDomain}${port}`;
+
+  const SERVICES = {
+    iam: [
+      ["Keycloak", "keycloak", "OIDC and SAML identity provider. The 'lab' realm ships with demo users, groups and roles."],
+      ["Vault", "vault", "HashiCorp Vault for secrets, dynamic credentials and encryption as a service."],
+    ],
+    ai: [
+      ["Open WebUI", "chat", "Chat interface wired to your local models. Start with the example prompts in docs/ai-prompts.md."],
+      ["Ollama API", "ollama", "Local LLM runtime. Models are pulled automatically on first boot."],
+      ["Qdrant", "qdrant", "Vector database for retrieval-augmented generation. Optional — enable the 'qdrant' profile."],
+    ],
+    observability: [
+      ["Grafana", "grafana", "Dashboards for container CPU, memory, disk, network, health and logs. Pre-provisioned."],
+      ["Prometheus", "prometheus", "Metrics collection and alerting rules across every container in the lab."],
+      ["Traefik", "traefik", "Edge router dashboard: live view of routers, services and middlewares."],
+    ],
+    platform: [
+      ["Gitea", "git", "Self-hosted Git service with issues, pull requests and CI runners."],
+      ["MinIO", "minio", "S3-compatible object storage. Buckets are created automatically."],
+    ],
+    ops: [
+      ["Portainer", "portainer", "Container management UI: exec into containers, inspect volumes, read logs."],
+      ["pgAdmin", "pgadmin", "Full-featured PostgreSQL admin console, pre-connected to the lab database."],
+      ["Adminer", "adminer", "Lightweight single-file database client, for when pgAdmin is more than you need."],
+    ],
+  };
+
+  const probe = async (href) => {
+    // `no-cors` yields an opaque response, so we cannot read the status code —
+    // but a resolved promise still proves the host answered, which is all a
+    // reachability dot needs. An 8s ceiling keeps a hung service from pinning
+    // the dot in "checking" forever.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      await fetch(href, { mode: "no-cors", signal: controller.signal, cache: "no-store" });
+      return true;
+    } catch {
+      return false;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  let total = 0, reachable = 0;
+
+  const render = () => {
+    for (const [group, items] of Object.entries(SERVICES)) {
+      const container = document.getElementById("group-" + group);
+      if (!container) continue;
+
+      for (const [name, sub, desc] of items) {
+        const href = url(sub);
+        const card = document.createElement("a");
+        card.className = "card";
+        card.href = href;
+        card.rel = "noopener";
+        card.innerHTML = `
+          <div class="card-top">
+            <span class="card-name"></span>
+            <span class="dot" title="checking"></span>
+          </div>
+          <p class="card-desc"></p>
+          <div class="card-host"></div>`;
+        card.querySelector(".card-name").textContent = name;
+        card.querySelector(".card-desc").textContent = desc;
+        card.querySelector(".card-host").textContent = href.replace(/^https?:\/\//, "");
+        container.appendChild(card);
+
+        total++;
+        const dot = card.querySelector(".dot");
+        probe(href).then((ok) => {
+          dot.classList.add(ok ? "up" : "down");
+          dot.title = ok ? "reachable" : "not reachable yet";
+          if (ok) reachable++;
+          document.getElementById("pill-up").textContent = `${reachable}/${total} services reachable`;
+        });
+      }
+    }
+    document.getElementById("pill-domain").textContent = "domain: " + baseDomain;
+  };
+
+  render();
+})();
+</script>
+</body>
+</html>

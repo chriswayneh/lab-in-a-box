@@ -1,0 +1,231 @@
+# =============================================================================
+# AI — Ollama, Open WebUI, Qdrant
+# =============================================================================
+# A fully local LLM stack: model weights, inference and the chat interface all
+# run on your machine, and nothing in this file makes an outbound request other
+# than the initial model download.
+#
+# Image tags here deliberately float, unlike everywhere else in the lab. The
+# Ollama runtime and the model formats it understands move in lockstep, and
+# pinning a runtime from six months ago against a model published last week is
+# the most common way this stack breaks. To pin anyway:
+#
+#   docker compose images ollama        # read the digest you are running
+#   # then replace `:latest` below with that digest
+# =============================================================================
+
+x-defaults: &defaults
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+  environment:
+    TZ: ${LAB_TZ:-UTC}
+
+x-hardened: &hardened
+  security_opt:
+    - no-new-privileges:true
+
+x-init-job: &init-job
+  restart: "no"
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "5m"
+      max-file: "2"
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Ollama — local model runtime
+  #
+  # CPU inference by default, which works on any machine and is slow but
+  # perfectly usable with a small model. For NVIDIA GPU passthrough:
+  #
+  #   make up GPU=1
+  #
+  # which layers compose/overrides/gpu.yml on top of this definition.
+  # ---------------------------------------------------------------------------
+  ollama:
+    <<: [*defaults, *hardened]
+    image: ollama/ollama:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-ollama
+    environment:
+      TZ: ${LAB_TZ:-UTC}
+      OLLAMA_HOST: 0.0.0.0:11434
+      # How long a model stays resident after its last request. Loading a model
+      # costs seconds; keeping it warm costs RAM. Five minutes is the
+      # compromise for a machine that is also running fifteen other containers.
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-5m}
+      # One model in memory at a time. Raising this on a laptop mostly buys
+      # swapping.
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_NUM_PARALLEL: "2"
+      # Open WebUI calls the API from the browser's origin, not the container's.
+      OLLAMA_ORIGINS: "*"
+    volumes:
+      # Model weights are large and slow to fetch. This volume is why `make
+      # down && make up` does not re-download them.
+      - ollama_models:/root/.ollama
+    networks:
+      - lab_ai
+      - lab_edge
+    healthcheck:
+      # The Ollama image ships no curl. Its own CLI talks to the local API,
+      # which makes it the most reliable probe available in-container.
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${COMPOSE_PROJECT_NAME:-lab}_edge
+      - traefik.http.routers.ollama.rule=Host(`ollama.${LAB_DOMAIN:-lab.localhost}`)
+      - traefik.http.routers.ollama.entrypoints=web,websecure
+      - traefik.http.routers.ollama.tls=true
+      # No compression middleware: Ollama streams tokens, and buffering the
+      # response to compress it destroys the streaming behaviour.
+      - traefik.http.routers.ollama.middlewares=lab-security-headers@file,lab-ratelimit@docker
+      - traefik.http.services.ollama.loadbalancer.server.port=11434
+
+  # ---------------------------------------------------------------------------
+  # Model provisioning
+  #
+  # Pulls OLLAMA_DEFAULT_MODELS and exits. This is the longest step of a cold
+  # first boot; watch it with `docker compose logs -f ollama-init`.
+  # ---------------------------------------------------------------------------
+  ollama-init:
+    <<: *init-job
+    image: ollama/ollama:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-ollama-init
+    entrypoint: ["/bin/sh", "/scripts/init-ollama.sh"]
+    environment:
+      TZ: ${LAB_TZ:-UTC}
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_DEFAULT_MODELS: ${OLLAMA_DEFAULT_MODELS:-llama3.2:1b}
+    volumes:
+      - ./scripts/init-ollama.sh:/scripts/init-ollama.sh:ro
+    networks:
+      - lab_ai
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # Open WebUI — chat interface
+  #
+  # State lives in SQLite on its own volume. Open WebUI can use PostgreSQL
+  # instead via DATABASE_URL, and the lab's PostgreSQL is right there — but the
+  # default is kept because a first boot that works everywhere beats a first
+  # boot that shows off. docs/ai.md covers the switch.
+  # ---------------------------------------------------------------------------
+  open-webui:
+    <<: [*defaults, *hardened]
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-open-webui
+    environment:
+      TZ: ${LAB_TZ:-UTC}
+
+      # --- Model backend ----------------------------------------------------
+      OLLAMA_BASE_URL: http://ollama:11434
+      # Disable the OpenAI API surface: this lab is local-only by design, and
+      # leaving it on invites accidental calls to a paid endpoint.
+      ENABLE_OPENAI_API: "false"
+
+      # --- Auth -------------------------------------------------------------
+      WEBUI_SECRET_KEY: ${OPENWEBUI_SECRET_KEY:-openwebui-insecure-dev-only}
+      WEBUI_AUTH: ${OPENWEBUI_AUTH:-true}
+      # The first account created becomes the administrator. Signup is left on
+      # so that first run works; turn it off once you have your account.
+      ENABLE_SIGNUP: "true"
+      DEFAULT_USER_ROLE: user
+      WEBUI_URL: https://chat.${LAB_DOMAIN:-lab.localhost}
+
+      # --- Retrieval --------------------------------------------------------
+      # Defaults to the embedded Chroma store. Set OPENWEBUI_VECTOR_DB=qdrant
+      # in .env *and* enable the qdrant profile to use Qdrant instead.
+      VECTOR_DB: ${OPENWEBUI_VECTOR_DB:-chroma}
+      QDRANT_URI: http://qdrant:6333
+      RAG_EMBEDDING_ENGINE: ""
+
+      # --- Privacy ----------------------------------------------------------
+      # Open WebUI otherwise checks for updates and can fetch model metadata
+      # from the internet. A self-hosted lab should stay self-hosted.
+      ENABLE_COMMUNITY_SHARING: "false"
+      ENABLE_MESSAGE_RATING: "false"
+      SCARF_NO_ANALYTICS: "true"
+      DO_NOT_TRACK: "true"
+      ANONYMIZED_TELEMETRY: "false"
+    volumes:
+      - openwebui_data:/app/backend/data
+    networks:
+      - lab_ai
+      - lab_edge
+    depends_on:
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      # The image runs database migrations and downloads an embedding model on
+      # first start, which takes a while.
+      start_period: 120s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${COMPOSE_PROJECT_NAME:-lab}_edge
+      - traefik.http.routers.openwebui.rule=Host(`chat.${LAB_DOMAIN:-lab.localhost}`)
+      - traefik.http.routers.openwebui.entrypoints=web,websecure
+      - traefik.http.routers.openwebui.tls=true
+      # Security headers only — the chat response is a token stream, and
+      # compressing it would buffer the answer until it was complete.
+      - traefik.http.routers.openwebui.middlewares=lab-security-headers@file,lab-ratelimit@docker
+      - traefik.http.services.openwebui.loadbalancer.server.port=8080
+
+  # ---------------------------------------------------------------------------
+  # Qdrant — vector database  (optional)
+  #
+  # Enable with:  COMPOSE_PROFILES=qdrant in .env, or `make up PROFILES=qdrant`
+  #
+  # Off by default because retrieval-augmented generation is a deliberate
+  # choice, not a default, and Open WebUI's embedded store is enough to try the
+  # idea out.
+  # ---------------------------------------------------------------------------
+  qdrant:
+    <<: [*defaults, *hardened]
+    image: qdrant/qdrant:v1.12.5
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-qdrant
+    profiles: ["qdrant"]
+    environment:
+      TZ: ${LAB_TZ:-UTC}
+      QDRANT__SERVICE__HTTP_PORT: "6333"
+      QDRANT__SERVICE__GRPC_PORT: "6334"
+      QDRANT__TELEMETRY_DISABLED: "true"
+      QDRANT__LOG_LEVEL: WARN
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - lab_ai
+      - lab_edge
+    healthcheck:
+      # Qdrant's image is distroless-ish and has no shell utilities, so the
+      # probe uses the binary's own healthcheck subcommand.
+      test: ["CMD", "/qdrant/qdrant", "--version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${COMPOSE_PROJECT_NAME:-lab}_edge
+      - traefik.http.routers.qdrant.rule=Host(`qdrant.${LAB_DOMAIN:-lab.localhost}`)
+      - traefik.http.routers.qdrant.entrypoints=web,websecure
+      - traefik.http.routers.qdrant.tls=true
+      - traefik.http.routers.qdrant.middlewares=lab-default@file,lab-ratelimit@docker
+      - traefik.http.services.qdrant.loadbalancer.server.port=6333

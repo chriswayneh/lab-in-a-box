@@ -1,0 +1,81 @@
+# =============================================================================
+# Dependabot
+# =============================================================================
+# Keeps pinned image tags and action versions current without anyone having to
+# remember to check.
+#
+# Updates are grouped on purpose. Fifteen separate "bump patch version" pull
+# requests a week is how a repository trains its maintainers to stop reading
+# Dependabot pull requests entirely.
+# =============================================================================
+
+version: 2
+
+updates:
+  # ---------------------------------------------------------------------------
+  # Container images.
+  #
+  # Dependabot's docker ecosystem reads image references out of compose files,
+  # which is one of the reasons every image is declared inline in compose/
+  # rather than being indirected through a variable in .env.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: docker-compose
+    directories:
+      - "/"
+      - "/compose"
+      - "/compose/overrides"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "docker"]
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # Grafana, Loki and Promtail share a release cadence and are version-
+      # matched in practice; bumping one without the others causes protocol
+      # mismatches in the log pipeline.
+      observability:
+        patterns:
+          - "grafana/*"
+          - "prom/*"
+          - "gcr.io/cadvisor/*"
+      # Both halves of the AI stack, which move together.
+      ai:
+        patterns:
+          - "ollama/*"
+          - "ghcr.io/open-webui/*"
+          - "qdrant/*"
+      # Everything else, patch and minor only — a major version bump of
+      # Keycloak or PostgreSQL is a migration, not a dependency update, and
+      # deserves its own pull request and its own testing.
+      infrastructure:
+        patterns: ["*"]
+        exclude-patterns:
+          - "grafana/*"
+          - "prom/*"
+          - "gcr.io/cadvisor/*"
+          - "ollama/*"
+          - "ghcr.io/open-webui/*"
+          - "qdrant/*"
+        update-types: ["minor", "patch"]
+
+  # ---------------------------------------------------------------------------
+  # GitHub Actions.
+  #
+  # A compromised action runs with the workflow's token. These matter more than
+  # their small diffs suggest.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    labels: ["dependencies", "ci"]
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      actions:
+        patterns: ["*"]

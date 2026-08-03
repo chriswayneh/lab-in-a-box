@@ -1,0 +1,196 @@
+# =============================================================================
+# Tools — Portainer, pgAdmin, Adminer, Watchtower
+# =============================================================================
+# Operator conveniences. Everything here is something you reach for when
+# something else has gone wrong.
+#
+# A note on the healthchecks below: three of these images ship no shell and no
+# HTTP client, so the usual `wget --spider` probe is unavailable. Each one uses
+# the best mechanism its image actually provides, and says so.
+# =============================================================================
+
+x-defaults: &defaults
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+  environment:
+    TZ: ${LAB_TZ:-UTC}
+
+x-hardened: &hardened
+  security_opt:
+    - no-new-privileges:true
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Portainer — container management
+  #
+  # The one service that gets read/write access to the real Docker socket.
+  # That is a deliberate, and significant, grant: anyone who can reach
+  # Portainer can start a privileged container and therefore own the host.
+  #
+  # It is here because a lab without a way to exec into a broken container is
+  # a lab you cannot debug. Treat the Portainer admin password as equivalent
+  # to root on this machine, and see docs/security.md before exposing the lab
+  # beyond localhost.
+  # ---------------------------------------------------------------------------
+  portainer:
+    <<: [*defaults, *hardened]
+    image: portainer/portainer-ce:lts
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-portainer
+    command: -H unix:///var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    networks:
+      - lab_edge
+    healthcheck:
+      # The image is built from scratch — no shell, no wget, no curl. Running
+      # the binary is the only probe available in-container. It confirms the
+      # image is intact and executable, not that the API is serving; the
+      # landing page's status dot covers the latter.
+      test: ["CMD", "/portainer", "--version"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${COMPOSE_PROJECT_NAME:-lab}_edge
+      - traefik.http.routers.portainer.rule=Host(`portainer.${LAB_DOMAIN:-lab.localhost}`)
+      - traefik.http.routers.portainer.entrypoints=web,websecure
+      - traefik.http.routers.portainer.tls=true
+      - traefik.http.routers.portainer.middlewares=lab-default@file,lab-ratelimit@docker
+      - traefik.http.services.portainer.loadbalancer.server.port=9000
+
+  # ---------------------------------------------------------------------------
+  # pgAdmin — full PostgreSQL console
+  #
+  # Server definitions are imported from configs/pgadmin/servers.json, so all
+  # three lab databases appear in the tree on first login. Passwords are not
+  # pre-filled; `make creds` prints them.
+  # ---------------------------------------------------------------------------
+  pgadmin:
+    <<: [*defaults, *hardened]
+    image: dpage/pgadmin4:8.14
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-pgadmin
+    environment:
+      TZ: ${LAB_TZ:-UTC}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-labadmin@lab.example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-pgadmin-insecure-dev-only}
+      # Default is 80, which the container's unprivileged user cannot bind.
+      PGADMIN_LISTEN_PORT: "5050"
+      # Skips the "set a master password" prompt on every session. The lab is
+      # already behind an authenticated login.
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+      PGADMIN_CONFIG_SERVER_MODE: "True"
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "True"
+      PGADMIN_CONFIG_LOGIN_BANNER: "\"Lab-in-a-Box — development environment\""
+      PGADMIN_CONFIG_CONSOLE_LOG_LEVEL: "30"
+      # pgAdmin phones home to check for updates by default.
+      PGADMIN_CONFIG_UPGRADE_CHECK_ENABLED: "False"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./configs/pgadmin/servers.json:/pgadmin4/servers.json:ro
+    networks:
+      - lab_edge
+      - lab_data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:5050/misc/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${COMPOSE_PROJECT_NAME:-lab}_edge
+      - traefik.http.routers.pgadmin.rule=Host(`pgadmin.${LAB_DOMAIN:-lab.localhost}`)
+      - traefik.http.routers.pgadmin.entrypoints=web,websecure
+      - traefik.http.routers.pgadmin.tls=true
+      - traefik.http.routers.pgadmin.middlewares=lab-default@file,lab-ratelimit@docker
+      - traefik.http.services.pgadmin.loadbalancer.server.port=5050
+
+  # ---------------------------------------------------------------------------
+  # Adminer — single-file database client
+  #
+  # pgAdmin is powerful and slow to load. Adminer is one PHP file and answers
+  # "what is actually in this table" in about two seconds.
+  # ---------------------------------------------------------------------------
+  adminer:
+    <<: [*defaults, *hardened]
+    image: adminer:4.8.1
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-adminer
+    environment:
+      TZ: ${LAB_TZ:-UTC}
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: dracula
+    networks:
+      - lab_edge
+      - lab_data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # This image has a shell but neither wget nor curl. PHP is guaranteed to
+      # be present — it is what serves the application — so the probe opens a
+      # socket against the listener directly.
+      test: ["CMD", "php", "-r", "exit(@fsockopen('127.0.0.1', 8080) ? 0 : 1);"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${COMPOSE_PROJECT_NAME:-lab}_edge
+      - traefik.http.routers.adminer.rule=Host(`adminer.${LAB_DOMAIN:-lab.localhost}`)
+      - traefik.http.routers.adminer.entrypoints=web,websecure
+      - traefik.http.routers.adminer.tls=true
+      - traefik.http.routers.adminer.middlewares=lab-default@file,lab-ratelimit@docker
+      - traefik.http.services.adminer.loadbalancer.server.port=8080
+
+  # ---------------------------------------------------------------------------
+  # Watchtower — automatic container updates  (optional)
+  #
+  # Enable with:  COMPOSE_PROFILES=watchtower  in .env
+  #
+  # Off by default on purpose. Unattended updates are excellent for a homelab
+  # and actively harmful for a demo environment, where a silently upgraded
+  # image turns "it worked yesterday" into an unreproducible bug. `make update`
+  # does the same job, when you ask for it.
+  # ---------------------------------------------------------------------------
+  watchtower:
+    <<: [*defaults, *hardened]
+    image: containrrr/watchtower:1.7.1
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-watchtower
+    profiles: ["watchtower"]
+    environment:
+      TZ: ${LAB_TZ:-UTC}
+      WATCHTOWER_SCHEDULE: ${WATCHTOWER_SCHEDULE:-0 0 4 * * *}
+      # Delete the superseded image after a successful update, so a long-lived
+      # lab does not accumulate every old layer on disk.
+      WATCHTOWER_CLEANUP: "true"
+      # Update containers one at a time and respect depends_on ordering.
+      WATCHTOWER_ROLLING_RESTART: "true"
+      WATCHTOWER_INCLUDE_STOPPED: "false"
+      WATCHTOWER_NOTIFICATION_REPORT: "true"
+      WATCHTOWER_LOG_LEVEL: info
+    volumes:
+      # Watchtower recreates containers, so unlike Traefik it needs write
+      # access to the API and cannot use the read-only socket proxy.
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - lab_edge
+    healthcheck:
+      # Watchtower ships its own health subcommand; this mirrors the HEALTHCHECK
+      # already baked into the image, so the intent is visible here too.
+      test: ["CMD", "/watchtower", "--health-check"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 15s

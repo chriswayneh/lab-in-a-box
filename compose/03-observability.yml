@@ -1,0 +1,321 @@
+# =============================================================================
+# Observability — Prometheus, Grafana, Loki, Promtail, exporters
+# =============================================================================
+# Metrics and logs, provisioned end to end. Nothing here needs a click to set
+# up: datasources, dashboards, scrape targets and alert rules are all files in
+# this repository, mounted read-only.
+#
+# The pipeline:
+#
+#   cAdvisor ──┐
+#   node-exp ──┼─▶ Prometheus ──┐
+#   Traefik  ──┘                ├─▶ Grafana
+#   containers ─▶ Promtail ─▶ Loki ─┘
+# =============================================================================
+
+x-defaults: &defaults
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+  environment:
+    TZ: ${LAB_TZ:-UTC}
+
+x-hardened: &hardened
+  security_opt:
+    - no-new-privileges:true
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Prometheus — metrics store and rule evaluator
+  #
+  # Retention is bounded by both time and size. Size matters more on a laptop:
+  # without it, a lab left running over a long weekend can quietly consume
+  # every free gigabyte.
+  # ---------------------------------------------------------------------------
+  prometheus:
+    <<: [*defaults, *hardened]
+    image: prom/prometheus:v3.1.0
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-prometheus
+    # The image's own unprivileged user.
+    user: "65534:65534"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION_TIME:-15d}
+      - --storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-4GB}
+      - --web.console.libraries=/usr/share/prometheus/console_libraries
+      - --web.console.templates=/usr/share/prometheus/consoles
+      # Required for Grafana's "delete series" and for reloading rules without
+      # restarting the container.
+      - --web.enable-lifecycle
+      - --web.external-url=https://prometheus.${LAB_DOMAIN:-lab.localhost}
+      - --web.route-prefix=/
+      - --log.level=warn
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    networks:
+      - lab_edge
+      - lab_observability
+    depends_on:
+      cadvisor:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${COMPOSE_PROJECT_NAME:-lab}_edge
+      - traefik.http.routers.prometheus.rule=Host(`prometheus.${LAB_DOMAIN:-lab.localhost}`)
+      - traefik.http.routers.prometheus.entrypoints=web,websecure
+      - traefik.http.routers.prometheus.tls=true
+      - traefik.http.routers.prometheus.middlewares=lab-default@file,lab-ratelimit@docker
+      - traefik.http.services.prometheus.loadbalancer.server.port=9090
+
+  # ---------------------------------------------------------------------------
+  # cAdvisor — per-container resource metrics
+  #
+  # The one container in this file that needs real host access. It reads cgroup
+  # accounting directly, which is why every mount below is a host path, and why
+  # they are all read-only.
+  #
+  # `privileged: true` is required on many hosts for cAdvisor to read the
+  # container runtime's state. This is the single largest privilege grant in
+  # the lab and it is here, documented, rather than scattered.
+  # ---------------------------------------------------------------------------
+  cadvisor:
+    <<: *defaults
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-cadvisor
+    privileged: true
+    command:
+      # Trim the metric set to what the dashboards read. cAdvisor's default
+      # output is enormous and most of it is never queried.
+      - --housekeeping_interval=15s
+      - --docker_only=true
+      - --store_container_labels=false
+      - --whitelisted_container_labels=com.docker.compose.service,com.docker.compose.project
+      - --disable_metrics=percpu,sched,process,hugetlb,referenced_memory,cpu_topology,resctrl
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - lab_observability
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # node-exporter — host metrics
+  #
+  # Runs in the host's PID and network namespaces so that the numbers describe
+  # the machine rather than the container's view of it.
+  # ---------------------------------------------------------------------------
+  node-exporter:
+    <<: [*defaults, *hardened]
+    image: prom/node-exporter:v1.8.2
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-node-exporter
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/host/root
+      # Ignore pseudo-filesystems; otherwise every overlay layer shows up as a
+      # separate "disk" in the filesystem panels.
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|rootfs/var/lib/docker)($$|/)
+      - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|cgroup.?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$$
+      - --no-collector.wifi
+      - --no-collector.hwmon
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      # Plain `:ro`, deliberately not `:ro,rslave`. The upstream node-exporter
+      # example uses rslave so that mounts created after the container starts
+      # are still visible — but Docker Desktop's Linux VM does not present `/`
+      # as a shared or slave mount, and the container fails outright with
+      # "path / is mounted on / but it is not a shared or slave mount".
+      #
+      # Losing rslave costs visibility of filesystems mounted later, which a
+      # lab does not do. Refusing to start on macOS and Windows costs far more.
+      - /:/host/root:ro
+    networks:
+      - lab_observability
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:9100/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # Loki — log store
+  # ---------------------------------------------------------------------------
+  loki:
+    <<: [*defaults, *hardened]
+    image: grafana/loki:3.3.2
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-loki
+    user: "10001:10001"
+    command:
+      - -config.file=/etc/loki/loki-config.yml
+      # Lets ${LOKI_RETENTION_PERIOD} inside the config resolve from the
+      # environment, so retention is tunable from .env.
+      - -config.expand-env=true
+    environment:
+      TZ: ${LAB_TZ:-UTC}
+      LOKI_RETENTION_PERIOD: ${LOKI_RETENTION_PERIOD:-168h}
+    volumes:
+      - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+    networks:
+      - lab_observability
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:3100/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
+
+  # ---------------------------------------------------------------------------
+  # Promtail — log shipper
+  #
+  # Collects through the read-only Docker socket proxy rather than by tailing
+  # host paths, which keeps it working identically on Linux, macOS and Windows.
+  # ---------------------------------------------------------------------------
+  promtail:
+    <<: [*defaults, *hardened]
+    image: grafana/promtail:3.3.2
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-promtail
+    command:
+      - -config.file=/etc/promtail/promtail-config.yml
+      - -config.expand-env=true
+    environment:
+      TZ: ${LAB_TZ:-UTC}
+      COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:-lab}
+    volumes:
+      - ./monitoring/promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - promtail_positions:/promtail
+    networks:
+      - lab_observability
+      - lab_socket
+    depends_on:
+      loki:
+        condition: service_healthy
+      socket-proxy:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:9080/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ---------------------------------------------------------------------------
+  # Grafana — dashboards
+  #
+  # Datasources and dashboards are provisioned from files, so a fresh volume
+  # comes up fully populated. Optional Keycloak SSO is wired but off by
+  # default; flip GRAFANA_OIDC_ENABLED=true in .env to use it.
+  # ---------------------------------------------------------------------------
+  grafana:
+    <<: [*defaults, *hardened]
+    image: grafana/grafana:11.5.0
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-grafana
+    user: "472:472"
+    environment:
+      TZ: ${LAB_TZ:-UTC}
+
+      # --- Admin account ----------------------------------------------------
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      # Grafana's own file-secret convention: <SETTING>__FILE, with two
+      # underscores. The password never enters the container's environment.
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
+
+      # --- Server -----------------------------------------------------------
+      GF_SERVER_ROOT_URL: https://grafana.${LAB_DOMAIN:-lab.localhost}
+      GF_SERVER_ENFORCE_DOMAIN: "false"
+
+      # --- Hardening --------------------------------------------------------
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_SECURITY_COOKIE_SAMESITE: lax
+      GF_SECURITY_CONTENT_TYPE_PROTECTION_HEADER: "true"
+      GF_SECURITY_X_CONTENT_TYPE_OPTIONS: "true"
+      GF_SECURITY_X_XSS_PROTECTION: "true"
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_ALLOW_ORG_CREATE: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+
+      # --- Keycloak single sign-on -----------------------------------------
+      # Realm roles map onto Grafana roles, so platform-admin lands as Admin
+      # and everyone else as Viewer. The client secret is set by keycloak-init.
+      GF_AUTH_GENERIC_OAUTH_ENABLED: ${GRAFANA_OIDC_ENABLED:-false}
+      GF_AUTH_GENERIC_OAUTH_NAME: Keycloak
+      GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP: "true"
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID: grafana
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: ${KEYCLOAK_GRAFANA_CLIENT_SECRET:-grafana-insecure-dev-only}
+      GF_AUTH_GENERIC_OAUTH_SCOPES: "openid email profile roles"
+      GF_AUTH_GENERIC_OAUTH_AUTH_URL: https://keycloak.${LAB_DOMAIN:-lab.localhost}/realms/${KEYCLOAK_REALM:-lab}/protocol/openid-connect/auth
+      # Token and userinfo calls travel container-to-container, so they use the
+      # internal address and never depend on the self-signed edge certificate.
+      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: http://keycloak:8080/realms/${KEYCLOAK_REALM:-lab}/protocol/openid-connect/token
+      GF_AUTH_GENERIC_OAUTH_API_URL: http://keycloak:8080/realms/${KEYCLOAK_REALM:-lab}/protocol/openid-connect/userinfo
+      # JMESPath over the `roles` claim, evaluated top to bottom. Folded across
+      # lines with `>-`, which joins them with single spaces — harmless here,
+      # since the expression is already space-separated.
+      GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH: >-
+        contains(roles[*], 'platform-admin') && 'Admin'
+        || contains(roles[*], 'developer') && 'Editor'
+        || 'Viewer'
+      GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_STRICT: "false"
+
+      # --- Dashboards -------------------------------------------------------
+      # Opening Grafana lands on the lab overview instead of an empty home.
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/lab-overview.json
+      GF_FEATURE_TOGGLES_ENABLE: "lokiLogsDataplane"
+    secrets:
+      - grafana_admin_password
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    networks:
+      - lab_edge
+      - lab_observability
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${COMPOSE_PROJECT_NAME:-lab}_edge
+      - traefik.http.routers.grafana.rule=Host(`grafana.${LAB_DOMAIN:-lab.localhost}`)
+      - traefik.http.routers.grafana.entrypoints=web,websecure
+      - traefik.http.routers.grafana.tls=true
+      - traefik.http.routers.grafana.middlewares=lab-default@file,lab-ratelimit@docker
+      - traefik.http.services.grafana.loadbalancer.server.port=3000

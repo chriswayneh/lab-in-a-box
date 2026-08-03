@@ -1,0 +1,42 @@
+# =============================================================================
+# Traefik dynamic configuration — TLS
+# =============================================================================
+# The lab ships without a certificate on purpose. When no certificate matches
+# an incoming SNI, Traefik generates and serves a self-signed one, so HTTPS
+# works on first boot with zero setup (your browser will warn — expected).
+#
+# To use a real certificate:
+#   1. Drop cert.pem + key.pem into configs/traefik/certs/
+#   2. Uncomment the `certificates` block below
+#   3. Set LAB_FORCE_HTTPS=true in .env, then `make restart`
+#
+# `mkcert` produces a locally-trusted pair with no browser warnings:
+#   mkcert -install
+#   mkcert -cert-file configs/traefik/certs/cert.pem \
+#          -key-file  configs/traefik/certs/key.pem  "*.lab.localhost" lab.localhost
+# =============================================================================
+
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      sniStrict: false
+      cipherSuites:
+        - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+      curvePreferences:
+        - CurveP521
+        - CurveP384
+
+    # Stricter profile — opt in per-router with `tls.options=modern@file`.
+    modern:
+      minVersion: VersionTLS13
+      sniStrict: true
+
+# certificates:
+#   - certFile: /etc/traefik/certs/cert.pem
+#     keyFile: /etc/traefik/certs/key.pem

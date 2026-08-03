@@ -1,0 +1,146 @@
+# =============================================================================
+# Prometheus — scrape configuration
+# =============================================================================
+# Targets are addressed by Docker service name. Compose's embedded DNS resolves
+# them on the shared network, so nothing here needs an IP address or a
+# discovery mechanism beyond "be on the same network".
+#
+# Prometheus does not expand environment variables in this file, so every value
+# is literal. Anything that must be tunable lives in the compose command-line
+# flags instead (retention, for example).
+# =============================================================================
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+  external_labels:
+    lab: lab-in-a-box
+    environment: development
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+# Alertmanager is not part of the lab yet — see the v2 roadmap. Rules still
+# evaluate and surface in Grafana's alert list without it.
+alerting:
+  alertmanagers: []
+
+scrape_configs:
+  # ---------------------------------------------------------------------------
+  # Prometheus itself. If this target is down, nothing else in this file can be
+  # trusted either.
+  # ---------------------------------------------------------------------------
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+        labels:
+          component: observability
+
+  # ---------------------------------------------------------------------------
+  # cAdvisor — per-container CPU, memory, disk and network.
+  #
+  # This is the single most important target in the lab: every container panel
+  # in the Grafana dashboards is built from cAdvisor series.
+  # ---------------------------------------------------------------------------
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["cadvisor:8080"]
+        labels:
+          component: observability
+    metric_relabel_configs:
+      # cAdvisor emits a series per container per filesystem per metric, which
+      # is a lot of cardinality for a laptop. Drop the per-filesystem detail
+      # that no dashboard reads.
+      - source_labels: [__name__]
+        regex: "container_blkio_device_usage_total"
+        action: drop
+      # Strip the leading slash Docker puts on container names so that panel
+      # legends read `lab-grafana` rather than `/lab-grafana`.
+      - source_labels: [name]
+        target_label: container
+        regex: "/?(.*)"
+        replacement: "$1"
+
+  # ---------------------------------------------------------------------------
+  # node-exporter — host CPU, memory, disk and network.
+  #
+  # Answers "is the container slow, or is the machine underneath it saturated?"
+  # ---------------------------------------------------------------------------
+  - job_name: node
+    static_configs:
+      - targets: ["node-exporter:9100"]
+        labels:
+          component: observability
+
+  # ---------------------------------------------------------------------------
+  # Traefik — request rates, latency and status codes for every routed service.
+  #
+  # Published on a dedicated metrics entrypoint (8083) that is never routed
+  # publicly, so scraping does not go through the edge it is measuring.
+  # ---------------------------------------------------------------------------
+  - job_name: traefik
+    static_configs:
+      - targets: ["traefik:8083"]
+        labels:
+          component: edge
+
+  # ---------------------------------------------------------------------------
+  # Keycloak — login rates, token issuance, JVM health.
+  #
+  # Served on the management port (9000), separate from the traffic port.
+  # ---------------------------------------------------------------------------
+  - job_name: keycloak
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["keycloak:9000"]
+        labels:
+          component: identity
+
+  # ---------------------------------------------------------------------------
+  # Loki — ingestion rate and query performance of the log pipeline itself.
+  # ---------------------------------------------------------------------------
+  - job_name: loki
+    static_configs:
+      - targets: ["loki:3100"]
+        labels:
+          component: observability
+
+  # ---------------------------------------------------------------------------
+  # MinIO — bucket usage, request rates, replication status.
+  #
+  # MinIO's cluster metrics endpoint is public by default when
+  # MINIO_PROMETHEUS_AUTH_TYPE=public, which compose sets. Without that it
+  # requires a signed JWT, which Prometheus cannot mint from a static file.
+  # ---------------------------------------------------------------------------
+  - job_name: minio
+    metrics_path: /minio/v2/metrics/cluster
+    static_configs:
+      - targets: ["minio:9000"]
+        labels:
+          component: storage
+
+  # ---------------------------------------------------------------------------
+  # Vault
+  #
+  # Left commented deliberately rather than shipped broken. Vault's telemetry
+  # endpoint requires either an authenticated token or
+  # `unauthenticated_metrics_access = true` in the listener stanza, and dev
+  # mode provides neither. Enabling it means writing a token to disk for
+  # Prometheus to read:
+  #
+  #   1. vault token create -policy=prometheus-metrics -period=768h
+  #   2. write it to monitoring/prometheus/vault-token
+  #   3. uncomment the job below
+  #
+  # docs/observability.md walks through it.
+  # ---------------------------------------------------------------------------
+  # - job_name: vault
+  #   metrics_path: /v1/sys/metrics
+  #   params:
+  #     format: ["prometheus"]
+  #   bearer_token_file: /etc/prometheus/vault-token
+  #   static_configs:
+  #     - targets: ["vault:8200"]
+  #       labels:
+  #         component: secrets

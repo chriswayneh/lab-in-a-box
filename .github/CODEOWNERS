@@ -1,0 +1,47 @@
+# =============================================================================
+# Code owners
+# =============================================================================
+# Whoever is listed here is requested for review automatically when a matching
+# path changes. GitHub matches the LAST rule that applies, so the specific
+# rules below deliberately come after the catch-all.
+#
+# SETUP: replace @OWNER with your GitHub username or team (e.g. @acme/platform)
+#        before pushing. GitHub silently ignores rules that name an account
+#        without repository access, so a stale handle here looks like it is
+#        working when it is not.
+# =============================================================================
+
+# Everything, unless a more specific rule applies below.
+*                           @OWNER
+
+# -----------------------------------------------------------------------------
+# The service topology. A change here can break every other service.
+# -----------------------------------------------------------------------------
+/docker-compose.yml         @OWNER
+/compose/                   @OWNER
+
+# -----------------------------------------------------------------------------
+# Security-sensitive paths.
+#
+# These define the lab's trust boundaries: who can authenticate, what they can
+# reach, and which containers hold privilege. Changes want a careful read, not
+# a rubber stamp.
+# -----------------------------------------------------------------------------
+/configs/keycloak/          @OWNER
+/configs/vault/             @OWNER
+/configs/traefik/           @OWNER
+/secrets/                   @OWNER
+/scripts/generate-secrets.sh @OWNER
+/docs/security.md           @OWNER
+/.trivyignore               @OWNER
+
+# -----------------------------------------------------------------------------
+# CI and supply chain.
+# -----------------------------------------------------------------------------
+/.github/                   @OWNER
+
+# -----------------------------------------------------------------------------
+# Generated — do not hand-edit. Regenerate with `make docs`.
+# -----------------------------------------------------------------------------
+/docs/SERVICES.md           @OWNER
+/architecture/dependency-graph.mmd @OWNER
