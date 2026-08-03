@@ -78,12 +78,12 @@ trade-offs that a lab makes against production are stated plainly rather than hi
 
 | Landing page | Grafana overview |
 | :---: | :---: |
-| ![Landing page](screenshots/landing-page.png) | ![Grafana](screenshots/grafana-overview.png) |
+| ![Landing page](screenshots/landing-page-live.png) | ![Grafana](screenshots/grafana-overview-live.png) |
 | Every active service, with live reachability | The provisioned Lab Overview dashboard |
 
 | Keycloak realm | Open WebUI |
 | :---: | :---: |
-| ![Keycloak](screenshots/keycloak-realm.png) | ![Open WebUI](screenshots/open-webui.png) |
+| ![Keycloak](screenshots/keycloak-realm-live.png) | ![Open WebUI](screenshots/open-webui-live.png) |
 | Keycloak administrator sign-in | Open WebUI's local first-run sign-in |
 
 </div>
