@@ -7,6 +7,7 @@ Where this project is going, and how to file the work.
 - [v2 — Identity governance](#v2--identity-governance)
 - [v3 — Infrastructure as code](#v3--infrastructure-as-code)
 - [v4 — AI operations](#v4--ai-operations)
+- [v5 — Homelab operations](#v5--homelab-operations)
 - [Filing the issues](#filing-the-issues)
 - [Principles](#principles)
 
@@ -20,6 +21,7 @@ Where this project is going, and how to file the work.
 | **v2.0** | Identity governance | Planned | 7 |
 | **v3.0** | Infrastructure as code | Planned | 7 |
 | **v4.0** | AI operations | Planned | 6 |
+| **v5.0** | Homelab operations | Planned | 3 |
 
 Full detail for every planned issue — description, acceptance criteria, labels — is in
 [`issues.yml`](issues.yml), which is the source of truth. This page is the summary.
@@ -28,9 +30,10 @@ Full detail for every planned issue — description, acceptance criteria, labels
 
 ## v1 — Foundation (shipped)
 
-Twenty-five services, provisioned automatically, starting with one command. Identity, secrets,
+Twenty-five default services, provisioned automatically, starting with one command. Identity, secrets,
 observability, object storage, Git hosting and a local LLM, behind a single reverse proxy with network
-segmentation and generated credentials.
+segmentation and generated credentials. Qdrant and Watchtower bring the catalogue to twenty-seven when
+their optional Compose profiles are enabled.
 
 See [`CHANGELOG.md`](../CHANGELOG.md) for the full inventory.
 
@@ -97,6 +100,23 @@ configuration and an LLM in the same place. That combination is the interesting 
 issues are worth doing because they explore where local models are genuinely useful — summarisation,
 correlation, first-draft documentation — and, just as usefully, where they are not. Any issue in this
 milestone that ships should say plainly what it got wrong in testing.
+
+---
+
+## v5 — Homelab operations
+
+The theme: **make the lab easier to trust and size for daily use, without adding a second monitoring or
+dashboard stack.** These are planned operational improvements, not services added to the default lab.
+
+| | Issue |
+| --- | --- |
+| `v5-1` | Backup verification and restore drill — prove a backup can restore into a healthy lab |
+| `v5-2` | External uptime monitoring profile — test the browser-facing routes independently of the stack |
+| `v5-3` | Resource presets — make the laptop-friendly, standard and full-AI footprints explicit |
+
+**Why this next.** The lab already has backup commands, health checks and a resource budget. The next
+step is making those guarantees continuously verifiable and easy to choose, without turning the default
+installation into a larger collection of overlapping tools.
 
 ---
 

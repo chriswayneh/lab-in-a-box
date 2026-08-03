@@ -24,6 +24,10 @@ milestones:
     description: >-
       AI operations. Use the local model for operational work — log analysis,
       incident context, documentation — and be honest about its limits.
+  - title: v5.0
+    description: >-
+      Homelab operations. Verify backups, test browser-facing availability and
+      make resource footprints explicit without expanding the default stack.
 
 issues:
 
@@ -479,3 +483,58 @@ issues:
       - Queries run against the local model only
       - Latency is acceptable, or streaming makes it feel so
       - Documented limits: what it answers well, and what it cannot answer at all
+
+  # ===========================================================================
+  # v5 — Homelab operations
+  # ===========================================================================
+
+  - id: v5-1
+    title: "Backup verification and restore drill"
+    milestone: v5.0
+    labels: [enhancement, operations, reliability, v5]
+    body: |
+      A backup command is only useful if its restore path is routinely proven.
+      Add an isolated, repeatable verification workflow that restores a chosen
+      backup, starts the minimum required services, and reports what was checked.
+
+      **Acceptance criteria**
+
+      - `make backup-verify` restores a selected backup into isolated volumes
+      - The verification run performs database integrity checks and HTTP health checks
+      - It never overwrites the active lab's volumes, networks or credentials
+      - A machine-readable report records the backup timestamp, checks and result
+      - Documentation states which data is intentionally excluded from backups
+
+  - id: v5-2
+    title: "External uptime monitoring profile"
+    milestone: v5.0
+    labels: [enhancement, operations, observability, v5]
+    body: |
+      Prometheus knows whether targets are healthy from inside the stack. Add an
+      optional monitoring profile that independently tests the browser-facing
+      routes, TLS and expected response status from outside those services.
+
+      **Acceptance criteria**
+
+      - The monitor is opt-in and does not expand the default stack
+      - It checks the landing page and every enabled public route
+      - Failed checks are visible in a simple UI and exposed as metrics
+      - Authentication-protected routes are tested without storing credentials in the UI
+      - Resource cost and the difference from Prometheus health checks are documented
+
+  - id: v5-3
+    title: "Documented resource presets"
+    milestone: v5.0
+    labels: [enhancement, operations, documentation, v5]
+    body: |
+      The lab should remain approachable on a laptop without hiding the cost of
+      its AI and observability components. Define a small set of explicit resource
+      footprints rather than asking new users to guess which services to stop.
+
+      **Acceptance criteria**
+
+      - Presets cover a laptop-friendly mode, the current default and a full-AI mode
+      - Each preset documents enabled services, expected RAM, disk and first-boot time
+      - The current one-command default remains unchanged
+      - Optional services remain opt-in through Compose profiles
+      - The landing page and README explain the active footprint clearly

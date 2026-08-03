@@ -117,6 +117,10 @@ def render_services(config: dict[str, Any], domain: str) -> str:
     services = config.get("services", {})
     categorised = {name for _, _, names in LAYERS for name in names}
     uncategorised = sorted(set(services) - categorised)
+    optional_services = sorted(
+        name for name, service in services.items() if service.get("profiles")
+    )
+    default_service_count = len(services) - len(optional_services)
 
     out: list[str] = []
     out.append("<!--")
@@ -132,12 +136,19 @@ def render_services(config: dict[str, Any], domain: str) -> str:
         f"defines it. Hostnames assume `LAB_DOMAIN={domain}`."
     )
     out.append("")
-    out.append(
-        f"**{len(services)} services** across **{len(LAYERS)} layers**. "
+    service_summary = f"**{len(services)} available services** across **{len(LAYERS)} layers**. "
+    if optional_services:
+        service_summary += (
+            f"**{default_service_count} start by default**; "
+            f"{', '.join(f'`{name}`' for name in optional_services)} require "
+            "their optional Compose profiles. "
+        )
+    service_summary += (
         "Services whose name ends in `-init` are one-shot provisioning jobs: "
         "they run once, do their work, and exit. A stopped `-init` container "
         "is a success, not a fault."
     )
+    out.append(service_summary)
     out.append("")
 
     groups = list(LAYERS)
