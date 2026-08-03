@@ -127,22 +127,26 @@ need `sudo` for every command.
 
 ### Run it
 
-```bash
-git clone https://github.com/OWNER/lab-in-a-box.git
+**Windows / easiest path.** Open PowerShell and paste these three lines. Docker Desktop must be
+running first.
+
+```powershell
+git clone https://github.com/chriswayneh/lab-in-a-box.git
 cd lab-in-a-box
-make up
-```
-
-Or, without `make`:
-
-```bash
 docker compose up -d
 ```
 
-The difference matters. `make up` generates unique credentials before starting and keeps file-backed
-ones in the git-ignored `secrets/local/` directory. A bare `docker compose up -d` works too — the stack
-ships with fallback development passwords so that the one-command promise is real — but those passwords
-are published in this repository and known to everybody.
+This is enough to use the complete local lab. It uses the deliberately published development passwords,
+which is appropriate only because the lab is reachable only from this computer.
+
+**Use unique passwords (recommended).** On macOS/Linux, or in Git Bash/WSL on Windows, run:
+
+```bash
+make up
+```
+
+`make up` generates unique credentials before starting and keeps file-backed ones in the git-ignored
+`secrets/local/` directory.
 
 Generate real ones at any time:
 
@@ -180,8 +184,8 @@ under [RFC 6761](https://www.rfc-editor.org/rfc/rfc6761#section-6.3) — no `hos
 
 > **Note**
 > Your browser will warn about the certificate. That is expected: the lab generates a self-signed one so
-> that HTTPS works with zero setup. [Use a trusted certificate](#https-and-certificates) if the warning
-> bothers you.
+> that HTTPS works with zero setup. For Windows, the two-copy-and-paste-step fix is in
+> [Trusted local HTTPS](#trusted-local-https-windows) below.
 
 ---
 
@@ -472,19 +476,49 @@ This is a **development lab**, not a production deployment, and it is explicit a
 > read [`docs/security.md`](docs/security.md) first — at minimum you need real certificates, generated
 > credentials, `LAB_FORCE_HTTPS=true`, and authentication in front of Traefik, Prometheus and Portainer.
 
-### HTTPS and certificates
+### Trusted local HTTPS (Windows)
 
-For locally-trusted certificates with no browser warning, use [mkcert](https://github.com/FiloSottile/mkcert):
+The lab works immediately with a browser warning. To remove it—and make the landing-page status dots
+accurate—give the browser a locally trusted certificate once. Open **PowerShell** in the cloned
+`lab-in-a-box` folder and paste these commands, one at a time:
+
+```powershell
+winget install FiloSottile.mkcert
+```
+
+Close and reopen PowerShell, then run:
+
+```powershell
+.\scripts\enable-local-tls.ps1
+docker compose up -d --force-recreate traefik
+```
+
+Refresh <https://lab.localhost>. The browser should no longer warn, and the landing page should report
+**12/13 services reachable**: Qdrant is the optional thirteenth service and is off by default.
+
+This script installs a local development CA only for the current computer, creates a certificate for
+`lab.localhost` and `*.lab.localhost`, and writes its certificate, private key, and Traefik configuration
+to Git-ignored paths. Nothing sensitive is committed or sent anywhere.
+
+### Trusted local HTTPS (macOS and Linux)
+
+Install [mkcert](https://github.com/FiloSottile/mkcert), then run:
 
 ```bash
 mkcert -install
 mkcert -cert-file configs/traefik/certs/cert.pem \
-       -key-file  configs/traefik/certs/key.pem \
+       -key-file configs/traefik/certs/key.pem \
        "*.lab.localhost" lab.localhost
+cat > configs/traefik/dynamic/local-certificate.yml <<'EOF'
+tls:
+  certificates:
+    - certFile: /etc/traefik/certs/cert.pem
+      keyFile: /etc/traefik/certs/key.pem
+EOF
+docker compose up -d --force-recreate traefik
 ```
 
-Then uncomment the `certificates` block in
-[`configs/traefik/dynamic/tls.yml`](configs/traefik/dynamic/tls.yml) and run `make https-on`.
+The locally generated certificate files and `local-certificate.yml` are ignored by Git.
 
 ---
 

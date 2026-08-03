@@ -26,6 +26,9 @@ volumes/
 # Copied in by `make https-on` from configs/traefik/optional/ — generated
 # state, not source.
 configs/traefik/dynamic/https-redirect.yml
+# Written by scripts/enable-local-tls.ps1 after mkcert creates a certificate.
+# It must remain local because it references the ignored private key.
+configs/traefik/dynamic/local-certificate.yml
 
 # ---------------------------------------------------------------------------
 # TLS material
