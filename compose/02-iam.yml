@@ -117,7 +117,7 @@ services:
       - traefik.http.routers.keycloak.rule=Host(`keycloak.${LAB_DOMAIN:-lab.localhost}`)
       - traefik.http.routers.keycloak.entrypoints=web,websecure
       - traefik.http.routers.keycloak.tls=true
-      - traefik.http.routers.keycloak.middlewares=lab-default@file,lab-ratelimit@docker
+      - traefik.http.routers.keycloak.middlewares=lab-keycloak-default@file,lab-ratelimit@docker
       - traefik.http.services.keycloak.loadbalancer.server.port=8080
 
   # ---------------------------------------------------------------------------
