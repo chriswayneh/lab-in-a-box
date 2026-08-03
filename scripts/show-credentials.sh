@@ -100,9 +100,12 @@ main() {
   printf '  %-14s %s\n' "Host" "localhost:$(env_value REDIS_PORT 6379)"
   row "Password" "$(env_value REDIS_PASSWORD redis-insecure-dev-only)"
 
-  printf '\n%s%s%s\n' "$C_CYAN" "Portainer / Open WebUI" "$C_RESET"
-  printf '  %s\n' "Both prompt you to create an administrator on first visit."
-  printf '  %s\n' "https://portainer.${DOMAIN}   https://chat.${DOMAIN}"
+  service "Portainer" "portainer"
+  row "User" "admin"
+  row "Password" "portainer-insecure-dev-only"
+
+  printf '\n%s%s%s\n' "$C_CYAN" "Open WebUI" "$C_RESET"
+  printf '  %s\n' "Create an administrator on first visit: https://chat.${DOMAIN}"
 
   log ""
   if (( INSECURE_FOUND )); then

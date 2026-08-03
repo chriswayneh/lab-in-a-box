@@ -12,14 +12,8 @@ provisioned, wired together and hardened automatically.
 [![Services](https://img.shields.io/badge/services-25-38bdf8)](docs/SERVICES.md)
 [![Setup](https://img.shields.io/badge/setup-1%20command-34d399)](#quick-start)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-blueviolet.svg)](CONTRIBUTING.md)
-
-<!--
-  After pushing to your own GitHub repository, replace OWNER below and move
-  these two badges up into the row above:
-
-  [![CI](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/ci.yml/badge.svg)](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/ci.yml)
-  [![Security](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/security.yml/badge.svg)](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/security.yml)
--->
+[![CI](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/ci.yml/badge.svg)](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/ci.yml)
+[![Security](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/security.yml/badge.svg)](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/security.yml)
 
 [Quick start](#quick-start) ·
 [Architecture](#architecture) ·
@@ -71,25 +65,20 @@ trade-offs that a lab makes against production are stated plainly rather than hi
 
 ## Screenshots
 
-> **Note**
-> These are placeholders. Run the lab and replace them — `screenshots/README.md` lists exactly
-> what each image should show and at what size.
+> Screenshots below were captured from the local development lab. They use only the project's
+> local service names and demo interfaces.
 
 <div align="center">
 
 | Landing page | Grafana overview |
 | :---: | :---: |
-| ![Landing page](screenshots/landing-page.png) | ![Grafana](screenshots/grafana-overview.png) |
-| Every service, with live reachability | Container CPU, memory, network, disk and restarts |
+| ![Landing page](screenshots/landing-page-live.png) | ![Grafana](screenshots/grafana-overview-live.png) |
+| Every active service, with live reachability | The provisioned Lab Overview dashboard |
 
 | Keycloak realm | Open WebUI |
 | :---: | :---: |
-| ![Keycloak](screenshots/keycloak-realm.png) | ![Open WebUI](screenshots/open-webui.png) |
-| Seeded users, groups and role mappings | Chatting with a local model about your own infrastructure |
-
-![First boot](screenshots/first-boot.gif)
-
-*`make up` from nothing to a healthy lab.*
+| ![Keycloak](screenshots/keycloak-login-desktop.png) | ![Open WebUI](screenshots/open-webui-live.png) |
+| Keycloak administrator sign-in | Open WebUI's local first-run sign-in |
 
 </div>
 
@@ -329,7 +318,7 @@ Full generated catalogue, including images, networks and privileges:
 | **Ollama** | <https://ollama.lab.localhost> | Local LLM runtime and API |
 | **Gitea** | <https://git.lab.localhost> | Git hosting with issues, pull requests and CI |
 | **MinIO** | <https://minio.lab.localhost> | Object storage console (S3 API at `s3.lab.localhost`) |
-| **Portainer** | <https://portainer.lab.localhost> | Container management and troubleshooting |
+| **Portainer** | <https://portainer.lab.localhost> | Container management and troubleshooting — `admin` / `portainer-insecure-dev-only` |
 | **pgAdmin** | <https://pgadmin.lab.localhost> | PostgreSQL console, pre-connected to all three databases |
 | **Adminer** | <https://adminer.lab.localhost> | Lightweight database client |
 | **Qdrant** | <https://qdrant.lab.localhost> | Vector database — optional, `COMPOSE_PROFILES=qdrant` |
@@ -494,7 +483,8 @@ docker compose up -d --force-recreate traefik
 ```
 
 Refresh <https://lab.localhost>. The browser should no longer warn, and the landing page should report
-**12/13 services reachable**: Qdrant is the optional thirteenth service and is off by default.
+**12/12 enabled services reachable**. Qdrant is shown separately as an optional disabled service; enable
+the `qdrant` profile when you want to use it.
 
 This script installs a local development CA only for the current computer, creates a certificate for
 `lab.localhost` and `*.lab.localhost`, and writes its certificate, private key, and Traefik configuration

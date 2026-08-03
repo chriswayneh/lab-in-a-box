@@ -51,3 +51,27 @@ http:
         middlewares:
           - lab-security-headers
           - lab-compress
+
+    # Keycloak loads its own same-origin authentication flow in a frame while
+    # bootstrapping the admin console. `frameDeny` would set X-Frame-Options:
+    # DENY and makes that console fail with its generic error page. Keep every
+    # other browser protection, but let Keycloak enforce its own same-origin
+    # framing policy through its Content-Security-Policy header.
+    lab-keycloak-security-headers:
+      headers:
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: strict-origin-when-cross-origin
+        permissionsPolicy: "camera=(), microphone=(), geolocation=(), payment=()"
+        stsSeconds: 300
+        stsIncludeSubdomains: false
+        stsPreload: false
+        customResponseHeaders:
+          X-Powered-By: ""
+          Server: ""
+
+    lab-keycloak-default:
+      chain:
+        middlewares:
+          - lab-keycloak-security-headers
+          - lab-compress

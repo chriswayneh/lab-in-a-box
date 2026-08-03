@@ -57,13 +57,14 @@
   }
 
   .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); }
-  a.card {
+  .card {
     display: block; text-decoration: none; color: inherit;
     background: var(--bg-soft); border: 1px solid var(--border);
     border-radius: var(--radius); padding: 18px 18px 16px;
     transition: border-color .15s ease, transform .15s ease;
   }
   a.card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .card.optional { opacity: .68; cursor: default; }
   .card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .card-name { font-weight: 620; letter-spacing: -.01em; }
   .card-desc { margin: 7px 0 0; font-size: 13.5px; color: var(--fg-muted); }
@@ -75,6 +76,7 @@
   }
   .dot.up { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent); }
   .dot.down { background: var(--down); box-shadow: 0 0 0 3px color-mix(in srgb, var(--down) 22%, transparent); }
+  .dot.optional { background: var(--pending); box-shadow: none; }
 
   .note {
     margin-top: 40px; padding: 16px 18px; border-radius: var(--radius);
@@ -155,7 +157,7 @@
     ai: [
       ["Open WebUI", "chat", "Chat interface wired to your local models. Start with the example prompts in docs/ai-prompts.md."],
       ["Ollama API", "ollama", "Local LLM runtime. Models are pulled automatically on first boot."],
-      ["Qdrant", "qdrant", "Vector database for retrieval-augmented generation. Optional — enable the 'qdrant' profile."],
+      ["Qdrant", "qdrant", "Optional vector database. Disabled by default; enable the qdrant profile to start it.", true],
     ],
     observability: [
       ["Grafana", "grafana", "Dashboards for container CPU, memory, disk, network, health and logs. Pre-provisioned."],
@@ -197,12 +199,18 @@
       const container = document.getElementById("group-" + group);
       if (!container) continue;
 
-      for (const [name, sub, desc] of items) {
+      for (const [name, sub, desc, optional] of items) {
         const href = url(sub);
-        const card = document.createElement("a");
-        card.className = "card";
-        card.href = href;
-        card.rel = "noopener";
+        const card = document.createElement(optional ? "div" : "a");
+        card.className = optional ? "card optional" : "card";
+        if (!optional) {
+          card.href = href;
+          // Keep the portal open as the launchpad while each app runs in its
+          // own browser tab. `noopener` prevents the opened app from gaining
+          // access to the portal window.
+          card.target = "_blank";
+          card.rel = "noopener";
+        }
         card.innerHTML = `
           <div class="card-top">
             <span class="card-name"></span>
@@ -212,11 +220,18 @@
           <div class="card-host"></div>`;
         card.querySelector(".card-name").textContent = name;
         card.querySelector(".card-desc").textContent = desc;
-        card.querySelector(".card-host").textContent = href.replace(/^https?:\/\//, "");
+        card.querySelector(".card-host").textContent = optional
+          ? "optional — disabled"
+          : href.replace(/^https?:\/\//, "");
         container.appendChild(card);
 
-        total++;
         const dot = card.querySelector(".dot");
+        if (optional) {
+          dot.classList.add("optional");
+          dot.title = "optional profile disabled";
+          continue;
+        }
+        total++;
         probe(href).then((ok) => {
           dot.classList.add(ok ? "up" : "down");
           dot.title = ok ? "reachable" : "not reachable yet";
