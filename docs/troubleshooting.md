@@ -436,5 +436,5 @@ docker compose logs --tail 100 <failing-service> > service.log
 Skim the logs before pasting — container logs can contain tokens, and the issue tracker is public. Never
 paste `.env`.
 
-The [bug report template](https://github.com/OWNER/lab-in-a-box/issues/new?template=bug_report.yml) asks
+The [bug report template](https://github.com/chriswayneh/lab-in-a-box/issues/new?template=bug_report.yml) asks
 for exactly these.

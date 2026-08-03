@@ -31,7 +31,7 @@ exactly this reason.
 ## Development setup
 
 ```bash
-git clone https://github.com/OWNER/lab-in-a-box.git
+git clone https://github.com/chriswayneh/lab-in-a-box.git
 cd lab-in-a-box
 make secrets
 make up

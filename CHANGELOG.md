@@ -25,7 +25,7 @@ First release. A complete self-hosted lab that starts with one command.
 
 #### Core
 
-- Traefik v3.3 edge router with automatic Docker service discovery, TLS, per-IP rate limiting and a
+- Traefik v3.6.17 edge router with automatic Docker service discovery, TLS, per-IP rate limiting and a
   shared security-header middleware chain
 - Read-only Docker socket proxy, so Traefik and Promtail never touch the real socket
 - PostgreSQL 17 hosting three databases with a separate least-privilege role for each
@@ -107,5 +107,5 @@ for a local development lab and wrong for production.
 
 ---
 
-[Unreleased]: https://github.com/OWNER/lab-in-a-box/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/OWNER/lab-in-a-box/releases/tag/v1.0.0
+[Unreleased]: https://github.com/chriswayneh/lab-in-a-box/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/chriswayneh/lab-in-a-box/releases/tag/v1.0.0

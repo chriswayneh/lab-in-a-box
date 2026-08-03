@@ -17,8 +17,8 @@ provisioned, wired together and hardened automatically.
   After pushing to your own GitHub repository, replace OWNER below and move
   these two badges up into the row above:
 
-  [![CI](https://github.com/OWNER/lab-in-a-box/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/lab-in-a-box/actions/workflows/ci.yml)
-  [![Security](https://github.com/OWNER/lab-in-a-box/actions/workflows/security.yml/badge.svg)](https://github.com/OWNER/lab-in-a-box/actions/workflows/security.yml)
+  [![CI](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/ci.yml/badge.svg)](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/ci.yml)
+  [![Security](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/security.yml/badge.svg)](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/security.yml)
 -->
 
 [Quick start](#quick-start) ·
@@ -42,7 +42,7 @@ service B.
 This one does all of that itself.
 
 ```bash
-git clone https://github.com/OWNER/lab-in-a-box.git
+git clone https://github.com/chriswayneh/lab-in-a-box.git
 cd lab-in-a-box
 docker compose up -d
 ```
@@ -687,7 +687,7 @@ pull request, and if you add a service, give it a healthcheck.
 
 Two placeholders need replacing after you fork:
 
-1. `@OWNER` in [`.github/CODEOWNERS`](.github/CODEOWNERS) → your GitHub username
+1. The owner in [`.github/CODEOWNERS`](.github/CODEOWNERS) → your GitHub username, if you fork the project
 1. `OWNER` in the clone URLs and badge links in this README and
    [`.github/ISSUE_TEMPLATE/config.yml`](.github/ISSUE_TEMPLATE/config.yml)
 

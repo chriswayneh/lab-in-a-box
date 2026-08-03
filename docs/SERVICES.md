@@ -16,7 +16,7 @@ _Edge routing, data stores and the landing page_
 
 | Service | Image | URL | Host ports | Networks | Health | Privileges |
 | --- | --- | --- | --- | --- | :---: | --- |
-| `traefik` | `traefik:v3.3` | `traefik.lab.localhost` | `80→8000`, `443→8443` | edge, socket | ✅ | uid `1000:1000` |
+| `traefik` | `traefik:v3.6.17` | `traefik.lab.localhost` | `80→8000`, `443→8443` | edge, socket | ✅ | uid `1000:1000` |
 | `socket-proxy` | `tecnativa/docker-socket-proxy:0.2.0` | — | — | socket | ✅ | docker socket (ro) |
 | `postgres` | `postgres:17-alpine` | — | `5432→5432` | data | ✅ | — |
 | `redis` | `redis:7.4-alpine` | — | `6379→6379` | data | ✅ | uid `redis` |

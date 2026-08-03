@@ -29,11 +29,11 @@
 # -----------------------------------------------------------------------------
 /configs/keycloak/          @OWNER
 /configs/vault/             @OWNER
-/configs/traefik/           @OWNER
-/secrets/                   @OWNER
-/scripts/generate-secrets.sh @OWNER
-/docs/security.md           @OWNER
-/.trivyignore               @OWNER
+/configs/traefik/           @chriswayneh
+/secrets/                   @chriswayneh
+/scripts/generate-secrets.sh @chriswayneh
+/docs/security.md           @chriswayneh
+/.trivyignore               @chriswayneh
 
 # -----------------------------------------------------------------------------
 # CI and supply chain.

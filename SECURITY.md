@@ -41,7 +41,7 @@ These are documented characteristics, not vulnerabilities:
 
 Use GitHub's private reporting:
 
-**[Report a vulnerability →](https://github.com/OWNER/lab-in-a-box/security/advisories/new)**
+**[Report a vulnerability →](https://github.com/chriswayneh/lab-in-a-box/security/advisories/new)**
 
 Include:
 
