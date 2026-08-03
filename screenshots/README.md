@@ -12,7 +12,7 @@ they produce, and the README stays about the project.
 | --- | --- | --- |
 | `landing-page-live.png` | <https://lab.localhost> | The full service index with status dots settled green |
 | `grafana-overview-live.png` | Grafana → Lab Overview | Populated panels — leave the lab running an hour first, an empty graph sells nothing |
-| `keycloak-realm-live.png` | Keycloak administrator console | The administrator sign-in page |
+| `keycloak-login-desktop.png` | Keycloak administrator console | The administrator sign-in page |
 | `open-webui-live.png` | <https://chat.lab.localhost> | The local first-run sign-in page |
 | `traefik-dashboard.png` | <https://traefik.lab.localhost> | The Routers view, showing every discovered service |
 | `vault-policies.png` | Vault → Policies | The four ACL policies (capture after authenticating with a local development token) |
