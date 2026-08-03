@@ -12,14 +12,8 @@ provisioned, wired together and hardened automatically.
 [![Services](https://img.shields.io/badge/services-25-38bdf8)](docs/SERVICES.md)
 [![Setup](https://img.shields.io/badge/setup-1%20command-34d399)](#quick-start)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-blueviolet.svg)](CONTRIBUTING.md)
-
-<!--
-  After pushing to your own GitHub repository, replace OWNER below and move
-  these two badges up into the row above:
-
-  [![CI](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/ci.yml/badge.svg)](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/ci.yml)
-  [![Security](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/security.yml/badge.svg)](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/security.yml)
--->
+[![CI](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/ci.yml/badge.svg)](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/ci.yml)
+[![Security](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/security.yml/badge.svg)](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/security.yml)
 
 [Quick start](#quick-start) ·
 [Architecture](#architecture) ·
