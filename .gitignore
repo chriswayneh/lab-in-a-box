@@ -18,6 +18,11 @@
 # .env. The local directory must never be committed.
 # ---------------------------------------------------------------------------
 secrets/local/
+# Lifecycle records written by `make jml-*`. These describe real identities in
+# a real lab and are evidence, not source. Redacted of secrets by
+# scripts/identity/record.py, but still nobody else's business.
+artifacts/
+
 backups/*
 !backups/.gitkeep
 data/

@@ -13,7 +13,50 @@ action from someone with an existing lab** — a `make clean`, a manual migratio
 
 ## [Unreleased]
 
-Nothing yet.
+Work in progress toward **v2.0 — Identity governance**. The milestone is not
+complete: `v2-1` has landed, `v2-2` through `v2-7` remain.
+
+### Added
+
+#### Identity lifecycle — roadmap `v2-1`
+
+- **Joiner/Mover/Leaver automation** across Keycloak, Vault and Gitea, driven by
+  declarative role profiles in `identity/profiles.json`:
+  - `make jml-join USER=… ROLE=…` — provisions the Keycloak user and group
+    membership, a Vault `userpass` identity bound to exactly one policy, and a
+    Gitea account and team
+  - `make jml-move USER=… FROM=… TO=…` — removes obsolete access **before**
+    adding new access, then prints a before/after diff resolved from live API
+    reads rather than from the profile
+  - `make jml-leave USER=…` — disables both accounts (never deletes), revokes
+    sessions and refresh tokens, deletes the Vault identity and revokes its
+    outstanding leases, and transfers owned repositories to a custody account
+  - `make jml-show USER=…` — effective access across all three services
+  - `make jml-test` — 105 integration checks against the running lab
+- Four role profiles mapped onto the groups the realm already had:
+  `developer`, `platform-admin`, `security`, `contractor`. Authorization stays
+  group-based; the engine never grants a realm role directly to a user
+- `configs/vault/policies/contractor.hcl` — the one policy the seeded realm
+  implied but did not ship, with explicit `deny` rules that survive future
+  broadening
+- Redacted JSON lifecycle records under `artifacts/identity/<user>/`, with a
+  single recursive redactor as the chokepoint for "no secrets in artifacts"
+- `docs/identity-governance.md` — the lifecycle model, the revocation semantics
+  in detail, and an explicit list of what v2-1 deliberately does not cover
+
+The engine runs in a throwaway `python:3.12-alpine` container using only the
+standard library, so it adds no host dependency and leaves `docker compose up -d`
+unchanged.
+
+### Fixed
+
+- **Custom user attributes were silently discarded by the Keycloak Admin API.**
+  Keycloak's declarative User Profile is enabled by default and drops any
+  attribute that is not declared — no error, the write just succeeds and the
+  value never appears. The realm's seeded users carried `title` and `employeeId`
+  only because realm import bypasses that validation; nothing could write them
+  afterwards. The lifecycle engine now declares the attributes it manages before
+  writing them.
 
 ---
 
