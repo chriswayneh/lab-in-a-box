@@ -228,10 +228,44 @@ check_secrets() {
   (( FAILURES++ )) || true
 }
 
+check_makefile_user_guard() {
+  # Regression test for a cross-platform trap.
+  #
+  # `USER` is exported by the shell on macOS and Linux, and make imports the
+  # environment as variables. Before the $(origin USER) guard in the Makefile,
+  # `make jml-leave` with no USER= inherited the operator's own account name and
+  # sailed straight past the usage check — an offboarding command aimed at
+  # whoever happened to be logged in.
+  #
+  # This never reproduces on a machine where USER is unset, which is why it is
+  # asserted explicitly rather than left to chance.
+  heading "Makefile argument guards"
+
+  if ! command -v make >/dev/null 2>&1; then
+    log "  ${C_DIM}skipped: make is not installed${C_RESET}"
+    return 0
+  fi
+
+  local output
+  if output="$(cd "$LAB_ROOT" && USER=someone-else make jml-leave 2>&1)"; then
+    fail "make jml-leave ran with no USER= — the environment's USER leaked in"
+    log "  ${C_DIM}${output}${C_RESET}"
+    return 1
+  fi
+
+  if [[ "$output" != *"Usage:"* ]]; then
+    fail "make jml-leave failed without printing usage"
+    return 1
+  fi
+
+  success "jml targets ignore an inherited USER and require an explicit one"
+}
+
 main() {
   log "${C_BOLD}Validating Lab-in-a-Box${C_RESET}"
 
   check_secrets
+  check_makefile_user_guard
   check_compose
   check_healthchecks
   check_yaml

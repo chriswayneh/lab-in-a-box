@@ -419,7 +419,7 @@ grants a role directly to a user.
 | **Leaver** | Disables (never deletes) both accounts, revokes sessions and refresh tokens, deletes the Vault identity and revokes its outstanding leases, and **transfers** owned repositories to a custody account rather than orphaning them |
 
 Every run writes a redacted JSON record to `artifacts/identity/<user>/`.
-`make jml-test` runs 101 integration checks against the live lab — nothing mocked.
+`make jml-test` runs 105 integration checks against the live lab — nothing mocked.
 
 On revocation, the docs are explicit about what is and isn't proven: refresh
 tokens die immediately and the access token is rejected by anything that consults

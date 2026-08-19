@@ -171,6 +171,18 @@ shell: ## Open a shell inside SERVICE (e.g. make shell SERVICE=postgres)
 # so none of this needs Python, curl or a service CLI on the host.
 # =============================================================================
 
+# `USER` is exported by the shell on macOS and Linux, and make imports the
+# environment as variables. Without this guard, `make jml-leave` with no USER=
+# would inherit the operator's own OS account name, sail past the usage check,
+# and attempt to offboard whoever is logged in.
+#
+# `$(origin USER)` distinguishes the two sources: a command-line assignment
+# reports "command line" and is kept; an inherited one reports "environment"
+# and is cleared so the usage message fires as intended.
+ifeq ($(origin USER),environment)
+USER :=
+endif
+
 jml-join: ## Provision an identity (USER=erin ROLE=developer)
 	@if [[ -z "$(USER)" || -z "$(ROLE)" ]]; then \
 		printf 'Usage: $(CYAN)make jml-join USER=erin ROLE=developer$(RESET)\n'; \

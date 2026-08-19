@@ -22,6 +22,7 @@ others did not -- see docs/identity-governance.md for the reconciliation story.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import sys
 
@@ -219,6 +220,22 @@ def summarise(results: list) -> str:
     return overall
 
 
+def employee_id(username: str) -> str:
+    """
+    A stable employee identifier derived from the username.
+
+    Deliberately not `hash()`: Python seeds its string hash randomly per
+    process, so the same person would receive a different employee ID on every
+    run. An identifier that changes when you look at it twice is worse than no
+    identifier at all — it silently breaks any downstream correlation.
+
+    SHA-256 is not used here for secrecy, only for a stable, well-distributed
+    mapping that produces the same value on every machine and every run.
+    """
+    digest = hashlib.sha256(username.encode()).hexdigest()
+    return f"E-{int(digest[:8], 16) % 90000 + 10000}"
+
+
 def initial_password() -> str:
     """
     The credential a joiner starts with.
@@ -258,8 +275,7 @@ def do_join(args, catalogue, services) -> int:
     gt = ServiceResult("Gitea")
 
     try:
-        employee_id = f"E-{abs(hash(username)) % 90000 + 10000}"
-        user = keycloak.reconcile_user(username, profile, employee_id, kc)
+        user = keycloak.reconcile_user(username, profile, employee_id(username), kc)
         keycloak.set_password_if_absent(user["id"], username, password, kc)
         keycloak.ensure_group(user["id"], username, profile.keycloak_group, kc)
         roles = keycloak.effective_realm_roles(user["id"])

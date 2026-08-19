@@ -32,7 +32,7 @@ complete: `v2-1` has landed, `v2-2` through `v2-7` remain.
     sessions and refresh tokens, deletes the Vault identity and revokes its
     outstanding leases, and transfers owned repositories to a custody account
   - `make jml-show USER=…` — effective access across all three services
-  - `make jml-test` — 101 integration checks against the running lab
+  - `make jml-test` — 105 integration checks against the running lab
 - Four role profiles mapped onto the groups the realm already had:
   `developer`, `platform-admin`, `security`, `contractor`. Authorization stays
   group-based; the engine never grants a realm role directly to a user

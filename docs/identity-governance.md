@@ -272,7 +272,7 @@ writes worked:
 | Mover | obsolete roles absent; new roles present; Vault policy list replaced; old team gone, new team present |
 | Leaver | password grant refused; zero active sessions; Vault login refused; Gitea login refused; no team memberships; repository present under the custody account |
 
-`make jml-test` runs 101 checks against the **running lab**. Nothing is mocked —
+`make jml-test` runs 105 checks against the **running lab**. Nothing is mocked —
 the feature being verified is whether revocation actually revokes, which a mock
 cannot answer. It uses disposable identities (`jmltest`, `jmltoken`); the seeded
 demo users are protected by an explicit deny-list and are never modified.

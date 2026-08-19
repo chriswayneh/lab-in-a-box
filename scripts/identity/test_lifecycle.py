@@ -22,6 +22,7 @@ import sys
 import time
 from pathlib import Path
 
+import jml
 import record
 from gitea import Gitea
 from keycloak import Keycloak
@@ -198,6 +199,25 @@ def test_validation(catalogue) -> None:
     proc = run("join", "--user", "alice", "--role", "developer", expect_rc=2)
     check("seeded demo identity is protected from mutation", proc.returncode == 2)
     check("alice is in the protected set", "alice" in PROTECTED_USERNAMES)
+
+    # Regression: employee IDs were derived from hash(), which Python seeds
+    # randomly per process, so the same person got a different ID on every run.
+    # Determinism is asserted across a SEPARATE interpreter, because within one
+    # process a randomised hash still looks stable.
+    first = jml.employee_id("erin")
+    same_process = jml.employee_id("erin")
+    other_process = subprocess.run(
+        [sys.executable, "-c",
+         "import sys; sys.path.insert(0, '/engine'); import jml; print(jml.employee_id('erin'))"],
+        capture_output=True, text=True, env={**os.environ, "PYTHONHASHSEED": "random"},
+    ).stdout.strip()
+
+    check("employee ID is stable within a process", first == same_process)
+    check("employee ID is stable ACROSS processes", first == other_process,
+          f"{first} != {other_process} — identifier is not reproducible")
+    check("employee ID has the expected shape", first.startswith("E-") and len(first) == 7, first)
+    check("different users get different employee IDs",
+          jml.employee_id("erin") != jml.employee_id("erica"))
 
 
 def test_joiner(catalogue, kc, vt, gt) -> None:

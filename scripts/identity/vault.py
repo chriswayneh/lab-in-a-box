@@ -142,9 +142,21 @@ class Vault:
             result.record(UNCHANGED, "no userpass identity to remove")
 
         # Revoke outstanding leases/tokens issued through userpass for this user.
+        #
+        # Always attempted, even when the identity was already gone: tokens
+        # outlive the auth entry that minted them, so skipping this on a re-run
+        # would be the one case where a live token survives offboarding.
+        #
+        # Vault answers 204 whether or not it revoked anything, so the status
+        # reported here is based on whether an identity existed to have issued
+        # leases in the first place. Claiming UPDATED on a re-run would make an
+        # idempotent command look like it kept changing things.
         try:
             self._call("PUT", f"/sys/leases/revoke-prefix/auth/userpass/login/{username}")
-            result.record(UPDATED, "revoked outstanding Vault tokens/leases for this identity")
+            if existed:
+                result.record(UPDATED, "revoked outstanding Vault tokens/leases for this identity")
+            else:
+                result.record(UNCHANGED, "no identity remained; lease revocation re-attempted as a precaution")
         except HttpError as exc:
             # A user who never logged in has no lease prefix; that is success,
             # not failure.
