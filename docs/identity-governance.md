@@ -261,6 +261,98 @@ custody account (`labadmin` by default, configurable via
 
 ---
 
+## RBAC simulator
+
+Roadmap item `v2-2`. Answers the question an access review actually asks:
+**what can this person reach, and why?**
+
+```bash
+make rbac-show    USER=erin
+make rbac-show    USER=erin FORMAT=json
+make rbac-diff    USER=alice OTHER=bob
+make rbac-who-can PERMISSION=vault:secret/data/security/*
+```
+
+**Strictly read-only.** Every call the simulator makes is a `GET`. It never adds
+a group, changes a policy, touches a team or disables an account, and the test
+suite snapshots identity state before and after a full run to prove it. Drift is
+reported, never corrected — remediation is a deliberate act with an audit trail,
+which is the `jml-*` commands' job.
+
+### What it resolves, and how
+
+It does not restate `profiles.json`. It resolves the chain from live state:
+
+| Service | How access is determined | Confidence |
+| --- | --- | --- |
+| Keycloak | Groups and the **composite** realm role mapping, read from the API | Enforced |
+| Vault | Attached policies, then the policy **document Vault is serving**, parsed into paths and capabilities | Enforced |
+| Gitea | Organisation team membership and each team's permission level | Enforced |
+| Grafana | Derived from realm roles via the deployment's `role_attribute_path`, and only when `GRAFANA_OIDC_ENABLED=true` | Derived |
+| Prometheus, Traefik, Portainer, pgAdmin, Adminer, MinIO, Open WebUI | Not wired to Keycloak | `NOT_IDENTITY_INTEGRATED` |
+
+Parsing the policy document Vault is *serving* rather than the `.hcl` in the
+repository is deliberate: if someone edited a policy at runtime, a review must
+show what is live, not what is committed.
+
+Every grant carries a decision, a permission, a reason, and how it was
+inherited — `direct`, `group-inherited`, or `derived`.
+
+Five decisions, not two. `NOT_IDENTITY_INTEGRATED` and `UNKNOWN` are genuinely
+different from `NOT_AUTHORIZED`, and collapsing them into "denied" is how access
+reviews end up confidently wrong.
+
+### Drift detection
+
+Expected access comes from the role profile implied by the identity's current
+group; actual access comes from the services. The difference is drift:
+
+| Kind | Meaning |
+| --- | --- |
+| `EXTRA_KEYCLOAK_GROUP` | Member of more than one group, so no single profile describes them |
+| `EXTRA_GITEA_TEAM` | In a team the profile does not grant |
+| `UNEXPECTED_VAULT_POLICY` | Holds a policy the profile does not grant |
+| `MISSING_VAULT_POLICY` / `MISSING_GITEA_TEAM` / `MISSING_REALM_ROLE` | The profile expects it; it is absent |
+| `STALE_VAULT_POLICY` / `STALE_GITEA_TEAM` | Downstream access surviving an offboarding |
+| `NO_GROUP` | Enabled but in no group, so inheriting nothing |
+
+Running it against the seeded realm immediately found real drift: `alice`,
+`bob`, `carol` and `dave` have no Gitea accounts, because v1's provisioning only
+ever created `labadmin`. That is a true finding about this lab, not a synthetic
+example.
+
+### Offboarded identities
+
+A disabled account is reported as disabled with its retained downstream accounts
+listed, never as "user not found". An account that outlives its identity is
+precisely what an access review exists to catch, so downstream services are
+checked even when no Keycloak identity exists at all.
+
+### `who-can` and wildcards
+
+Resource matching runs in **both directions**. A user holding Vault `secret/*`
+can reach `secret/data/security/foo`, so asking who can reach
+`secret/data/security/` returns them even though the granted string is shorter
+than the query. Prefix matching alone would answer "nobody" — the most dangerous
+wrong answer an access review can give.
+
+### Relationship to the lifecycle commands
+
+The simulator makes lifecycle changes legible:
+
+```bash
+make jml-join  USER=erin ROLE=developer && make rbac-show USER=erin
+make jml-move  USER=erin FROM=developer TO=security && make rbac-show USER=erin
+make jml-leave USER=erin && make rbac-show USER=erin
+```
+
+It also found a genuine sharp edge in v2-1 while walking all four profiles: the
+joiner only ever *added* a group, so a second `jml-join` with a different role
+left the identity holding both. The joiner now refuses and points at
+`jml-move`, which removes the old access first and records a diff.
+
+---
+
 ## Verification
 
 Each flow verifies by **reading state back from the API**, not by assuming its
@@ -272,7 +364,9 @@ writes worked:
 | Mover | obsolete roles absent; new roles present; Vault policy list replaced; old team gone, new team present |
 | Leaver | password grant refused; zero active sessions; Vault login refused; Gitea login refused; no team memberships; repository present under the custody account |
 
-`make jml-test` runs 105 checks against the **running lab**. Nothing is mocked —
+`make jml-test` runs **238 checks** across two suites — 105 lifecycle and 133
+RBAC simulator — against the **running lab**. Run one at a time with
+`make jml-test SUITE=lifecycle` or `SUITE=rbac`. Nothing is mocked —
 the feature being verified is whether revocation actually revokes, which a mock
 cannot answer. It uses disposable identities (`jmltest`, `jmltoken`); the seeded
 demo users are protected by an explicit deny-list and are never modified.
@@ -352,7 +446,7 @@ any artifact on disk.
 
 ## Limitations
 
-What v2-1 deliberately does **not** do:
+What v2-1 and v2-2 deliberately do **not** do:
 
 - **No authoritative identity source.** The operator's command *is* the request.
   There is no HR system, no Workday or SCIM feed, no joiner queue.
@@ -377,9 +471,30 @@ What v2-1 deliberately does **not** do:
   the user personally owns. Organisation-owned repositories are untouched by
   design.
 
-The remaining v2 roadmap items — RBAC simulator, access review campaigns, a SCIM
-endpoint, identity audit pipelines, alerting and forward-auth — are **not
-implemented**. See [the roadmap](../roadmap/README.md).
+Specific to the RBAC simulator:
+
+- **No remediation.** Drift is reported and never corrected. That is a design
+  decision, not a gap.
+- **Expected state needs exactly one group.** An identity in two groups matches
+  no single profile, so drift detection reports the extra membership and then
+  stops short of deriving expected downstream access.
+- **Grafana is derived, not observed.** The Grafana role is computed from the
+  `role_attribute_path` expression in the compose file, not read from Grafana's
+  own database. If that expression changes, `GRAFANA_ROLE_RULES` in `rbac.py`
+  must change with it. Nothing enforces that today.
+- **Vault path matching is prefix-and-wildcard, not a policy engine.** It does
+  not evaluate Vault's full precedence rules, templated paths, or parameter
+  constraints. For the lab's policies it is accurate; for arbitrary ones it is
+  an approximation.
+- **`who-can` scans the realm's users.** It is capped at 200 identities and
+  reports the first matching grant per user rather than the most specific one.
+- **Unintegrated services are a maintained list.** `UNINTEGRATED_SERVICES` in
+  `rbac.py` is hand-written. A newly added service will not appear in the report
+  until it is listed there.
+
+The remaining v2 roadmap items — access review campaigns, a SCIM endpoint,
+identity audit pipelines, alerting and forward-auth — are **not implemented**.
+See [the roadmap](../roadmap/README.md).
 
 ---
 
@@ -395,7 +510,12 @@ implemented**. See [the roadmap](../roadmap/README.md).
 | `scripts/identity/model.py` | Profiles, validation, change tracking |
 | `scripts/identity/record.py` | Audit records and secret redaction |
 | `scripts/identity/labhttp.py` | Standard-library HTTP helper |
-| `scripts/identity/test_lifecycle.py` | Integration test suite |
-| `scripts/jml.sh` | Containerised entry point |
+| `scripts/identity/rbac.py` | RBAC analysis: effective access and drift (read-only) |
+| `scripts/identity/rbac_cli.py` | Simulator CLI, rendering, diff and who-can |
+| `scripts/identity/test_lifecycle.py` | Lifecycle integration test suite |
+| `scripts/identity/test_rbac.py` | Simulator integration test suite |
+| `scripts/jml.sh` | Lifecycle entry point |
+| `scripts/rbac.sh` | Simulator entry point |
+| `scripts/lib/engine.sh` | Shared containerised runner for all of the above |
 | `scripts/test-identity.sh` | Containerised test entry point |
 | `configs/vault/policies/contractor.hcl` | Vault policy added for the contractor profile |

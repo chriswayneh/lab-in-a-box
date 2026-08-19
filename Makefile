@@ -26,6 +26,11 @@ MAKEFLAGS += --no-print-directory
 # -----------------------------------------------------------------------------
 GPU        ?= 0
 SERVICE    ?=
+# Identity targets. FORMAT defaults to text; the rbac-* targets also accept json.
+FORMAT     ?= text
+OTHER      ?=
+PERMISSION ?=
+SUITE      ?= all
 BACKUP     ?=
 PROFILES   ?=
 FORCE      ?= 0
@@ -69,7 +74,8 @@ endif
 
 .PHONY: help up down restart clean logs ps health creds secrets hooks backup \
         restore update pull validate lint docs shell https-on https-off version \
-        jml-join jml-move jml-leave jml-show jml-test
+        jml-join jml-move jml-leave jml-show jml-test \
+        rbac-show rbac-diff rbac-who-can
 
 # =============================================================================
 # Help
@@ -212,8 +218,34 @@ jml-show: ## Print an identity's effective access across all services (USER=erin
 	fi
 	@bash scripts/jml.sh show --user "$(USER)"
 
-jml-test: ## Run the identity lifecycle test suite against the running lab
-	@bash scripts/test-identity.sh
+jml-test: ## Run the identity test suites against the running lab (SUITE=lifecycle|rbac|all)
+	@bash scripts/test-identity.sh $(SUITE)
+
+# -----------------------------------------------------------------------------
+# RBAC simulator — read-only. Answers "what can this person actually reach?"
+# -----------------------------------------------------------------------------
+
+rbac-show: ## Effective access for an identity, with reasons (USER=erin [FORMAT=json])
+	@if [[ -z "$(USER)" ]]; then \
+		printf 'Usage: $(CYAN)make rbac-show USER=erin$(RESET) [FORMAT=json]\n'; \
+		exit 1; \
+	fi
+	@bash scripts/rbac.sh show --user "$(USER)" --format "$(FORMAT)"
+
+rbac-diff: ## What one identity can reach that another cannot (USER=alice OTHER=bob)
+	@if [[ -z "$(USER)" || -z "$(OTHER)" ]]; then \
+		printf 'Usage: $(CYAN)make rbac-diff USER=alice OTHER=bob$(RESET) [FORMAT=json]\n'; \
+		exit 1; \
+	fi
+	@bash scripts/rbac.sh diff --user "$(USER)" --other "$(OTHER)" --format "$(FORMAT)"
+
+rbac-who-can: ## Every identity that can reach a resource (PERMISSION=vault:secret/data/security/*)
+	@if [[ -z "$(PERMISSION)" ]]; then \
+		printf 'Usage: $(CYAN)make rbac-who-can PERMISSION=vault:secret/data/security/*$(RESET)\n'; \
+		printf 'Services: $(DIM)keycloak, vault, gitea, grafana$(RESET)\n'; \
+		exit 1; \
+	fi
+	@bash scripts/rbac.sh who-can --permission "$(PERMISSION)" --format "$(FORMAT)"
 
 # =============================================================================
 # Credentials

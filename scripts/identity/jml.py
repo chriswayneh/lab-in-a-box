@@ -270,6 +270,33 @@ def do_join(args, catalogue, services) -> int:
 
     before = capture(keycloak, vault, gitea, username)
 
+    # Refuse to provision a second profile onto an identity that already holds
+    # one. The joiner only ever ADDS a group, so without this it would quietly
+    # leave the person in both — entitlement accumulation, which is precisely
+    # the failure this milestone exists to prevent.
+    #
+    # Not silently corrected either: moving someone between profiles is the
+    # mover's job, and the mover produces the before/after diff and session
+    # revocation that a role change should be recorded with.
+    existing = [
+        g for g in before["keycloak"]["groups"]
+        if g != profile.keycloak_group and any(
+            p.keycloak_group == g for p in catalogue.profiles.values()
+        )
+    ]
+    if existing:
+        current = next(
+            (p.name for p in catalogue.profiles.values() if p.keycloak_group == existing[0]),
+            existing[0],
+        )
+        raise ValidationError(
+            f"{username!r} already holds the {current!r} profile ({existing[0]}).\n"
+            f"  Joining would add {profile.keycloak_group} on top, leaving both.\n\n"
+            f"  To change their role, use the mover — it removes the old access first\n"
+            f"  and records a before/after diff:\n"
+            f"    make jml-move USER={username} FROM={current} TO={profile.name}"
+        )
+
     kc = ServiceResult("Keycloak")
     vt = ServiceResult("Vault")
     gt = ServiceResult("Gitea")
