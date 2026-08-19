@@ -86,8 +86,13 @@ Optional, and worth having:
 ```bash
 pip install yamllint
 brew install shellcheck    # or: apt install shellcheck
-npm install -g markdownlint-cli2
 ```
+
+Markdown deliberately has no entry above. `make validate` lints it through a
+pinned container, so it needs nothing on your machine and — more importantly —
+runs the exact linter version CI runs. A globally installed `markdownlint-cli2`
+tracks whatever npm last gave you, which is how a tree that lints clean locally
+gets rejected by CI over a rule your copy does not have.
 
 ---
 

@@ -190,12 +190,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Runs the same pinned container a contributor gets from `make validate`,
+      # rather than the markdownlint-cli2 action. The action and a local install
+      # drifted apart once already — CI rejected a tree that linted clean
+      # locally, because the two were on different markdownlint engines and the
+      # newer one had a rule the older one lacked.
+      #
+      # Globs and ignores come from .markdownlint-cli2.jsonc, so they are not
+      # repeated here; passing them would override the config and reintroduce
+      # a second source of truth.
       - name: Lint
-        uses: DavidAnson/markdownlint-cli2-action@v24.2.0
-        with:
-          globs: |
-            **/*.md
-            !docs/SERVICES.md
+        run: bash scripts/check-markdown.sh
 
       - name: Check links
         uses: lycheeverse/lychee-action@v2
