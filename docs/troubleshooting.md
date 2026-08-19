@@ -24,13 +24,13 @@ make health
 
 Three sections:
 
-**Containers** — anything long-running. `starting` means the healthcheck has not passed yet and is
+**Containers.** Anything long-running. `starting` means the healthcheck has not passed yet and is
 normal for the first minute or two. `UNHEALTHY` means it started and then failed its own check.
 
-**Provisioning** — the one-shot `-init` jobs. `completed` is what you want. These containers are
+**Provisioning.** The one-shot `-init` jobs. `completed` is what you want. These containers are
 *supposed* to exit; `docker compose ps` showing them as `Exited (0)` is success, not a fault.
 
-**HTTP routes** — whether Traefik actually routes each hostname. A `401` or `403` counts as healthy: a
+**HTTP routes.** Whether Traefik actually routes each hostname. A `401` or `403` counts as healthy: a
 service demanding credentials is a service that is up and enforcing them.
 
 For a specific service:
@@ -83,7 +83,7 @@ git restore secrets/
 services.include must be a mapping
 ```
 
-Your Docker Compose predates v2.20. Check with `docker compose version` and update — on Docker Desktop,
+Your Docker Compose predates v2.20. Check with `docker compose version` and update. On Docker Desktop,
 update the whole application.
 
 ---
@@ -96,7 +96,7 @@ update the whole application.
 Bind for 0.0.0.0:443 failed: port is already allocated
 ```
 
-Something else — often another Traefik, a local nginx, or IIS on Windows — has it. Either stop that, or
+Something else has it, often another Traefik, a local nginx, or IIS on Windows. Either stop that, or
 move the lab:
 
 ```bash
@@ -123,7 +123,7 @@ Get-NetTCPConnection -LocalPort 443 | Select-Object OwningProcess
 
 ### `*.lab.localhost` does not resolve
 
-Rare — `.localhost` is loopback by definition under RFC 6761 — but some corporate DNS and some VPN
+This is rare, because `.localhost` is loopback by definition under RFC 6761, but some corporate DNS and some VPN
 clients intercept it anyway.
 
 Test:
@@ -152,7 +152,7 @@ The route does not exist. Usually the container is not on `lab_edge`, or its lab
 docker compose logs traefik | grep -i error
 ```
 
-Open <https://traefik.lab.localhost> and check the Routers tab — if the router is not listed, Traefik
+Open <https://traefik.lab.localhost> and check the Routers tab. If the router is not listed, Traefik
 never saw the labels.
 
 ### 502 or 503 from Traefik
@@ -170,7 +170,7 @@ If the container is healthy and you still get 502, the port in
 ### Certificate warning in the browser
 
 Expected. The lab serves a self-signed certificate so HTTPS works with no setup. Either accept it, or
-install a locally-trusted one with [mkcert](https://github.com/FiloSottile/mkcert) — see the
+install a locally-trusted one with [mkcert](https://github.com/FiloSottile/mkcert). See the
 [README](../README.md#https-and-certificates).
 
 ---
@@ -224,9 +224,9 @@ docker compose up --force-recreate ollama-init
 | Job | Failure usually means |
 | --- | --- |
 | `keycloak-init` | The realm import did not land, or `DEMO_USER_PASSWORD` violates the password policy |
-| `vault-init` | Vault sealed or restarted — in dev mode a restart wipes everything, so re-run this |
+| `vault-init` | Vault sealed or restarted. In dev mode a restart wipes everything, so re-run this |
 | `minio-init` | Wrong root password, i.e. the secret file changed after MinIO's first boot |
-| `gitea-init` | `app.ini` had not been written yet. Non-fatal — finish setup in the browser |
+| `gitea-init` | `app.ini` had not been written yet. Non-fatal: finish setup in the browser |
 | `ollama-init` | Model name typo, or no disk space. Check against <https://ollama.com/library> |
 
 Vault is worth repeating: **dev mode stores everything in memory**. Restarting the Vault container loses
@@ -246,7 +246,7 @@ docker compose logs keycloak | grep -i "database\|connection\|migration"
 docker compose exec postgres psql -U lab -c "\l"     # is the keycloak DB there?
 ```
 
-If the `keycloak` database is missing, the PostgreSQL init script did not run — it only runs on an empty
+If the `keycloak` database is missing, the PostgreSQL init script did not run. It only runs on an empty
 data directory. A `make clean` recreates it.
 
 Keycloak also needs around 1 GB of RAM. If Docker is constrained to 4 GB with Ollama also running, it
@@ -269,7 +269,7 @@ curl -s http://localhost:9090/api/v1/targets | python3 -m json.tool | grep healt
 
 Or open <https://prometheus.lab.localhost/targets>.
 
-If cAdvisor is down, every container panel will be empty — it is the source of all of them. cAdvisor
+If cAdvisor is down, every container panel will be empty, because it is the source of all of them. cAdvisor
 needs privileged mode and several host mounts, and is the service most likely to be blocked by a
 hardened or unusual host.
 
@@ -284,7 +284,7 @@ curl -s http://localhost:3100/ready
 ```
 
 Promtail reads logs through the socket proxy. If the proxy is down, discovery finds nothing and Promtail
-reports no error — it simply has no targets. Check the proxy is running and that Promtail is on
+reports no error, it simply has no targets. Check the proxy is running and that Promtail is on
 `lab_socket`.
 
 </details>
@@ -303,7 +303,7 @@ If the list is empty, pull one directly:
 docker compose exec ollama ollama pull llama3.2:1b
 ```
 
-Then refresh Open WebUI — it queries Ollama for the model list on page load.
+Then refresh Open WebUI. It queries Ollama for the model list on page load.
 
 </details>
 
@@ -321,7 +321,7 @@ tooling. Pointing an S3 client at the console port is the most common MinIO mist
 <details>
 <summary><strong>Gitea shows the installation page</strong></summary>
 
-`gitea-init` could not create the administrator. This is non-fatal by design — complete the setup in the
+`gitea-init` could not create the administrator. This is non-fatal by design. Complete the setup in the
 browser, or re-run the job:
 
 ```bash
@@ -341,7 +341,7 @@ Check Docker's memory allocation. 8 GB is the floor for the full stack; Keycloak
 will take whatever a model needs.
 
 - **Docker Desktop** → Settings → Resources → Memory
-- **Linux** — no limit by default; check the host has headroom with `free -h`
+- **Linux.** No limit by default; check the host has headroom with `free -h`
 
 Free the largest consumer:
 
@@ -378,7 +378,7 @@ docker image prune                              # reclaim superseded layers
 
 ### Windows: `make` is not recognised
 
-Use Git Bash rather than PowerShell — GNU make ships with Git for Windows. Or install it with
+Use Git Bash rather than PowerShell, because GNU make ships with Git for Windows. Or install it with
 `choco install make`, or use WSL. Every target's raw `docker compose` equivalent is in the
 [README](../README.md#commands).
 
@@ -401,7 +401,7 @@ than steady-state operation. [OrbStack](https://orbstack.dev/) is noticeably fas
 ### macOS: Ollama does not use the GPU
 
 It cannot. Docker on macOS runs Linux containers in a VM with no access to Apple's Metal API. For GPU
-acceleration on Apple Silicon, run Ollama natively and point Open WebUI at it — see
+acceleration on Apple Silicon, run Ollama natively and point Open WebUI at it. See
 [`docs/ai.md`](ai.md#gpu-acceleration).
 
 ---
@@ -410,7 +410,7 @@ acceleration on Apple Silicon, run Ollama natively and point Open WebUI at it �
 
 ```bash
 make down          # stop, keep all data
-make clean         # delete every volume — asks first
+make clean         # delete every volume, asks first
 make clean && make secrets && make up      # completely fresh, new credentials
 ```
 
@@ -433,7 +433,7 @@ make version  > version.txt
 docker compose logs --tail 100 <failing-service> > service.log
 ```
 
-Skim the logs before pasting — container logs can contain tokens, and the issue tracker is public. Never
+Skim the logs before pasting. Container logs can contain tokens, and the issue tracker is public. Never
 paste `.env`.
 
 The [bug report template](https://github.com/chriswayneh/lab-in-a-box/issues/new?template=bug_report.yml) asks

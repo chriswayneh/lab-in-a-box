@@ -75,13 +75,13 @@ Hand-maintained diagrams. For the generated startup graph see
 ┌─────────────────────────────────────────────────────────────────────┐
 │ lab_ai                                            egress: yes       │
 │ ollama  ollama-init  open-webui  qdrant                             │
-│ Egress is required — model weights are pulled from the registry.    │
+│ Egress is required: model weights are pulled from the registry.     │
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
 │ lab_socket                      🔒 internal      egress: NONE       │
 │ socket-proxy  traefik  promtail                                     │
-│ Read-only Docker API. POST denied — no container can be created.    │
+│ Read-only Docker API. POST denied: no container can be created.     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -93,7 +93,7 @@ Hand-maintained diagrams. For the generated startup graph see
   Browser
      │
      │  1. DNS:  *.lab.localhost → 127.0.0.1
-     │           RFC 6761 §6.3 — no hosts file, no resolver config
+     │           RFC 6761 §6.3: no hosts file, no resolver config
      ▼
   Host :443
      │
@@ -102,10 +102,10 @@ Hand-maintained diagrams. For the generated startup graph see
      ▼
   Traefik
      │
-     │  3. TLS — self-signed if no certificate matches the SNI
+     │  3. TLS: self-signed if no certificate matches the SNI
      │           TLS 1.2 minimum, modern cipher suites
      │
-     │  4. Router match — Host(`grafana.lab.localhost`)
+     │  4. Router match: Host(`grafana.lab.localhost`)
      │           discovered from a label on the container itself,
      │           read through the read-only socket proxy
      │

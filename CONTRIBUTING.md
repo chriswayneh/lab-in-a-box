@@ -1,6 +1,6 @@
 # Contributing
 
-Contributions are welcome — particularly dashboards, hardening, platform-specific fixes, and
+Contributions are welcome, particularly dashboards, hardening, platform-specific fixes, and
 documentation corrections where something was unclear or wrong.
 
 - [Before you start](#before-you-start)
@@ -88,9 +88,9 @@ pip install yamllint
 brew install shellcheck    # or: apt install shellcheck
 ```
 
-Markdown deliberately has no entry above. `make validate` lints it through a
-pinned container, so it needs nothing on your machine and — more importantly —
-runs the exact linter version CI runs. A globally installed `markdownlint-cli2`
+Markdown has no entry above. `make validate` lints it through a
+pinned container, so it needs nothing on your machine and runs the exact linter
+version CI runs. A globally installed `markdownlint-cli2`
 tracks whatever npm last gave you, which is how a tree that lints clean locally
 gets rejected by CI over a rule your copy does not have.
 
@@ -104,7 +104,7 @@ Three questions, in order:
    A change that requires a manual step first is not a change to this project.
 
 1. **Does it still work on Linux, macOS and Windows?** The lab avoids host bind mounts for data,
-   collects logs through the Docker API rather than host paths, and forces LF line endings — all three
+   collects logs through the Docker API rather than host paths, and forces LF line endings. All three
    exist because the alternative broke on one platform. Please do not undo them.
 
 1. **Is the reasoning captured where someone will find it?** Comments in this repository explain *why*,
@@ -122,7 +122,7 @@ that is worth discussing in the issue.
 **Networks.** Join only what it actually needs. A service that does not use the database does not go on
 `lab_data`. This is the single most valuable habit in the repository.
 
-**Healthcheck.** Required — CI fails without one. Several images ship no shell and no HTTP client, so
+**Healthcheck.** Required, and CI fails without one. Several images ship no shell and no HTTP client, so
 verify what is actually available rather than assuming:
 
 ```bash
@@ -135,7 +135,7 @@ docker inspect <image> --format '{{json .Config.Healthcheck}}'    # it may alrea
 **Hardening.** Add `security_opt: no-new-privileges:true`. Set a non-root `user:` if the image supports
 one. Add `read_only: true` with tmpfs mounts if it writes nothing persistent.
 
-**Credentials.** From `.env` or a Docker secret — never hard-coded. If it needs a new one:
+**Credentials.** From `.env` or a Docker secret, never hard-coded. If it needs a new one:
 
 - add it to `.env.example` as `CHANGEME_<NAME>` so `make secrets` fills it in
 - add it to `scripts/show-credentials.sh` so `make creds` reports it
@@ -147,14 +147,14 @@ the pull request why it should not be backed up.
 
 **Routing.** Traefik labels following the existing pattern, including
 `middlewares=lab-default@file,lab-ratelimit@docker`. If your service streams responses, use
-`lab-security-headers@file` instead — compression buffers the body and breaks streaming.
+`lab-security-headers@file` instead, because compression buffers the body and breaks streaming.
 
 **Image tag.** Pin it. If it genuinely must float, say why in `.trivyignore`. CI rejects an image with no
 tag at all.
 
 **Provisioning.** If it needs setup, write an idempotent `-init` job following the pattern in
-`scripts/init-*.sh`: wait for healthy, converge, exit. Prefer the tool's own declarative mechanism —
-a mounted config file, a native import flag — over a script whenever one exists.
+`scripts/init-*.sh`: wait for healthy, converge, exit. Prefer the tool's own declarative mechanism (a
+mounted config file, a native import flag) over a script whenever one exists.
 
 **Documentation.** Update the service and ports tables in the README, then run `make docs`.
 
@@ -166,7 +166,7 @@ a mounted config file, a native import flag — over a script whenever one exist
 1. **Share → Export → Save to file**, with *Export for sharing externally* **off**. That option replaces
    datasource uids with template inputs, which breaks provisioning.
 1. Save to `monitoring/grafana/dashboards/`.
-1. Give it a stable top-level `uid` — CI fails without one.
+1. Give it a stable top-level `uid`. CI fails without one.
 1. Reference datasources as `{"type": "prometheus", "uid": "prometheus"}` or
    `{"type": "loki", "uid": "loki"}`.
 1. Give every panel a `description`. A panel that needs explaining in Slack should have explained itself.
@@ -179,18 +179,18 @@ a mounted config file, a native import flag — over a script whenever one exist
 noise; one that records a rejected alternative is worth its space forever.
 
 ```yaml
-# Good — records a decision
+# Good: records a decision
 # Runs unprivileged, which is why the entrypoints bind 8000/8443 instead of
 # 80/443: an unprivileged process cannot bind a low port.
 user: "1000:1000"
 
-# Bad — restates the line
+# Bad: restates the line
 # Set the user to 1000
 user: "1000:1000"
 ```
 
 **Shell.** `set -euo pipefail` in bash. POSIX `sh` with `set -eu` for anything running inside an
-Alpine-based image — those have no bash, and a bashism will pass local checks and fail at runtime. Source
+Alpine-based image. Those have no bash, and a bashism will pass local checks and fail at runtime. Source
 `scripts/lib/common.sh` for logging and helpers.
 
 **YAML.** Two-space indent, `yamllint --strict` clean. Section headers use the `# ===` banner style

@@ -27,9 +27,9 @@ insert a password. No `docker exec` to create the admin user. And critically: **
 Compose parses the project**, because a user typing the documented command will not run it.
 
 That last point is what shapes the credential model. Compose resolves environment variables and secret
-file paths at *parse* time — before any container exists. Nothing running inside the lab can generate a
+file paths at *parse* time, before any container exists. Nothing running inside the lab can generate a
 credential the lab itself needs to start. So the lab ships with fallback development values baked into
-`${VAR:-default}` expressions. `make secrets` — which is what the README actually recommends — writes
+`${VAR:-default}` expressions. `make secrets`, which is what the README recommends, writes
 random values before Compose runs, with file-backed values kept in `secrets/local/`.
 
 The trade-off is stated plainly rather than hidden: the fallback passwords are in the repository, and
@@ -61,7 +61,7 @@ Each include sets `project_directory: .` so that a relative path inside a fragme
 repository root. Without it, Compose would resolve `./configs/...` relative to `compose/`, and every
 volume mount would point somewhere that does not exist.
 
-Shared declarations — networks, volumes and secrets — live in the root file only. They are the contract
+Shared declarations (networks, volumes and secrets) live in the root file only. They are the contract
 between fragments: a service in `04-ai.yml` can join `lab_data` without that file knowing how `lab_data`
 is defined.
 
@@ -89,10 +89,10 @@ Five networks. A service can reach only what it shares one with.
 | `lab_socket` | **yes** | Socket proxy, Traefik, Promtail |
 
 `internal: true` severs the network from the host and the internet entirely. Containers on it can talk to
-each other and to nothing else. PostgreSQL has no outbound route — not firewalled, *absent*.
+each other and to nothing else. PostgreSQL has no outbound route. The route is absent, not filtered.
 
 Services join only the networks they use. Keycloak is on `lab_edge` (to be routed), `lab_data` (to reach
-PostgreSQL) and `lab_observability` (to be scraped) — and nothing else. Open WebUI is on `lab_ai` and
+PostgreSQL) and `lab_observability` (to be scraped), and nothing else. Open WebUI is on `lab_ai` and
 `lab_edge`, so it has no path to the database at all.
 
 ```text
@@ -122,7 +122,7 @@ What happens when you open `https://grafana.lab.localhost`:
 
 1. **DNS.** `*.lab.localhost` resolves to `127.0.0.1` with no configuration, under
    [RFC 6761 §6.3](https://www.rfc-editor.org/rfc/rfc6761#section-6.3). Browsers and resolvers treat
-   `.localhost` as loopback by definition. This is why the lab needs no `hosts` file entry — a detail
+   `.localhost` as loopback by definition. This is why the lab needs no `hosts` file entry, a detail
    that removes the single most common setup failure in projects like this.
 
 1. **Host port.** Traefik publishes `443 → 8443`. The container binds 8443 rather than 443 because it
@@ -134,7 +134,7 @@ What happens when you open `https://grafana.lab.localhost`:
    `configs/traefik/dynamic/tls.yml`.
 
 1. **Routing.** Traefik matched `Host(\`grafana.lab.localhost\`)` from a *label on the Grafana
-   container*, discovered through the Docker API. Adding a service means adding labels — there is no
+   container*, discovered through the Docker API. Adding a service means adding labels. There is no
    central routing table to update.
 
 1. **Middleware.** The request passes `lab-default@file` (security headers, compression) and
@@ -144,14 +144,14 @@ What happens when you open `https://grafana.lab.localhost`:
 
 ### Why static config is CLI flags and dynamic config is a file
 
-Traefik treats its three static-configuration sources — file, CLI flags, environment variables — as
+Traefik treats its three static-configuration sources (file, CLI flags, environment variables) as
 mutually exclusive. Only one is used.
 
 The lab needs `${LAB_DOMAIN}` and `${TRAEFIK_LOG_LEVEL}` from `.env`, and a static `traefik.yml` cannot
 interpolate them. So static configuration is CLI flags in `compose/01-core.yml`, where Compose does the
 interpolation.
 
-Dynamic configuration — middlewares, TLS options — *is* a file, in `configs/traefik/dynamic/`, watched and
+Dynamic configuration (middlewares, TLS options) *is* a file, in `configs/traefik/dynamic/`, watched and
 hot-reloaded. The one exception is the rate-limit middleware, whose thresholds come from `.env`: the file
 provider does not interpolate environment variables, so it is defined as a label on the Traefik container
 instead, where Compose can. It is referenced as `lab-ratelimit@docker` rather than `@file` for exactly
@@ -210,7 +210,7 @@ and does not need a retry loop.
 
 This matters most for Keycloak, which needs 30–90 seconds on first boot to run its database migrations
 and import the realm. Anything that starts talking to it before then gets connection refused. The
-alternative — a `sleep 60` in an entrypoint — is both slower on a fast machine and unreliable on a slow one.
+alternative, a `sleep 60` in an entrypoint, is both slower on a fast machine and unreliable on a slow one.
 
 Every long-running service defines a healthcheck, and CI fails the build if one is added without.
 Writing them was not uniform, because several images ship no shell and no HTTP client:
@@ -219,7 +219,7 @@ Writing them was not uniform, because several images ship no shell and no HTTP c
 | --- | --- | --- |
 | Keycloak | `bash` + `/dev/tcp` speaking HTTP by hand | `ubi9-micro` base: no curl, no wget |
 | Traefik | `traefik healthcheck` | Built from scratch; its own binary is the only tool present |
-| Portainer | `/portainer --version` | No shell at all. Verifies the binary runs, not that the API serves — an honest limitation |
+| Portainer | `/portainer --version` | No shell at all. Verifies the binary runs, not that the API serves. A known limitation |
 | Adminer | `php -r 'fsockopen(...)'` | Has a shell but no curl or wget; PHP is guaranteed present |
 | Ollama | `ollama list` | Its CLI talks to the local API |
 | Watchtower | `/watchtower --health-check` | Mirrors the image's own built-in check |
@@ -230,7 +230,7 @@ These were verified by inspecting each image, not assumed.
 
 ## State and persistence
 
-Sixteen named volumes hold every piece of persistent state. No bind mounts for data — only for
+Sixteen named volumes hold every piece of persistent state. No bind mounts for data, only for
 read-only configuration.
 
 `make down` stops the lab and keeps all of it. Only `make clean` removes volumes, and it requires typing
@@ -293,8 +293,8 @@ Decisions where a reasonable engineer would have chosen differently, and the rea
 
 ### Docker socket proxy instead of mounting the socket
 
-Traefik needs the Docker API for service discovery. Mounting `/var/run/docker.sock` — what nearly every
-Traefik example does — grants root on the host: anything that can reach that socket can start a
+Traefik needs the Docker API for service discovery. Mounting `/var/run/docker.sock`, which nearly every
+Traefik example does, grants root on the host: anything that can reach that socket can start a
 privileged container that mounts `/`.
 
 `tecnativa/docker-socket-proxy` sits in front, on an `internal` network, allowing only the endpoints the
@@ -320,12 +320,12 @@ Ollama's runtime and the model formats it can load move in lockstep; pinning a s
 against a model published last week is the most common way this stack breaks. Open WebUI publishes
 `:main` as its release channel. MinIO publishes date-stamped tags with no stable minor to track.
 
-They are listed in `.trivyignore` with this reasoning, and CI still fails on any image with *no* tag —
+They are listed in `.trivyignore` with this reasoning, and CI still fails on any image with *no* tag.
 an implicit `:latest` is unreproducible without saying so, which is worse than an explicit one.
 
 ### HTTPS redirect as a dynamic router
 
-Forcing HTTP → HTTPS is normally an entrypoint-level redirect, which is *static* configuration —
+Forcing HTTP → HTTPS is normally an entrypoint-level redirect, which is *static* configuration,
 toggling it would mean restarting Traefik and duplicating its entire flag list in an override file.
 
 Instead, `make https-on` copies a catch-all router with a `redirectScheme` middleware into the watched
@@ -346,7 +346,7 @@ the read-only proxy rather than adding a second socket mount.
 
 ## See also
 
-- [`docs/SERVICES.md`](SERVICES.md) — generated catalogue of every service, network and volume
-- [`docs/security.md`](security.md) — threat model and trust boundaries
-- [`docs/observability.md`](observability.md) — the metrics and logs pipeline
-- [`architecture/dependency-graph.mmd`](../architecture/dependency-graph.mmd) — generated startup graph
+- [`docs/SERVICES.md`](SERVICES.md): generated catalogue of every service, network and volume
+- [`docs/security.md`](security.md): threat model and trust boundaries
+- [`docs/observability.md`](observability.md): the metrics and logs pipeline
+- [`architecture/dependency-graph.mmd`](../architecture/dependency-graph.mmd): generated startup graph

@@ -2,7 +2,7 @@
 
 ## What does this change?
 
-<!-- One or two sentences. The "why" matters more than the "what" — the diff
+<!-- One or two sentences. The "why" matters more than the "what", because the diff
      already shows what changed. -->
 
 ## Why?
@@ -19,7 +19,7 @@
 - [ ] Security hardening
 - [ ] Documentation
 - [ ] Tooling (Makefile, scripts, CI)
-- [ ] Breaking change — existing labs need action to upgrade
+- [ ] Breaking change: existing labs need action to upgrade
 
 ## Checks
 
@@ -31,7 +31,7 @@
 
 - [ ] It has a healthcheck
 - [ ] It joins only the networks it actually needs
-- [ ] Any credential it needs comes from `.env` or a Docker secret — nothing hard-coded
+- [ ] Any credential it needs comes from `.env` or a Docker secret, nothing hard-coded
 - [ ] It declares `security_opt: no-new-privileges` and runs as a non-root user where the image allows it
 - [ ] Persistent state is on a named volume, and that volume is in the backup list in `scripts/backup.sh`
 - [ ] Its image tag is pinned (or the reason it floats is documented in `.trivyignore`)
@@ -50,7 +50,7 @@
 
 ## Screenshots
 
-<!-- For anything with a UI — a dashboard, a page, a CLI output change. -->
+<!-- For anything with a UI: a dashboard, a page, a CLI output change. -->
 
 ---
 

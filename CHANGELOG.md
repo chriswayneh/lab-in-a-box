@@ -6,26 +6,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Because this project is infrastructure rather than a library, "breaking" means **a change that requires
-action from someone with an existing lab** — a `make clean`, a manual migration, or an edit to their
+action from someone with an existing lab**: a `make clean`, a manual migration, or an edit to their
 `.env`. Those are always called out explicitly.
 
 ---
 
 ## [Unreleased]
 
-Work in progress toward **v2.0 — Identity governance**. The milestone is not
+Work in progress toward **v2.0, Identity governance**. The milestone is not
 complete: `v2-1` and `v2-2` have landed, `v2-3` through `v2-7` remain.
 
 ### Added
 
-#### RBAC simulator — roadmap `v2-2`
+#### RBAC simulator (roadmap `v2-2`)
 
-- **`make rbac-show USER=…`** — effective access for an identity, with a reason
+- **`make rbac-show USER=…`** shows effective access for an identity, with a reason
   and an inheritance kind (`direct`, `group-inherited`, `derived`) on every
   grant. `FORMAT=json` for scripting.
-- **`make rbac-diff USER=… OTHER=…`** — what one identity can reach that another
+- **`make rbac-diff USER=… OTHER=…`** shows what one identity can reach that another
   cannot, with the source of each difference.
-- **`make rbac-who-can PERMISSION=…`** — reverse lookup across the realm.
+- **`make rbac-who-can PERMISSION=…`** performs a reverse lookup across the realm.
   Resource matching is wildcard-aware in both directions, so a holder of Vault
   `secret/*` is correctly reported for a question about `secret/data/security/`.
 - **Resolution from live state, not configuration.** Vault policy documents are
@@ -44,33 +44,33 @@ complete: `v2-1` and `v2-2` have landed, `v2-3` through `v2-7` remain.
   accounts listed, never as "user not found".
 - 133 new integration checks (`make jml-test SUITE=rbac`), including a
   before/after state snapshot proving the simulator mutates nothing.
-- `scripts/lib/engine.sh` — one containerised runner shared by the lifecycle
+- `scripts/lib/engine.sh`: one containerised runner shared by the lifecycle
   commands, the simulator and both test suites.
 
-#### Identity lifecycle — roadmap `v2-1`
+#### Identity lifecycle (roadmap `v2-1`)
 
 - **Joiner/Mover/Leaver automation** across Keycloak, Vault and Gitea, driven by
   declarative role profiles in `identity/profiles.json`:
-  - `make jml-join USER=… ROLE=…` — provisions the Keycloak user and group
+  - `make jml-join USER=… ROLE=…` provisions the Keycloak user and group
     membership, a Vault `userpass` identity bound to exactly one policy, and a
     Gitea account and team
-  - `make jml-move USER=… FROM=… TO=…` — removes obsolete access **before**
+  - `make jml-move USER=… FROM=… TO=…` removes obsolete access **before**
     adding new access, then prints a before/after diff resolved from live API
     reads rather than from the profile
-  - `make jml-leave USER=…` — disables both accounts (never deletes), revokes
+  - `make jml-leave USER=…` disables both accounts (never deletes), revokes
     sessions and refresh tokens, deletes the Vault identity and revokes its
     outstanding leases, and transfers owned repositories to a custody account
-  - `make jml-show USER=…` — effective access across all three services
-  - `make jml-test` — 105 integration checks against the running lab
+  - `make jml-show USER=…` prints effective access across all three services
+  - `make jml-test` runs 105 integration checks against the running lab
 - Four role profiles mapped onto the groups the realm already had:
   `developer`, `platform-admin`, `security`, `contractor`. Authorization stays
   group-based; the engine never grants a realm role directly to a user
-- `configs/vault/policies/contractor.hcl` — the one policy the seeded realm
+- `configs/vault/policies/contractor.hcl`: the one policy the seeded realm
   implied but did not ship, with explicit `deny` rules that survive future
   broadening
 - Redacted JSON lifecycle records under `artifacts/identity/<user>/`, with a
   single recursive redactor as the chokepoint for "no secrets in artifacts"
-- `docs/identity-governance.md` — the lifecycle model, the revocation semantics
+- `docs/identity-governance.md`: the lifecycle model, the revocation semantics
   in detail, and an explicit list of what v2-1 deliberately does not cover
 
 The engine runs in a throwaway `python:3.12-alpine` container using only the
@@ -81,7 +81,7 @@ unchanged.
 
 - **`jml-join` could stack a second role profile onto an existing identity.**
   The joiner only ever added a group, so joining someone who already held a
-  different profile left them in both — the entitlement accumulation this
+  different profile left them in both, which is the entitlement accumulation this
   milestone exists to prevent. It now refuses and points at `jml-move`, which
   removes the old access first and records a diff. Found by the RBAC simulator
   while walking all four profiles.
@@ -92,7 +92,7 @@ unchanged.
   suites in one command.
 - **Custom user attributes were silently discarded by the Keycloak Admin API.**
   Keycloak's declarative User Profile is enabled by default and drops any
-  attribute that is not declared — no error, the write just succeeds and the
+  attribute that is not declared. There is no error: the write succeeds and the
   value never appears. The realm's seeded users carried `title` and `employeeId`
   only because realm import bypasses that validation; nothing could write them
   afterwards. The lifecycle engine now declares the attributes it manages before
@@ -100,7 +100,7 @@ unchanged.
 
 ---
 
-## [1.0.0] — 2026-08-03
+## [1.0.0] - 2026-08-03
 
 First release. A complete self-hosted lab that starts with one command.
 
@@ -157,12 +157,12 @@ First release. A complete self-hosted lab that starts with one command.
 
 #### Automation
 
-- `make secrets` — CSPRNG credentials for every service, guaranteed to satisfy Keycloak's password policy
-- `make health` — checks containers, provisioning jobs and HTTP routes separately
-- `make backup` / `make restore` — `pg_dumpall` for the database, tarballs for volumes, with a manifest
-- `make validate` — everything CI runs, locally, including `promtool` over the alert rules
-- `make docs` — regenerates the service catalogue and dependency graph from the compose project itself
-- `make creds` — reads live credentials and flags any still using a shipped default
+- `make secrets`: CSPRNG credentials for every service, guaranteed to satisfy Keycloak's password policy
+- `make health`: checks containers, provisioning jobs and HTTP routes separately
+- `make backup` / `make restore`: `pg_dumpall` for the database, tarballs for volumes, with a manifest
+- `make validate`: everything CI runs, locally, including `promtool` over the alert rules
+- `make docs`: regenerates the service catalogue and dependency graph from the compose project itself
+- `make creds`: reads live credentials and flags any still using a shipped default
 
 #### Project
 
@@ -178,7 +178,7 @@ First release. A complete self-hosted lab that starts with one command.
 
 - Docker secrets for every image with real `_FILE` support
 - Non-root users wherever the image allows; `no-new-privileges` on every container
-- Exactly one capability grant in the whole stack — `IPC_LOCK` on Vault, to keep secrets out of swap
+- Exactly one capability grant in the whole stack: `IPC_LOCK` on Vault, to keep secrets out of swap
 - Database ports published to `127.0.0.1` only
 - Log rotation on every container
 

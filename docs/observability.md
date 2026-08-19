@@ -60,11 +60,11 @@ deploy is worse than one the UI refused to make.
 
 The default home dashboard. Opening Grafana lands here.
 
-- **At a glance** — containers running, restarts in the last hour, host CPU / memory / disk gauges
-- **Compute** — CPU and memory per container, with a `$container` template variable to filter
-- **I/O** — network and disk throughput per container, drawn symmetrically around zero (receive positive,
+- **At a glance.** Containers running, restarts in the last hour, host CPU / memory / disk gauges
+- **Compute.** CPU and memory per container, with a `$container` template variable to filter
+- **I/O.** Network and disk throughput per container, drawn symmetrically around zero (receive positive,
   transmit negative)
-- **Health** — a sortable table of uptime and 24-hour restart counts, colour-coded, plus a live Loki panel
+- **Health.** A sortable table of uptime and 24-hour restart counts, colour-coded, plus a live Loki panel
   of errors across every container
 
 Restart events are annotated onto every time-series panel, so a latency spike and the restart that caused
@@ -73,7 +73,7 @@ it line up visually.
 ### Lab Logs (`lab-logs`)
 
 - Log volume by service, stacked
-- Share of total volume, as a donut — which service is doing the most talking
+- Share of total volume, as a donut, showing which service is doing the most talking
 - Errors and warnings charted separately from total volume, because a 2% error rate is invisible next to
   total traffic
 - A filterable log explorer driven by three template variables: **Service**, **Level** and a free-text
@@ -83,7 +83,7 @@ it line up visually.
 
 - Request rate, error rate, p95 latency and open connections, as stat panels
 - Requests by service and responses by status class
-- p50 / p95 / p99 latency together — p50 shows the typical experience, p99 shows the worst one somebody
+- p50 / p95 / p99 latency together. p50 shows the typical experience, p99 shows the worst one somebody
   actually had
 - Keycloak JVM heap, and a live panel of identity events (logins, token grants, admin changes)
 
@@ -92,7 +92,7 @@ it line up visually.
 ## Alert rules
 
 Nine rules in three groups, in `monitoring/prometheus/rules/lab-alerts.yml`. Every one carries a
-description that says what to *do* — an alert that does not is a noise generator.
+description that says what to *do*. An alert that does not is a noise generator.
 
 | Group | Alert | Fires when |
 | --- | --- | --- |
@@ -100,7 +100,7 @@ description that says what to *do* — an alert that does not is a noise generat
 | | `ContainerUnhealthy` | A container is registered but producing no CPU samples for 5m |
 | | `ContainerRestartLoop` | More than 3 restarts in 15m |
 | saturation | `ContainerHighCPU` | Above 85% of a core for 10m |
-| | `ContainerHighMemory` | Above 90% of its limit for 10m — **only where a limit is set** |
+| | `ContainerHighMemory` | Above 90% of its limit for 10m, **only where a limit is set** |
 | | `HostMemoryPressure` | Host above 90% for 10m |
 | | `HostDiskFillingUp` | A real filesystem above 85% for 15m |
 | edge | `HighErrorRate` | Over 5% 5xx for a service for 5m |
@@ -171,7 +171,7 @@ is picked up on the next 15-second refresh with no configuration change.
 | Label | Source |
 | --- | --- |
 | `container` | Container name, leading slash stripped |
-| `service` | Compose service name — stable across recreations |
+| `service` | Compose service name, stable across recreations |
 | `project` | Compose project name |
 | `stream` | `stdout` or `stderr` |
 | `detected_level` | Parsed from the line content |
@@ -220,7 +220,7 @@ sum by (service) (rate({job="lab-containers"}[5m]))
            component: platform
    ```
 
-1. Validate and reload — no restart needed, Prometheus has `--web.enable-lifecycle`:
+1. Validate and reload. No restart is needed, because Prometheus has `--web.enable-lifecycle`:
 
    ```bash
    make validate
@@ -234,7 +234,7 @@ sum by (service) (rate({job="lab-containers"}[5m]))
 ## Adding a dashboard
 
 1. Build it in the Grafana UI.
-1. Export via **Share → Export → Save to file**, with *Export for sharing externally* **off** — that
+1. Export via **Share → Export → Save to file**, with *Export for sharing externally* **off**. That
    option replaces datasource uids with template inputs, which breaks provisioning.
 1. Save it to `monitoring/grafana/dashboards/`.
 1. Set a stable `uid` at the top level. CI fails without one, because provisioned dashboards are
@@ -242,7 +242,7 @@ sum by (service) (rate({job="lab-containers"}[5m]))
 1. Confirm datasources are referenced as `{"type": "prometheus", "uid": "prometheus"}` or
    `{"type": "loki", "uid": "loki"}`.
 
-It appears within 30 seconds — the provisioner re-reads the directory on an interval.
+It appears within 30 seconds, because the provisioner re-reads the directory on an interval.
 
 ---
 
@@ -305,7 +305,7 @@ schema_config:
 Then add `lab_edge` to Loki's networks so it can reach MinIO, and pass the MinIO credentials into its
 environment. `-config.expand-env=true` is already set, so `${VAR}` resolves.
 
-Use a scoped MinIO service account rather than the root credentials — `init-minio.sh` already creates a
+Use a scoped MinIO service account rather than the root credentials. `init-minio.sh` already creates a
 `lab-app` policy that shows the shape.
 
 ---
@@ -322,7 +322,7 @@ The Prometheus **size** limit matters more than the time limit on a laptop: with
 running over a long weekend quietly consumes every free gigabyte.
 
 Loki's retention only takes effect because `compactor.retention_enabled: true` is set. Without that,
-`retention_period` is advisory and nothing is ever deleted — a common and expensive misconfiguration.
+`retention_period` is advisory and nothing is ever deleted, which is a common and expensive misconfiguration.
 
 Check what is actually being used:
 

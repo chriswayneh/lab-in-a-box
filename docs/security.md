@@ -52,7 +52,7 @@ What this lab defends against, what it does not, and where the line is drawn.
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
 │ HOST                                                            │
-│  Docker daemon — root-equivalent. Everything below trusts it.   │
+│  Docker daemon: root-equivalent. Everything below trusts it.    │
 │                                                                 │
 │  ┌───────────────────────────────────────────────────────────┐  │
 │  │ EDGE                              (lab_edge, reachable)   │  │
@@ -61,14 +61,14 @@ What this lab defends against, what it does not, and where the line is drawn.
 │  └───────────────────────────────────────────────────────────┘  │
 │                                                                 │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │ DATA                     (lab_data, internal — no egress) │  │
+│  │ DATA                      (lab_data, internal, no egress) │  │
 │  │  PostgreSQL · Redis                                        │  │
 │  │  Reachable only from services that explicitly join.        │  │
 │  └───────────────────────────────────────────────────────────┘  │
 │                                                                 │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │ CONTROL                (lab_socket, internal — no egress) │  │
-│  │  Socket proxy — read-only Docker API, POST denied.        │  │
+│  │ CONTROL                 (lab_socket, internal, no egress) │  │
+│  │  Socket proxy: read-only Docker API, POST denied.         │  │
 │  └───────────────────────────────────────────────────────────┘  │
 │                                                                 │
 │  ⚠ Portainer and Watchtower hold the REAL socket (read/write).  │
@@ -77,9 +77,9 @@ What this lab defends against, what it does not, and where the line is drawn.
 
 ```
 
-The important line is between EDGE and DATA. Compromising Open WebUI — the most internet-facing,
-fastest-moving component in the lab — yields no network path to PostgreSQL, because Open WebUI is not on
-`lab_data`.
+The important boundary is between EDGE and DATA. Open WebUI is the most exposed and fastest-moving
+component in the lab. Compromising it yields no network path to PostgreSQL, because Open WebUI is not
+attached to `lab_data`.
 
 ---
 
@@ -98,13 +98,13 @@ Tier 1 uses each image's documented convention, which is not uniform:
 ```yaml
 POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password        # postgres
 MINIO_ROOT_PASSWORD_FILE: /run/secrets/minio_root_password    # minio
-GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/...            # grafana — two underscores
+GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/...            # grafana: two underscores
 
 ```
 
 Tier 2 is a genuine weakness: those values appear in `docker inspect`. It is accepted rather than papered
-over, because the alternative — a custom entrypoint per service — adds a maintenance burden and a new
-failure mode without removing the secret from the process's environment anyway.
+over. The alternative, a custom entrypoint per service, adds a maintenance burden and a new failure
+mode without removing the secret from the process's environment anyway.
 
 ### Generation
 
@@ -121,7 +121,7 @@ surfaces much later as a confusing provisioning failure rather than an obvious r
 
 ### The shipped defaults
 
-The repository contains fallback credentials — `changeme-postgres-insecure-dev-only` and similar — in
+The repository contains fallback credentials (`changeme-postgres-insecure-dev-only` and similar) in
 the tracked `secrets/*.txt` files and as `${VAR:-default}` expressions in the compose files.
 
 This is a conscious trade. The project's central promise is that `docker compose up -d` works with no
@@ -142,8 +142,8 @@ The mitigations are visibility, not obscurity:
 
 ## Network segmentation
 
-Five networks; `internal: true` on two of them. An internal network has no route to the host or the
-internet — not filtered, absent.
+Five networks, with `internal: true` on two of them. An internal network has no route to the host or
+the internet. The route is absent, not filtered.
 
 | Network | Internal | Egress |
 | --- | :---: | --- |
@@ -176,7 +176,7 @@ from other machines on your network.
 | Log rotation | Every container: 10 MB × 3 files. Without it a chatty container fills the disk |
 | Resource discipline | Redis capped at 256 MB with LRU eviction; `FLUSHALL` and `CONFIG` renamed to nothing |
 
-Traefik running as UID 1000 is why its entrypoints bind 8000/8443 rather than 80/443 — an unprivileged
+Traefik running as UID 1000 is why its entrypoints bind 8000/8443 rather than 80/443. An unprivileged
 process cannot bind a low port. The host port mapping does the translation, rather than granting
 `CAP_NET_BIND_SERVICE`.
 
@@ -185,7 +185,7 @@ process cannot bind a low port. The host port mapping does the translation, rath
 ## The Docker socket
 
 The single largest privilege in any Compose stack. Anything that can write to `/var/run/docker.sock`
-can start a privileged container that mounts the host filesystem — which is root on your machine.
+can start a privileged container that mounts the host filesystem, which is root on your machine.
 
 **Traefik does not get it.** It talks to `tecnativa/docker-socket-proxy` over `tcp://socket-proxy:2375`,
 on an internal network, configured as:
@@ -220,8 +220,8 @@ Nothing else depends on it.
 The Keycloak realm is a working RBAC example, not decoration.
 
 **Roles are granted to groups; users join groups.** Nobody holds a role directly. Revoking access means
-removing someone from a group, which is auditable and reversible — unlike unpicking a dozen direct
-grants.
+removing someone from a group, which is auditable and reversible. Unpicking a dozen direct grants is
+neither.
 
 | Group | Roles | Models |
 | --- | --- | --- |
@@ -232,10 +232,10 @@ grants.
 
 Realm settings that matter:
 
-- **Brute-force protection** — 5 failures, then a 60-second wait that increments to a 900-second cap
-- **Password policy** — 12 characters, mixed case, a digit, not the username, 3-generation history
-- **Token lifetimes** — 5-minute access tokens, 30-minute idle SSO session
-- **Audit events** — both user and admin events enabled, with details, retained 7 days
+- **Brute-force protection.** 5 failures, then a 60-second wait that increments to a 900-second cap
+- **Password policy.** 12 characters, mixed case, a digit, not the username, 3-generation history
+- **Token lifetimes.** 5-minute access tokens, 30-minute idle SSO session
+- **Audit events.** Both user and admin events enabled, with details, retained 7 days
 - **CSP and security headers** set at the realm level
 
 Grafana can federate to it (`GRAFANA_OIDC_ENABLED=true`), mapping realm roles onto Grafana roles: a
@@ -271,14 +271,14 @@ A leaked pipeline credential should be boring.
 
 ## Supply chain
 
-- **Every image carries an explicit tag.** CI fails on any image with none — an implicit `:latest` is
+- **Every image carries an explicit tag.** CI fails on any image with none. An implicit `:latest` is
   unreproducible without saying so.
 - **Three images float deliberately** (Ollama, Open WebUI, MinIO) with the reasoning recorded in
   `.trivyignore`. Every other image is pinned to a specific version.
 - **Dependabot** proposes grouped weekly updates for images and Actions. Grouping is intentional:
   fifteen individual bump PRs a week trains maintainers to stop reading them.
 - **CI security workflow**, on every change and again weekly:
-  - Gitleaks over full history — a secret that was committed and then removed is still compromised
+  - Gitleaks over full history. A secret that was committed and then removed is still compromised
   - Trivy image scanning for critical, *fixable* CVEs (unfixable findings are noise)
   - Trivy configuration scanning, uploaded to GitHub code scanning
 
@@ -328,8 +328,8 @@ If you must reach the lab from outside `localhost`, this is the minimum. None of
 1. **Remove or protect the high-privilege services.** Portainer at minimum; consider Adminer and
    pgAdmin too.
 
-1. **Put authentication in front of everything unauthenticated** — Prometheus and the Traefik dashboard
-   — with Traefik forward-auth against Keycloak.
+1. **Put authentication in front of everything unauthenticated.** Prometheus and the Traefik dashboard
+   both need it, using Traefik forward-auth against Keycloak.
 
 1. **Stop publishing database ports.** Delete the `ports:` blocks for `postgres` and `redis` in
    `compose/01-core.yml`. Services reach them over `lab_data` regardless.
@@ -348,5 +348,5 @@ should stay on `localhost` and be reached over a VPN or SSH tunnel instead.
 
 ## Reporting a vulnerability
 
-Please report privately rather than opening a public issue —
-see [`SECURITY.md`](../SECURITY.md).
+Please report privately rather than opening a public issue. See
+[`SECURITY.md`](../SECURITY.md).
