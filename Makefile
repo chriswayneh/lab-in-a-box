@@ -68,7 +68,8 @@ RESET := \033[0m
 endif
 
 .PHONY: help up down restart clean logs ps health creds secrets hooks backup \
-        restore update pull validate lint docs shell https-on https-off version
+        restore update pull validate lint docs shell https-on https-off version \
+        jml-join jml-move jml-leave jml-show jml-test
 
 # =============================================================================
 # Help
@@ -162,6 +163,45 @@ shell: ## Open a shell inside SERVICE (e.g. make shell SERVICE=postgres)
 		exit 1; \
 	fi
 	@$(COMPOSE) exec $(SERVICE) sh -c 'command -v bash >/dev/null && exec bash || exec sh'
+
+# =============================================================================
+# Identity lifecycle  (Joiner / Mover / Leaver)
+#
+# Role profiles live in identity/profiles.json. The engine runs in a container,
+# so none of this needs Python, curl or a service CLI on the host.
+# =============================================================================
+
+jml-join: ## Provision an identity (USER=erin ROLE=developer)
+	@if [[ -z "$(USER)" || -z "$(ROLE)" ]]; then \
+		printf 'Usage: $(CYAN)make jml-join USER=erin ROLE=developer$(RESET)\n'; \
+		printf 'Profiles: $(DIM)developer, platform-admin, security, contractor$(RESET)\n'; \
+		exit 1; \
+	fi
+	@bash scripts/jml.sh join --user "$(USER)" --role "$(ROLE)"
+
+jml-move: ## Move an identity between profiles (USER=erin FROM=contractor TO=developer)
+	@if [[ -z "$(USER)" || -z "$(FROM)" || -z "$(TO)" ]]; then \
+		printf 'Usage: $(CYAN)make jml-move USER=erin FROM=contractor TO=developer$(RESET)\n'; \
+		exit 1; \
+	fi
+	@bash scripts/jml.sh move --user "$(USER)" --from "$(FROM)" --to "$(TO)"
+
+jml-leave: ## Offboard an identity, revoking access everywhere (USER=erin)
+	@if [[ -z "$(USER)" ]]; then \
+		printf 'Usage: $(CYAN)make jml-leave USER=erin$(RESET)\n'; \
+		exit 1; \
+	fi
+	@bash scripts/jml.sh leave --user "$(USER)"
+
+jml-show: ## Print an identity's effective access across all services (USER=erin)
+	@if [[ -z "$(USER)" ]]; then \
+		printf 'Usage: $(CYAN)make jml-show USER=erin$(RESET)\n'; \
+		exit 1; \
+	fi
+	@bash scripts/jml.sh show --user "$(USER)"
+
+jml-test: ## Run the identity lifecycle test suite against the running lab
+	@bash scripts/test-identity.sh
 
 # =============================================================================
 # Credentials

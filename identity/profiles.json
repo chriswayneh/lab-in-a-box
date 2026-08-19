@@ -1,0 +1,148 @@
+{
+  "_readme": [
+    "Role profiles for the Joiner/Mover/Leaver lifecycle (roadmap v2-1).",
+    "",
+    "A profile is the DESIRED STATE of an identity, expressed once and applied to",
+    "every service. The lifecycle engine reads this file, compares it against what",
+    "each service actually reports, and applies only the differences.",
+    "",
+    "Every group named here already exists in configs/keycloak/realm-export.json.",
+    "Profiles describe how to reach the seeded RBAC model; they do not invent a",
+    "parallel one. Authorization stays group-based: the engine never grants a realm",
+    "role directly to a user, because in this realm the groups carry the roles.",
+    "",
+    "JSON rather than YAML so the file parses with the Python standard library and",
+    "is checked by the existing CI 'JSON' job. Comments live in _readme / summary",
+    "fields for the same reason.",
+    "",
+    "The 'effective_roles' list is DOCUMENTATION of what the group grants, used to",
+    "render the operator-facing access diff. It is never written to Keycloak - the",
+    "engine reads real role mappings back from the API when it verifies."
+  ],
+
+  "gitea": {
+    "_readme": [
+      "Gitea has no organisation in a stock v1 lab, so the engine creates this one",
+      "on first use and reconciles the teams below. Doing it here rather than in",
+      "scripts/init-gitea.sh keeps `docker compose up -d` byte-for-byte unchanged."
+    ],
+    "organization": "lab-engineering",
+    "organization_full_name": "Lab Engineering",
+    "organization_description": "Teams provisioned by the identity lifecycle engine.",
+    "repository_transfer_target": "labadmin"
+  },
+
+  "keycloak": {
+    "_readme": [
+      "Attributes the realm already models. employeeId is generated per user;",
+      "these are the static ones a profile decides."
+    ],
+    "managed_attributes": ["title", "employeeId", "department", "costCenter", "lifecycleState"]
+  },
+
+  "profiles": {
+
+    "developer": {
+      "summary": "Builds and ships applications. The default profile for a joiner.",
+      "keycloak": {
+        "group": "/Application Engineering",
+        "attributes": {
+          "title": "Software Engineer",
+          "department": "Engineering",
+          "costCenter": "CC-1010"
+        },
+        "effective_roles": ["developer", "ai-user"]
+      },
+      "vault": {
+        "policy": "developer",
+        "grants": [
+          "read/write  secret/data/apps/*",
+          "read        secret/data/infrastructure/*",
+          "encrypt/decrypt via transit/lab-app"
+        ]
+      },
+      "gitea": {
+        "team": "developers",
+        "permission": "write",
+        "grants": ["write access to repositories in lab-engineering"]
+      }
+    },
+
+    "platform-admin": {
+      "summary": "Operates the lab infrastructure and its identity plane.",
+      "keycloak": {
+        "group": "/Platform Engineering",
+        "attributes": {
+          "title": "Platform Engineer",
+          "department": "Engineering",
+          "costCenter": "CC-1000"
+        },
+        "effective_roles": ["platform-admin", "developer", "ai-user"]
+      },
+      "vault": {
+        "policy": "platform-admin",
+        "grants": [
+          "read/write  secret/data/*",
+          "manage      auth methods and policies",
+          "encrypt/decrypt via transit/lab-app"
+        ]
+      },
+      "gitea": {
+        "team": "platform",
+        "permission": "admin",
+        "grants": ["admin access to repositories in lab-engineering"]
+      }
+    },
+
+    "security": {
+      "summary": "Investigates the lab. Reads widely, changes almost nothing.",
+      "keycloak": {
+        "group": "/Security",
+        "attributes": {
+          "title": "Security Analyst",
+          "department": "Risk & Security",
+          "costCenter": "CC-2000"
+        },
+        "effective_roles": ["security-analyst", "auditor", "ai-user"]
+      },
+      "vault": {
+        "policy": "security-analyst",
+        "grants": [
+          "read        secret/data/security/*",
+          "read        audit device configuration",
+          "list        auth methods"
+        ]
+      },
+      "gitea": {
+        "team": "security",
+        "permission": "read",
+        "grants": ["read access to repositories in lab-engineering"]
+      }
+    },
+
+    "contractor": {
+      "summary": "Time-boxed external collaborator. Deliberately the smallest grant.",
+      "keycloak": {
+        "group": "/Contractors",
+        "attributes": {
+          "title": "External Contractor",
+          "department": "External",
+          "costCenter": "CC-9000"
+        },
+        "effective_roles": ["contractor"]
+      },
+      "vault": {
+        "policy": "contractor",
+        "grants": [
+          "read        secret/data/apps/demo-api only",
+          "no access to infrastructure, security or ci paths"
+        ]
+      },
+      "gitea": {
+        "team": "contractors",
+        "permission": "read",
+        "grants": ["read access to repositories in lab-engineering"]
+      }
+    }
+  }
+}

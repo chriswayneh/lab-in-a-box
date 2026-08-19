@@ -55,6 +55,7 @@ trade-offs that a lab makes against production are stated plainly rather than hi
 | | |
 | --- | --- |
 | **Identity** | Keycloak with a seeded realm — 4 users, 4 groups, 6 roles, 4 OIDC clients, brute-force protection and a password policy |
+| **Identity lifecycle** | Joiner/Mover/Leaver automation across Keycloak, Vault and Gitea — group-based RBAC, access diffing, session and refresh-token revocation, repository custody transfer, redacted audit records |
 | **Secrets** | Vault with KV v2, transit encryption, AppRole for machines, userpass for humans, and least-privilege ACL policies |
 | **Observability** | Prometheus, Grafana, Loki and Promtail — 3 provisioned dashboards, 9 alert rules, metrics and logs correlated |
 | **AI** | Ollama with a model pulled automatically, Open WebUI wired to it, optional Qdrant for retrieval |
@@ -385,9 +386,48 @@ the whole point of RBAC, and it is what the Joiner/Mover/Leaver demo on the [roa
 | `make docs` | Regenerate the catalogue and dependency graph | `bash scripts/generate-docs.sh` |
 | `make shell SERVICE=x` | Shell inside a container | `docker compose exec x sh` |
 | `make https-on` / `off` | Toggle the HTTP→HTTPS redirect | — |
+| `make jml-join` | Provision an identity everywhere | `bash scripts/jml.sh join …` |
+| `make jml-move` | Change role profile, with an access diff | `bash scripts/jml.sh move …` |
+| `make jml-leave` | Offboard and revoke access everywhere | `bash scripts/jml.sh leave …` |
+| `make jml-show` | Print effective access across services | `bash scripts/jml.sh show …` |
+| `make jml-test` | Run the lifecycle test suite | `bash scripts/test-identity.sh` |
 
 **Variables:** `GPU=1` (NVIDIA passthrough for Ollama), `PROFILES=qdrant,watchtower`,
-`SERVICE=<name>`, `BACKUP=<timestamp>`, `FORCE=1`.
+`SERVICE=<name>`, `BACKUP=<timestamp>`, `FORCE=1`, `USER=`/`ROLE=`/`FROM=`/`TO=` for the `jml-*` targets.
+
+---
+
+## Identity lifecycle
+
+The realm models RBAC. These commands model what happens to it **over time** —
+the part where real identity programmes actually fail.
+
+```bash
+make jml-join  USER=erin ROLE=developer     # provision across Keycloak, Vault, Gitea
+make jml-move  USER=erin FROM=developer TO=security   # with a before/after access diff
+make jml-leave USER=erin                    # revoke everywhere, including live sessions
+```
+
+Four role profiles ([`identity/profiles.json`](identity/profiles.json)) map onto the
+groups the realm already has. Authorization stays group-based — the engine never
+grants a role directly to a user.
+
+| Flow | What it does |
+| --- | --- |
+| **Joiner** | Creates the Keycloak user and group membership, a Vault `userpass` identity bound to one policy, and a Gitea account and team. Idempotent: a second run reports `UNCHANGED` and never resets a password |
+| **Mover** | Removes obsolete access *before* adding new access, so entitlements cannot accumulate, then prints a diff resolved from live API reads |
+| **Leaver** | Disables (never deletes) both accounts, revokes sessions and refresh tokens, deletes the Vault identity and revokes its outstanding leases, and **transfers** owned repositories to a custody account rather than orphaning them |
+
+Every run writes a redacted JSON record to `artifacts/identity/<user>/`.
+`make jml-test` runs 101 integration checks against the live lab — nothing mocked.
+
+On revocation, the docs are explicit about what is and isn't proven: refresh
+tokens die immediately and the access token is rejected by anything that consults
+Keycloak, but a resource server validating a JWT purely offline would still accept
+it until `exp` — bounded to 300 seconds by the realm's `accessTokenLifespan`.
+
+**→ [docs/identity-governance.md](docs/identity-governance.md)** for the full model,
+security implications and limitations.
 
 ---
 
