@@ -261,6 +261,21 @@ check_makefile_user_guard() {
   success "jml targets ignore an inherited USER and require an explicit one"
 }
 
+check_markdown() {
+  # Delegated to the same script CI runs, so a clean `make validate` genuinely
+  # means a clean Markdown job rather than "clean on whichever linter version
+  # this machine happens to have".
+  heading "Markdown"
+
+  if bash "${LAB_SCRIPT_DIR}/check-markdown.sh" >/dev/null 2>&1; then
+    success "markdownlint clean"
+    return 0
+  fi
+
+  fail "markdownlint reported problems"
+  bash "${LAB_SCRIPT_DIR}/check-markdown.sh" 2>&1 | sed 's/^/  /' || true
+}
+
 main() {
   log "${C_BOLD}Validating Lab-in-a-Box${C_RESET}"
 
@@ -271,6 +286,7 @@ main() {
   check_yaml
   check_json
   check_shell
+  check_markdown
 
   # Pulls a container image, so it is opt-out for a fast inner loop.
   if [[ "${SKIP_UPSTREAM:-0}" != "1" ]]; then
