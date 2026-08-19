@@ -721,10 +721,15 @@ More, including how to read the init-job logs and what each provisioning script 
 | Version | Theme | Highlights |
 | --- | --- | --- |
 | **v1** | Foundation ✅ | The stack you are reading about |
-| **v2** | Identity governance | Joiner/Mover/Leaver automation, RBAC simulator, access reviews, SCIM, audit pipeline |
+| **v2** | Identity governance 🚧 | v2-1 JML ✅ · v2-2 RBAC simulator ✅ · v2-3 access reviews next · SCIM and audit pipeline planned |
 | **v3** | Infrastructure as code | Terraform and Ansible deployments, a Kubernetes edition, AWS/Azure/GCP targets |
 | **v4** | AI operations | Log analysis, incident response copilot, automatic infrastructure documentation, RAG over your own runbooks |
 | **v5** | Homelab operations | Backup verification, external uptime monitoring and resource presets |
+
+**v2 is in progress.** Identity lifecycle automation and the RBAC simulator have
+landed and are usable today — see [Identity lifecycle](#identity-lifecycle) above,
+or [`docs/identity-governance.md`](docs/identity-governance.md) for the full model.
+v1.0.0 remains the only tagged release.
 
 Full detail, including ready-to-file issues with acceptance criteria, is in
 [`roadmap/`](roadmap/README.md).

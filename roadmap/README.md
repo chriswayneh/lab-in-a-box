@@ -18,7 +18,7 @@ Where this project is going, and how to file the work.
 | Milestone | Theme | Status | Issues |
 | --- | --- | --- | :---: |
 | **v1.0** | Foundation — the working lab | ✅ Shipped | — |
-| **v2.0** | Identity governance | Planned | 7 |
+| **v2.0** | Identity governance | 🚧 In progress — 2 of 7 done | 7 |
 | **v3.0** | Infrastructure as code | Planned | 7 |
 | **v4.0** | AI operations | Planned | 6 |
 | **v5.0** | Homelab operations | Planned | 3 |
