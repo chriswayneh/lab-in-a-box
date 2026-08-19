@@ -26,7 +26,7 @@ Browser ──443──▶ Traefik ──▶ Open WebUI ──▶ Ollama ──�
 ```
 
 Both services sit on `lab_ai`. Open WebUI is also on `lab_edge` so Traefik can route it. Neither has any
-path to `lab_data` — the chat interface, which processes untrusted input by definition, cannot reach the
+path to `lab_data`. The chat interface, which processes untrusted input by definition, cannot reach the
 identity provider's database.
 
 `ollama-init` runs once on first boot, pulls the configured models and exits. It is a remote control, not
@@ -37,15 +37,15 @@ model storage and no privileges.
 
 ## Models
 
-The default is deliberately small:
+The default is small:
 
 ```bash
 OLLAMA_DEFAULT_MODELS=llama3.2:1b     # ~1.3 GB
 ```
 
 A 1B model is not going to impress anyone with its reasoning, but it downloads in a couple of minutes on
-an ordinary connection and runs acceptably on CPU. The alternative — defaulting to something genuinely
-capable — means a 20 GB download standing between a new user and a working lab.
+an ordinary connection and runs acceptably on CPU. Defaulting to something more capable would put a
+20 GB download between a new user and a working lab.
 
 Swap it for something better as soon as you have the disk and the RAM:
 
@@ -97,7 +97,7 @@ OLLAMA_MAX_LOADED_MODELS: 1    # how many can be resident at once
 
 Loading a model costs seconds; keeping it warm costs gigabytes of RAM. Five minutes and one model is the
 right compromise on a machine that is also running twenty-three other containers. With a GPU, the
-trade-off inverts — the GPU override raises both.
+trade-off inverts, and the GPU override raises both.
 
 ---
 
@@ -125,7 +125,7 @@ docker compose logs ollama | grep -i "gpu\|cuda"
 `compose/overrides/gpu.yml` also raises `OLLAMA_KEEP_ALIVE` to 30 minutes and allows two loaded models,
 because on a GPU the expensive part is loading, not holding.
 
-AMD ROCm and Apple Metal are not wired up. Metal in particular cannot work here — Docker on macOS runs
+AMD ROCm and Apple Metal are not wired up. Metal in particular cannot work here, because Docker on macOS runs
 Linux containers in a VM with no access to the Metal API. On an Apple Silicon machine, run Ollama
 natively and point Open WebUI at it via `OLLAMA_BASE_URL=http://host.docker.internal:11434`.
 
@@ -169,7 +169,7 @@ response = client.chat.completions.create(
 )
 ```
 
-Note that the Ollama route has compression middleware deliberately omitted — buffering a response to
+The Ollama route omits compression middleware, because buffering a response to
 compress it destroys token streaming.
 
 ---
@@ -231,7 +231,7 @@ To switch:
    DATABASE_URL: postgresql://openwebui:${OPENWEBUI_DB_PASSWORD}@postgres:5432/openwebui
    ```
 
-1. Recreate from scratch — the init script only runs on an empty data directory:
+1. Recreate from scratch. The init script only runs on an empty data directory:
 
    ```bash
    make secrets && make clean && make up
@@ -273,6 +273,6 @@ The AI stack is configured to stay local:
 | `QDRANT__TELEMETRY_DISABLED: true` | Same for the vector store |
 
 After the initial model pull, the only outbound traffic from `lab_ai` is whatever you deliberately ask
-for — pulling another model, or fetching a URL you paste into a chat.
+for: pulling another model, or fetching a URL you paste into a chat.
 
 Conversations are stored in the `openwebui_data` volume and are included in `make backup`.

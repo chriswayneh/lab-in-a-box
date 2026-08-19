@@ -3,7 +3,7 @@
 Joiner / Mover / Leaver lifecycle automation for the seeded Keycloak realm.
 
 Roadmap item [`v2-1`](../roadmap/README.md). This page documents what is
-implemented, how it works, and — at least as importantly — what it does not do.
+implemented, how it works, and what it does not do.
 
 ---
 
@@ -55,7 +55,7 @@ flowchart TD
 
 The engine runs in a `python:3.12-alpine` container attached to the lab's edge
 network, using only the Python standard library. Nothing is installed on the
-host — no Python, no `jq`, no Keycloak, Vault or Gitea CLI. `docker compose up -d`
+host: no Python, no `jq`, no Keycloak, Vault or Gitea CLI. `docker compose up -d`
 is unchanged.
 
 ### Why reconciliation
@@ -107,18 +107,18 @@ make jml-join USER=erin ROLE=developer
 
 1. Validate the username against a strict pattern and refuse seeded demo identities.
 1. Resolve the role profile.
-1. **Keycloak** — create or reconcile the user, declare and set attributes
+1. **Keycloak.** Create or reconcile the user, declare and set attributes
    (`title`, `department`, `costCenter`, `employeeId`, `lifecycleState`), set an
    initial credential *only if none exists*, and add the profile's group.
-1. **Vault** — create the `userpass` identity bound to exactly one policy,
+1. **Vault.** Create the `userpass` identity bound to exactly one policy,
    loading that policy from `configs/vault/policies/` if the running Vault does
    not have it yet.
-1. **Gitea** — ensure the organisation and team exist, create or reactivate the
+1. **Gitea.** Ensure the organisation and team exist, create or reactivate the
    account, and add the team membership.
 1. Verify by reading back: effective roles, Vault policy list, team membership.
 1. Print a welcome summary and write a lifecycle record.
 
-The initial credential is `DEMO_USER_PASSWORD` — the same shared lab password
+The initial credential is `DEMO_USER_PASSWORD`, the same shared lab password
 the seeded users get, printed by `make creds`. A provisioned identity therefore
 behaves exactly like `alice` or `bob`. It is never written to an artifact.
 
@@ -133,8 +133,8 @@ Running it twice converges rather than duplicating. Statuses are explicit:
 | `UNCHANGED` | Already matched the desired state; nothing was done |
 | `FAILED` | The operation could not be completed |
 
-A second `jml-join` reports `UNCHANGED` throughout and — importantly — does
-**not** reset a password the person may have already changed.
+A second `jml-join` reports `UNCHANGED` throughout, and does not reset a password
+the person may have already changed.
 
 ---
 
@@ -160,8 +160,8 @@ The order is the whole point:
 Removing before adding means the identity never holds both entitlements, even
 for the milliseconds between two API calls. **Entitlement accumulation is the
 failure this flow exists to prevent**, and the test suite asserts specifically
-that the old group, old roles, old Vault policy and old team are gone — not
-merely that the new ones arrived.
+that the old group, old roles, old Vault policy and old team are gone, not just
+that the new ones arrived.
 
 Example output:
 
@@ -214,8 +214,8 @@ name suggests:
   server-side validation
 
 Offline sessions are enumerated per client and revoked separately, because a
-plain logout does not always clear them — an offline token surviving offboarding
-is exactly the failure mode this flow targets.
+plain logout does not always clear them, and an offline token surviving
+offboarding is the failure mode this flow targets.
 
 **What is genuinely proven, and what is not:**
 
@@ -231,8 +231,8 @@ into a resource server and un-issue one. After `jml-leave`:
 
 That last row is a property of stateless JWTs, not a defect in this
 implementation, and it is bounded: the realm sets `accessTokenLifespan` to
-**300 seconds**, so the worst-case window is five minutes. Refresh tokens — the
-ones that would otherwise grant indefinite access — are dead immediately.
+**300 seconds**, so the worst-case window is five minutes. Refresh tokens, which
+would otherwise grant indefinite access, are invalidated immediately.
 
 The test suite proves the rows it can prove and does not claim the one it
 cannot. See [Verification](#verification).
@@ -254,8 +254,8 @@ custody account (`labadmin` by default, configurable via
   thing they leave behind.
 - Organisation-owned repositories need no transfer; only personally-owned ones
   are moved.
-- If a transfer fails — most commonly because the custody account already owns a
-  repository of that name — the service is reported `FAILED` and the overall
+- If a transfer fails, most commonly because the custody account already owns a
+  repository of that name, the service is reported `FAILED` and the overall
   result becomes `PARTIAL_FAILURE`. The engine will not quietly continue past an
   offboarding step that did not happen.
 
@@ -276,7 +276,7 @@ make rbac-who-can PERMISSION=vault:secret/data/security/*
 **Strictly read-only.** Every call the simulator makes is a `GET`. It never adds
 a group, changes a policy, touches a team or disables an account, and the test
 suite snapshots identity state before and after a full run to prove it. Drift is
-reported, never corrected — remediation is a deliberate act with an audit trail,
+reported, never corrected. Remediation is a deliberate act with an audit trail,
 which is the `jml-*` commands' job.
 
 ### What it resolves, and how
@@ -296,7 +296,7 @@ repository is deliberate: if someone edited a policy at runtime, a review must
 show what is live, not what is committed.
 
 Every grant carries a decision, a permission, a reason, and how it was
-inherited — `direct`, `group-inherited`, or `derived`.
+inherited: `direct`, `group-inherited`, or `derived`.
 
 Five decisions, not two. `NOT_IDENTITY_INTEGRATED` and `UNKNOWN` are genuinely
 different from `NOT_AUTHORIZED`, and collapsing them into "denied" is how access
@@ -333,8 +333,8 @@ checked even when no Keycloak identity exists at all.
 Resource matching runs in **both directions**. A user holding Vault `secret/*`
 can reach `secret/data/security/foo`, so asking who can reach
 `secret/data/security/` returns them even though the granted string is shorter
-than the query. Prefix matching alone would answer "nobody" — the most dangerous
-wrong answer an access review can give.
+than the query. Prefix matching alone would answer "nobody", which is the most
+dangerous wrong answer an access review can give.
 
 ### Relationship to the lifecycle commands
 
@@ -364,9 +364,9 @@ writes worked:
 | Mover | obsolete roles absent; new roles present; Vault policy list replaced; old team gone, new team present |
 | Leaver | password grant refused; zero active sessions; Vault login refused; Gitea login refused; no team memberships; repository present under the custody account |
 
-`make jml-test` runs **238 checks** across two suites — 105 lifecycle and 133
-RBAC simulator — against the **running lab**. Run one at a time with
-`make jml-test SUITE=lifecycle` or `SUITE=rbac`. Nothing is mocked —
+`make jml-test` runs **238 checks** across two suites, 105 lifecycle and 133 RBAC
+simulator, against the **running lab**. Run one at a time with
+`make jml-test SUITE=lifecycle` or `SUITE=rbac`. Nothing is mocked:
 the feature being verified is whether revocation actually revokes, which a mock
 cannot answer. It uses disposable identities (`jmltest`, `jmltoken`); the seeded
 demo users are protected by an explicit deny-list and are never modified.
@@ -429,7 +429,7 @@ any artifact on disk.
   and explicit `deny` everywhere else. `deny` beats every other rule in Vault, so
   it survives a future broadening of the grants above it.
 - **Admin credentials stay in the environment.** They are passed to the container
-  as environment variables, never as command-line arguments — argv is visible to
+  as environment variables, never as command-line arguments. Argv is visible to
   every process on the host; an environment block is not. They are used only to
   authenticate the adapters and are never logged or persisted.
 - **Injection resistance.** The engine builds no shell commands from user input;
@@ -492,8 +492,8 @@ Specific to the RBAC simulator:
   `rbac.py` is hand-written. A newly added service will not appear in the report
   until it is listed there.
 
-The remaining v2 roadmap items — access review campaigns, a SCIM endpoint,
-identity audit pipelines, alerting and forward-auth — are **not implemented**.
+The remaining v2 roadmap items (access review campaigns, a SCIM endpoint,
+identity audit pipelines, alerting and forward-auth) are **not implemented**.
 See [the roadmap](../roadmap/README.md).
 
 ---

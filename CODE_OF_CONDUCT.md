@@ -33,7 +33,7 @@ race, caste, colour, religion, or sexual identity and orientation.
 
 ## Scope
 
-This applies in all project spaces — issues, pull requests, discussions, commit messages, code comments —
+This applies in all project spaces (issues, pull requests, discussions, commit messages, code comments)
 and when someone is representing the project in public.
 
 ## Enforcement

@@ -4,7 +4,7 @@ Diagrams live here; the reasoning behind them is in [`docs/architecture.md`](../
 
 | File | What it shows | Maintained |
 | --- | --- | --- |
-| [`dependency-graph.mmd`](dependency-graph.mmd) | Startup order, grouped by layer | **Generated** — `make docs` |
+| [`dependency-graph.mmd`](dependency-graph.mmd) | Startup order, grouped by layer | **Generated** by `make docs` |
 | [`overview.md`](overview.md) | System overview, networks, request path, ASCII diagrams | By hand |
 
 The generated graph is regenerated from the compose project itself, so it cannot drift. CI fails if the

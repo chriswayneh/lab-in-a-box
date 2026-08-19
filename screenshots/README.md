@@ -11,7 +11,7 @@ they produce, and the README stays about the project.
 | File | Where | Should show |
 | --- | --- | --- |
 | `landing-page-live.png` | <https://lab.localhost> | The full service index with status dots settled green |
-| `grafana-overview-live.png` | Grafana → Lab Overview | Populated panels — leave the lab running an hour first, an empty graph sells nothing |
+| `grafana-overview-live.png` | Grafana → Lab Overview | Populated panels. Leave the lab running an hour first; an empty graph shows nothing |
 | `keycloak-login-desktop.png` | Keycloak administrator console | The administrator sign-in page |
 | `open-webui-live.png` | <https://chat.lab.localhost> | The local first-run sign-in page |
 | `traefik-dashboard.png` | <https://traefik.lab.localhost> | The Routers view, showing every discovered service |
@@ -37,7 +37,7 @@ repository, and they are not searchable afterwards. Check for:
 - Real hostnames, internal IP ranges, or your own email address
 - Browser tabs, bookmarks and notifications from the rest of your life
 
-**File size.** Compress before committing — [Squoosh](https://squoosh.app/) or `pngquant`. Aim for under
+**File size.** Compress before committing with [Squoosh](https://squoosh.app/) or `pngquant`. Aim for under
 500 KB per PNG. Nobody enjoys cloning a 40 MB repository of screenshots.
 
 ## Recording the GIF
@@ -65,5 +65,5 @@ Type "make health" Enter    Sleep 12s
 Alternatives: [asciinema](https://asciinema.org/) with `agg` to convert, or
 [terminalizer](https://github.com/faressoft/terminalizer).
 
-Keep it under 15 seconds of playback and under 5 MB. Cut the dead time during image pulls — nobody needs
+Keep it under 15 seconds of playback and under 5 MB. Cut the dead time during image pulls. Nobody needs
 to watch a progress bar in real time.

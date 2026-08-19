@@ -2,11 +2,11 @@
 
 # Lab-in-a-Box
 
-**A complete self-hosted AI, infrastructure and identity lab. One command. Zero configuration.**
+**A self-hosted AI, infrastructure and identity lab. One command, no manual configuration.**
 
-Twenty-five default containers — identity, secrets, observability, object storage, Git hosting and a
-local LLM — provisioned, wired together and hardened automatically. Two more services, Qdrant and
-Watchtower, are available through optional Compose profiles.
+Twenty-five containers by default: identity, secrets, observability, object storage, Git hosting and a
+local LLM. All provisioned and wired together automatically. Two more services, Qdrant and Watchtower,
+are available through optional Compose profiles.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Docker Compose](https://img.shields.io/badge/Docker%20Compose-v2.20%2B-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
@@ -44,8 +44,8 @@ docker compose up -d
 
 A few minutes later you have a running identity provider with a populated realm, a secrets manager with
 policies and roles, dashboards already showing live container metrics, an object store with buckets,
-a Git server with an administrator, and a local language model you can chat with — all behind a single
-reverse proxy on friendly hostnames, with no entry added to your `hosts` file.
+a Git server with an administrator, and a local language model you can chat with. All of it sits behind
+a single reverse proxy on friendly hostnames, with no entry added to your `hosts` file.
 
 It is built to be read as much as run. Every non-obvious decision is explained where it is made, and the
 trade-offs that a lab makes against production are stated plainly rather than hidden.
@@ -54,11 +54,11 @@ trade-offs that a lab makes against production are stated plainly rather than hi
 
 | | |
 | --- | --- |
-| **Identity** | Keycloak with a seeded realm — 4 users, 4 groups, 6 roles, 4 OIDC clients, brute-force protection and a password policy |
-| **Identity lifecycle** | Joiner/Mover/Leaver automation across Keycloak, Vault and Gitea — group-based RBAC, access diffing, session and refresh-token revocation, repository custody transfer, redacted audit records |
-| **Access review** | A read-only RBAC simulator that answers "what can this person reach, and why?" — resolves live Keycloak, Vault and Gitea state, explains every grant's source, and surfaces entitlement drift |
+| **Identity** | Keycloak with a seeded realm: 4 users, 4 groups, 6 roles, 4 OIDC clients, brute-force protection and a password policy |
+| **Identity lifecycle** | Joiner/Mover/Leaver automation across Keycloak, Vault and Gitea. Group-based RBAC, access diffing, session and refresh-token revocation, repository custody transfer, redacted audit records |
+| **Access review** | A read-only RBAC simulator that answers "what can this person reach, and why?" It resolves live Keycloak, Vault and Gitea state, explains every grant's source, and surfaces entitlement drift |
 | **Secrets** | Vault with KV v2, transit encryption, AppRole for machines, userpass for humans, and least-privilege ACL policies |
-| **Observability** | Prometheus, Grafana, Loki and Promtail — 3 provisioned dashboards, 9 alert rules, metrics and logs correlated |
+| **Observability** | Prometheus, Grafana, Loki and Promtail: 3 provisioned dashboards, 9 alert rules, metrics and logs correlated |
 | **AI** | Ollama with a model pulled automatically, Open WebUI wired to it, optional Qdrant for retrieval |
 | **Platform** | Gitea with Actions enabled, MinIO with buckets, policies, versioning and lifecycle rules |
 | **Edge** | Traefik with automatic service discovery, TLS, rate limiting and security headers |
@@ -99,20 +99,20 @@ trade-offs that a lab makes against production are stated plainly rather than hi
 | Disk | 20 GB free | 40 GB free |
 | CPU | 4 cores | 8 cores |
 
-Optional: GNU `make` and `bash` for the convenience targets. Everything works without them —
+Optional: GNU `make` and `bash` for the convenience targets. Everything works without them, and
 the equivalent `docker compose` command is shown alongside each target below.
 
 <details>
 <summary><strong>Windows, macOS and Linux notes</strong></summary>
 
-**Windows** — install [Docker Desktop](https://docs.docker.com/desktop/install/windows-install/) with the
+**Windows.** Install [Docker Desktop](https://docs.docker.com/desktop/install/windows-install/) with the
 WSL 2 backend. Use Git Bash (ships with [Git for Windows](https://git-scm.com/download/win)) or a WSL
 shell to run `make`. In plain PowerShell, use the `docker compose` commands directly.
 
-**macOS** — Docker Desktop or [OrbStack](https://orbstack.dev/). Give Docker at least 8 GB of RAM in
+**macOS.** Docker Desktop or [OrbStack](https://orbstack.dev/). Give Docker at least 8 GB of RAM in
 Settings → Resources, or Keycloak and Ollama will fight over memory.
 
-**Linux** — Docker Engine plus the Compose plugin. If your user is not in the `docker` group you will
+**Linux.** Docker Engine plus the Compose plugin. If your user is not in the `docker` group you will
 need `sudo` for every command.
 
 </details>
@@ -128,7 +128,7 @@ cd lab-in-a-box
 docker compose up -d
 ```
 
-This is enough to use the complete local lab. It uses the deliberately published development passwords,
+This is enough to use the complete local lab. It uses the published development passwords,
 which is appropriate only because the lab is reachable only from this computer.
 
 **Use unique passwords (recommended).** On macOS/Linux, or in Git Bash/WSL on Windows, run:
@@ -170,7 +170,7 @@ Later starts take seconds.
 ### Open it
 
 Everything lives on `*.lab.localhost`, which resolves to `127.0.0.1` on every modern operating system
-under [RFC 6761](https://www.rfc-editor.org/rfc/rfc6761#section-6.3) — no `hosts` file editing, no DNS setup.
+under [RFC 6761](https://www.rfc-editor.org/rfc/rfc6761#section-6.3). No `hosts` file editing, no DNS setup.
 
 **<https://lab.localhost>** is the front door and links to everything else.
 
@@ -187,7 +187,7 @@ under [RFC 6761](https://www.rfc-editor.org/rfc/rfc6761#section-6.3) — no `hos
 graph TB
     User(["Browser"])
 
-    subgraph edge["lab_edge — public"]
+    subgraph edge["lab_edge (public)"]
         Traefik["<b>Traefik</b><br/>routing · TLS · rate limits"]
         Landing["Landing page"]
     end
@@ -216,12 +216,12 @@ graph TB
         MinIO["MinIO"]
     end
 
-    subgraph data["lab_data — isolated, no internet"]
+    subgraph data["lab_data (isolated, no internet)"]
         Postgres[("PostgreSQL")]
         Redis[("Redis")]
     end
 
-    subgraph socket["lab_socket — isolated"]
+    subgraph socket["lab_socket (isolated)"]
         SocketProxy["Socket proxy<br/><i>read-only Docker API</i>"]
     end
 
@@ -248,21 +248,21 @@ graph TB
     class Postgres,Redis store
 ```
 
-### Five networks, not one
+### Five networks
 
-Segmentation is the cheapest security control in the whole stack. A service can only reach what it shares
-a network with.
+The stack uses five Docker networks to limit service-to-service connectivity. A service can only reach
+what it shares a network with.
 
 | Network | Isolated | What lives there |
 | --- | :---: | --- |
 | `lab_edge` | | Traefik and everything with an HTTP route |
-| `lab_data` | 🔒 | PostgreSQL, Redis and their clients — **no internet access, in or out** |
+| `lab_data` | 🔒 | PostgreSQL, Redis and their clients. No internet access, in or out |
 | `lab_observability` | | Scrape targets, log shippers and their backends |
 | `lab_ai` | | Model serving (needs egress to download model weights) |
 | `lab_socket` | 🔒 | The read-only Docker API proxy |
 
-A compromised chat interface has no route to the identity provider's database. That is not a policy
-statement — there is no network path.
+The AI network has no route to the identity database. Docker network segmentation enforces that
+boundary.
 
 ### Startup order
 
@@ -284,7 +284,7 @@ vault ───────▶ vault-init
 ```
 
 A full generated graph lives in [`architecture/dependency-graph.mmd`](architecture/dependency-graph.mmd),
-and a deeper walkthrough — including the ASCII diagram, the request path and the provisioning model — is in
+and a deeper walkthrough, covering the ASCII diagram, the request path and the provisioning model, is in
 [`docs/architecture.md`](docs/architecture.md).
 
 ### One project, six files
@@ -321,10 +321,10 @@ Full generated catalogue, including images, networks and privileges:
 | **Ollama** | <https://ollama.lab.localhost> | Local LLM runtime and API |
 | **Gitea** | <https://git.lab.localhost> | Git hosting with issues, pull requests and CI |
 | **MinIO** | <https://minio.lab.localhost> | Object storage console (S3 API at `s3.lab.localhost`) |
-| **Portainer** | <https://portainer.lab.localhost> | Container management and troubleshooting — `admin` / `portainer-insecure-dev-only` |
+| **Portainer** | <https://portainer.lab.localhost> | Container management and troubleshooting. `admin` / `portainer-insecure-dev-only` |
 | **pgAdmin** | <https://pgadmin.lab.localhost> | PostgreSQL console, pre-connected to all three databases |
 | **Adminer** | <https://adminer.lab.localhost> | Lightweight database client |
-| **Qdrant** | <https://qdrant.lab.localhost> | Vector database — optional, `COMPOSE_PROFILES=qdrant` |
+| **Qdrant** | <https://qdrant.lab.localhost> | Vector database. Optional, `COMPOSE_PROFILES=qdrant` |
 
 ### Host ports
 
@@ -334,9 +334,9 @@ The lab binds four ports on your machine, and no more. Everything else is reacha
 | --- | --- | --- | --- |
 | `80` | Traefik | all interfaces | HTTP |
 | `443` | Traefik | all interfaces | HTTPS |
-| `5432` | PostgreSQL | `127.0.0.1` only | Local tools — `psql`, DataGrip, migrations |
-| `6379` | Redis | `127.0.0.1` only | Local tools — `redis-cli` |
-| `2222` | Gitea SSH | all interfaces | `git clone ssh://` — cannot be routed by an HTTP proxy |
+| `5432` | PostgreSQL | `127.0.0.1` only | Local tools: `psql`, DataGrip, migrations |
+| `6379` | Redis | `127.0.0.1` only | Local tools: `redis-cli` |
+| `2222` | Gitea SSH | all interfaces | `git clone ssh://`. Cannot be routed by an HTTP proxy |
 
 Change any of them in `.env` (`LAB_HTTP_PORT`, `LAB_HTTPS_PORT`, `POSTGRES_PORT`, `REDIS_PORT`,
 `GITEA_SSH_PORT`) if something already has them.
@@ -360,7 +360,7 @@ scenario rather than four identical accounts:
 | `carol` | Security | `security-analyst`, `auditor`, `ai-user` | Reviews it |
 | `dave` | Contractors | `contractor` | External, deliberately minimal access |
 
-Roles are granted to *groups*, and users join groups — nobody holds a role directly. That indirection is
+Roles are granted to *groups*, and users join groups. Nobody holds a role directly. That indirection is
 the whole point of RBAC, and it is what the Joiner/Mover/Leaver demo on the [roadmap](#roadmap) automates.
 
 ---
@@ -374,7 +374,7 @@ the whole point of RBAC, and it is what the Joiner/Mover/Leaver demo on the [roa
 | `make up` | Start the lab, generating credentials on first run | `docker compose up -d` |
 | `make down` | Stop everything, **keep all data** | `docker compose down` |
 | `make restart` | Restart all, or one `SERVICE=` | `docker compose restart` |
-| `make clean` | Delete every volume — asks first | `docker compose down -v` |
+| `make clean` | Delete every volume, asks first | `docker compose down -v` |
 | `make logs` | Follow logs, all or one `SERVICE=` | `docker compose logs -f` |
 | `make ps` | Container status | `docker compose ps` |
 | `make health` | Containers, provisioning jobs and HTTP routes | `bash scripts/health-check.sh` |
@@ -386,7 +386,7 @@ the whole point of RBAC, and it is what the Joiner/Mover/Leaver demo on the [roa
 | `make validate` | Everything CI checks, locally | `bash scripts/validate.sh` |
 | `make docs` | Regenerate the catalogue and dependency graph | `bash scripts/generate-docs.sh` |
 | `make shell SERVICE=x` | Shell inside a container | `docker compose exec x sh` |
-| `make https-on` / `off` | Toggle the HTTP→HTTPS redirect | — |
+| `make https-on` / `off` | Toggle the HTTP→HTTPS redirect | n/a |
 | `make jml-join` | Provision an identity everywhere | `bash scripts/jml.sh join …` |
 | `make jml-move` | Change role profile, with an access diff | `bash scripts/jml.sh move …` |
 | `make jml-leave` | Offboard and revoke access everywhere | `bash scripts/jml.sh leave …` |
@@ -403,8 +403,8 @@ the whole point of RBAC, and it is what the Joiner/Mover/Leaver demo on the [roa
 
 ## Identity lifecycle
 
-The realm models RBAC. These commands model what happens to it **over time** —
-the part where real identity programmes actually fail.
+The realm models RBAC. These commands cover what happens to it over time:
+onboarding, role changes and offboarding.
 
 ```bash
 make jml-join  USER=erin ROLE=developer     # provision across Keycloak, Vault, Gitea
@@ -413,18 +413,18 @@ make jml-leave USER=erin                    # revoke everywhere, including live 
 ```
 
 Four role profiles ([`identity/profiles.json`](identity/profiles.json)) map onto the
-groups the realm already has. Authorization stays group-based — the engine never
+groups the realm already has. Authorization stays group-based. The engine never
 grants a role directly to a user.
 
 | Flow | What it does |
 | --- | --- |
 | **Joiner** | Creates the Keycloak user and group membership, a Vault `userpass` identity bound to one policy, and a Gitea account and team. Idempotent: a second run reports `UNCHANGED` and never resets a password |
 | **Mover** | Removes obsolete access *before* adding new access, so entitlements cannot accumulate, then prints a diff resolved from live API reads |
-| **Leaver** | Disables (never deletes) both accounts, revokes sessions and refresh tokens, deletes the Vault identity and revokes its outstanding leases, and **transfers** owned repositories to a custody account rather than orphaning them |
+| **Leaver** | Disables (never deletes) both accounts, revokes sessions and refresh tokens, deletes the Vault identity and revokes its outstanding leases, and transfers owned repositories to a custody account instead of orphaning them |
 
 Every run writes a redacted JSON record to `artifacts/identity/<user>/`.
 
-### Access review — what can this person reach?
+### Access review: what can this person reach?
 
 ```bash
 make rbac-show    USER=erin                              # effective access, with reasons
@@ -432,23 +432,23 @@ make rbac-diff    USER=alice OTHER=bob                   # what one has that the
 make rbac-who-can PERMISSION=vault:secret/data/security/*  # reverse lookup
 ```
 
-Read-only. It resolves live state rather than restating configuration — Vault
+Read-only. It resolves live state instead of restating configuration. Vault
 policy documents are fetched and parsed into the paths they actually grant,
 Grafana's role is computed from the deployment's own `role_attribute_path`, and
 every grant says whether it is direct, group-inherited or derived.
 
 It also compares actual access against what the role profile expects and reports
-the difference as **drift** — an extra Gitea team, an unexpected Vault policy, an
+the difference as drift: an extra Gitea team, an unexpected Vault policy, an
 entitlement that survived an offboarding. Services with no identity integration
-are labelled as such rather than silently reported as "no access".
+are labelled as such, not reported as "no access".
 
 `make jml-test` runs 238 integration checks across both suites against the live
-lab — nothing mocked.
+lab. Nothing is mocked.
 
-On revocation, the docs are explicit about what is and isn't proven: refresh
-tokens die immediately and the access token is rejected by anything that consults
-Keycloak, but a resource server validating a JWT purely offline would still accept
-it until `exp` — bounded to 300 seconds by the realm's `accessTokenLifespan`.
+Revocation behaviour is documented precisely. Refresh tokens are invalidated
+immediately, and the access token is rejected by anything that consults Keycloak.
+A resource server validating a JWT purely offline would still accept it until
+`exp`, bounded to 300 seconds by the realm's `accessTokenLifespan`.
 
 **→ [docs/identity-governance.md](docs/identity-governance.md)** for the full model,
 security implications and limitations.
@@ -467,7 +467,7 @@ Highlights:
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `LAB_DOMAIN` | `lab.localhost` | Every service is published at `<name>.$LAB_DOMAIN`. Point it at a real domain for a remote deployment — Keycloak's redirect URIs are rewritten to match automatically |
+| `LAB_DOMAIN` | `lab.localhost` | Every service is published at `<name>.$LAB_DOMAIN`. Point it at a real domain for a remote deployment. Keycloak's redirect URIs are rewritten to match automatically |
 | `LAB_HTTP_PORT` / `LAB_HTTPS_PORT` | `80` / `443` | Change if something already owns them |
 | `LAB_FORCE_HTTPS` | `false` | Off so the first run is not a wall of certificate warnings |
 | `COMPOSE_PROFILES` | *(empty)* | `qdrant`, `watchtower` |
@@ -484,7 +484,7 @@ make up GPU=1
 
 Requires an NVIDIA GPU and the
 [Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
-Layers [`compose/overrides/gpu.yml`](compose/overrides/gpu.yml), which also raises the model keep-alive —
+Layers [`compose/overrides/gpu.yml`](compose/overrides/gpu.yml), which also raises the model keep-alive,
 with a GPU, keeping a model resident is cheap and reloading is the expensive part.
 
 ---
@@ -496,44 +496,44 @@ This is a **development lab**, not a production deployment, and it is explicit a
 
 ### What it does properly
 
-- **Network segmentation** — five networks; the database and Docker API planes are `internal: true`
+- **Network segmentation.** Five networks. The database and Docker API planes are `internal: true`
   and have no route to the internet
-- **No raw Docker socket for Traefik** — a [read-only socket proxy](compose/01-core.yml) exposes only the
+- **No raw Docker socket for Traefik.** A [read-only socket proxy](compose/01-core.yml) exposes only the
   endpoints service discovery uses, with `POST` denied entirely. A fully compromised Traefik cannot start
   a container
-- **Docker secrets** for the images with real `_FILE` support — credentials never appear in
+- **Docker secrets** for the images with real `_FILE` support. Credentials do not appear in
   `docker inspect`, the process table or shell history
 - **Non-root containers** wherever the image allows: Traefik (`1000`), Prometheus (`65534`),
   Grafana (`472`), Loki (`10001`), Gitea (`1000`), nginx (unprivileged variant)
 - **`no-new-privileges`** on every container; a read-only root filesystem on the landing page
-- **Per-service database roles** — Keycloak and Gitea each get their own PostgreSQL login, scoped to
+- **Per-service database roles.** Keycloak and Gitea each get their own PostgreSQL login, scoped to
   their own database, created with `NOCREATEDB NOCREATEROLE NOSUPERUSER`
 - **Least-privilege Vault policies**, including an explicit `deny` on audit-device paths for the
   administrator policy, so an operator cannot erase their own trail
 - **Rate limiting and security headers** on every routed service
-- **Generated credentials** — 32 characters of CSPRNG output per service
-- **CI security scanning** — secret scanning over full history, image CVEs and configuration hardening
+- **Generated credentials.** 32 characters of CSPRNG output per service
+- **CI security scanning.** Secret scanning over full history, image CVEs and configuration checks
 
-### What is deliberately not production-grade
+### What is not production-grade
 
 | | Why it is fine here | What production needs |
 | --- | --- | --- |
-| Vault runs in **dev mode** | In-memory, auto-unsealed, one root token — right for a lab you rebuild daily | Durable storage, real unseal key shares, no root token in circulation |
+| Vault runs in **dev mode** | In-memory, auto-unsealed, one root token. Appropriate for a lab you rebuild daily | Durable storage, real unseal key shares, no root token in circulation |
 | Keycloak runs `start-dev` | Avoids a multi-step certificate exercise on `localhost`; persistence is still PostgreSQL | `start --optimized` with a real hostname and certificate |
-| **Self-signed TLS** | HTTPS works with zero setup | A real certificate — see below |
+| **Self-signed TLS** | HTTPS works with zero setup | A real certificate. See below |
 | **Portainer holds the Docker socket** | You cannot debug a lab you cannot exec into | Restricted access, or drop it |
 | **cAdvisor is privileged** | It genuinely needs cgroup access to produce container metrics | Same, but treat the host as inside the trust boundary |
 | Fallback passwords are **in this repo** | Makes `docker compose up -d` genuinely work with no prior step | `make secrets`, always |
 
 > **Warning**
 > Do not expose this lab to the internet as-is. It is designed for `localhost`. If you need it reachable,
-> read [`docs/security.md`](docs/security.md) first — at minimum you need real certificates, generated
+> read [`docs/security.md`](docs/security.md) first. At minimum you need real certificates, generated
 > credentials, `LAB_FORCE_HTTPS=true`, and authentication in front of Traefik, Prometheus and Portainer.
 
 ### Trusted local HTTPS (Windows)
 
-The lab works immediately with a browser warning. To remove it—and make the landing-page status dots
-accurate—give the browser a locally trusted certificate once. Open **PowerShell** in the cloned
+The lab works immediately with a browser warning. To remove it, and make the landing-page status dots
+accurate, give the browser a locally trusted certificate once. Open **PowerShell** in the cloned
 `lab-in-a-box` folder and paste these commands, one at a time:
 
 ```powershell
@@ -579,7 +579,7 @@ The locally generated certificate files and `local-certificate.yml` are ignored 
 
 ## Observability
 
-Grafana comes up already populated — no datasource to add, no dashboard to import.
+Grafana comes up already populated. There is no datasource to add and no dashboard to import.
 
 | Dashboard | Shows |
 | --- | --- |
@@ -599,7 +599,7 @@ chunks into MinIO, are in [`docs/observability.md`](docs/observability.md).
 ## AI
 
 Open WebUI is wired to Ollama on first boot, and a model is downloaded automatically. The default is
-deliberately small — `llama3.2:1b`, about 1.3 GB — so the lab is usable within minutes rather than after a
+small by default (`llama3.2:1b`, about 1.3 GB) so the lab is usable within minutes rather than after a
 20 GB download.
 
 Bigger models are one variable away:
@@ -635,8 +635,8 @@ Given this Vault policy, what could a holder of this token actually do that
 the author probably did not intend?
 ```
 
-A larger set — including infrastructure documentation, incident triage and security review prompts, with
-notes on where small models fall down — is in [`docs/ai-prompts.md`](docs/ai-prompts.md).
+A larger set covering infrastructure documentation, incident triage and security review, with notes on
+where small models fall down, is in [`docs/ai-prompts.md`](docs/ai-prompts.md).
 
 ---
 
@@ -648,7 +648,7 @@ make restore                         # restore the newest
 make restore BACKUP=20260803-141500  # or a specific one
 ```
 
-PostgreSQL is captured with `pg_dumpall`, not by copying its files — copying a running database's data
+PostgreSQL is captured with `pg_dumpall`, not by copying its files. Copying a running database's data
 directory produces a backup that restores into a corrupt cluster. Everything else is a tar of the named
 volume, taken read-only, while the lab keeps running.
 
@@ -662,7 +662,7 @@ for secret material.
 
 ## Troubleshooting
 
-`make health` first — it checks containers, provisioning jobs and HTTP routes separately, so it usually
+`make health` first. It checks containers, provisioning jobs and HTTP routes separately, so it usually
 tells you which of the three is wrong.
 
 <details>
@@ -706,7 +706,7 @@ Almost always: `.env` was regenerated after the service already stored the old p
 <details>
 <summary><strong>Everything is slow</strong></summary>
 
-Check Docker's memory allocation — 8 GB is the floor, and Ollama plus Keycloak will use most of it.
+Check Docker's memory allocation. 8 GB is the floor, and Ollama plus Keycloak will use most of it.
 Stopping the AI stack (`docker compose stop ollama open-webui`) frees the largest consumer.
 
 </details>
@@ -727,7 +727,7 @@ More, including how to read the init-job logs and what each provisioning script 
 | **v5** | Homelab operations | Backup verification, external uptime monitoring and resource presets |
 
 **v2 is in progress.** Identity lifecycle automation and the RBAC simulator have
-landed and are usable today — see [Identity lifecycle](#identity-lifecycle) above,
+landed and are usable today. See [Identity lifecycle](#identity-lifecycle) above,
 or [`docs/identity-governance.md`](docs/identity-governance.md) for the full model.
 v1.0.0 remains the only tagged release.
 
@@ -738,7 +738,7 @@ Full detail, including ready-to-file issues with acceptance criteria, is in
 
 ## Contributing
 
-Contributions are genuinely welcome — especially dashboards, hardening, and documentation fixes where
+Contributions are welcome, especially dashboards, hardening and documentation fixes where
 something was unclear.
 
 Start with [`CONTRIBUTING.md`](CONTRIBUTING.md). The short version: run `make validate` before opening a

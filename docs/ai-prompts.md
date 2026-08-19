@@ -2,7 +2,7 @@
 
 Prompts that do something useful with a model running next to your infrastructure.
 
-The point of a local LLM in a lab like this is not that it is better than a hosted one — it is not. The
+A local LLM in a lab like this is not better than a hosted one. The
 point is that you can paste your actual configuration, real logs and internal architecture into it
 without a data-handling conversation first.
 
@@ -141,7 +141,7 @@ wildcards and to capabilities that combine into something larger.
 
 ```text
 Here are my Traefik middleware definitions. What attacks do these mitigate,
-and — more usefully — what do they not cover that someone might assume they do?
+and what do they not cover that someone might assume they do?
 ```
 
 **Reason about a trust boundary.** **[8B+]**
@@ -157,7 +157,7 @@ thing they could get to?
 
 ```text
 This diff adds a new service to my Compose stack. Does it follow the same
-security posture as the existing services — non-root user, no-new-privileges,
+security posture as the existing services: non-root user, no-new-privileges,
 minimal networks, healthcheck, no hard-coded credentials? List what is missing.
 ```
 
@@ -173,7 +173,7 @@ last 50 lines of its logs. Is the service actually broken, or is the
 healthcheck wrong?
 ```
 
-That distinction is worth asking for explicitly — a wrong healthcheck and a broken service look identical
+That distinction is worth asking for explicitly, because a wrong healthcheck and a broken service look identical
 from the outside, and models default to assuming the service is at fault.
 
 **Explain a networking problem.**
@@ -236,7 +236,7 @@ while keeping isolation between services.
 
 ```text
 Write a conventional-commits message for this diff. Explain why in the body,
-not what — the diff already shows what.
+not what. The diff already shows what.
 ```
 
 ---
