@@ -45,13 +45,13 @@ The theme: **turn the seeded Keycloak realm into a working demonstration of iden
 access governance.** This is the area where most self-hosted labs stop at "we installed an IdP", and it
 is where the genuinely interesting problems are.
 
-**Status: in progress.** `v2-1` is complete; `v2-2` is next. The milestone itself is not done.
+**Status: in progress.** `v2-1` and `v2-2` are complete; `v2-3` is next. The milestone itself is not done.
 
 | | Issue | Status |
 | --- | --- | --- |
 | `v2-1` | Joiner/Mover/Leaver automation — provision, transfer and deprovision an identity end to end | ✅ **Complete** — see [docs/identity-governance.md](../docs/identity-governance.md) |
-| `v2-2` | RBAC simulator — answer "what can this person actually reach?" across every service | ⬅ **Next** |
-| `v2-3` | Access review campaign — periodic recertification with an approve/revoke workflow | |
+| `v2-2` | RBAC simulator — answer "what can this person actually reach?" across every service | ✅ **Complete** — see [docs/identity-governance.md](../docs/identity-governance.md#rbac-simulator) |
+| `v2-3` | Access review campaign — periodic recertification with an approve/revoke workflow | ⬅ **Next** |
 | `v2-4` | SCIM provisioning endpoint — push identity changes to downstream services | |
 | `v2-5` | Audit event pipeline — ship Keycloak and Vault audit events into Loki with a dashboard | |
 | `v2-6` | Alertmanager — route the alert rules that currently evaluate into nothing | |

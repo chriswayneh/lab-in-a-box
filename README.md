@@ -56,6 +56,7 @@ trade-offs that a lab makes against production are stated plainly rather than hi
 | --- | --- |
 | **Identity** | Keycloak with a seeded realm — 4 users, 4 groups, 6 roles, 4 OIDC clients, brute-force protection and a password policy |
 | **Identity lifecycle** | Joiner/Mover/Leaver automation across Keycloak, Vault and Gitea — group-based RBAC, access diffing, session and refresh-token revocation, repository custody transfer, redacted audit records |
+| **Access review** | A read-only RBAC simulator that answers "what can this person reach, and why?" — resolves live Keycloak, Vault and Gitea state, explains every grant's source, and surfaces entitlement drift |
 | **Secrets** | Vault with KV v2, transit encryption, AppRole for machines, userpass for humans, and least-privilege ACL policies |
 | **Observability** | Prometheus, Grafana, Loki and Promtail — 3 provisioned dashboards, 9 alert rules, metrics and logs correlated |
 | **AI** | Ollama with a model pulled automatically, Open WebUI wired to it, optional Qdrant for retrieval |
@@ -390,7 +391,10 @@ the whole point of RBAC, and it is what the Joiner/Mover/Leaver demo on the [roa
 | `make jml-move` | Change role profile, with an access diff | `bash scripts/jml.sh move …` |
 | `make jml-leave` | Offboard and revoke access everywhere | `bash scripts/jml.sh leave …` |
 | `make jml-show` | Print effective access across services | `bash scripts/jml.sh show …` |
-| `make jml-test` | Run the lifecycle test suite | `bash scripts/test-identity.sh` |
+| `make jml-test` | Run the identity test suites | `bash scripts/test-identity.sh` |
+| `make rbac-show` | Effective access for one identity, with reasons | `bash scripts/rbac.sh show …` |
+| `make rbac-diff` | What one identity can reach that another cannot | `bash scripts/rbac.sh diff …` |
+| `make rbac-who-can` | Every identity that can reach a resource | `bash scripts/rbac.sh who-can …` |
 
 **Variables:** `GPU=1` (NVIDIA passthrough for Ollama), `PROFILES=qdrant,watchtower`,
 `SERVICE=<name>`, `BACKUP=<timestamp>`, `FORCE=1`, `USER=`/`ROLE=`/`FROM=`/`TO=` for the `jml-*` targets.
@@ -419,7 +423,27 @@ grants a role directly to a user.
 | **Leaver** | Disables (never deletes) both accounts, revokes sessions and refresh tokens, deletes the Vault identity and revokes its outstanding leases, and **transfers** owned repositories to a custody account rather than orphaning them |
 
 Every run writes a redacted JSON record to `artifacts/identity/<user>/`.
-`make jml-test` runs 105 integration checks against the live lab — nothing mocked.
+
+### Access review — what can this person reach?
+
+```bash
+make rbac-show    USER=erin                              # effective access, with reasons
+make rbac-diff    USER=alice OTHER=bob                   # what one has that the other does not
+make rbac-who-can PERMISSION=vault:secret/data/security/*  # reverse lookup
+```
+
+Read-only. It resolves live state rather than restating configuration — Vault
+policy documents are fetched and parsed into the paths they actually grant,
+Grafana's role is computed from the deployment's own `role_attribute_path`, and
+every grant says whether it is direct, group-inherited or derived.
+
+It also compares actual access against what the role profile expects and reports
+the difference as **drift** — an extra Gitea team, an unexpected Vault policy, an
+entitlement that survived an offboarding. Services with no identity integration
+are labelled as such rather than silently reported as "no access".
+
+`make jml-test` runs 238 integration checks across both suites against the live
+lab — nothing mocked.
 
 On revocation, the docs are explicit about what is and isn't proven: refresh
 tokens die immediately and the access token is rejected by anything that consults

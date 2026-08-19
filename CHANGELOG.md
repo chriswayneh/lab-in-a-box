@@ -14,9 +14,38 @@ action from someone with an existing lab** — a `make clean`, a manual migratio
 ## [Unreleased]
 
 Work in progress toward **v2.0 — Identity governance**. The milestone is not
-complete: `v2-1` has landed, `v2-2` through `v2-7` remain.
+complete: `v2-1` and `v2-2` have landed, `v2-3` through `v2-7` remain.
 
 ### Added
+
+#### RBAC simulator — roadmap `v2-2`
+
+- **`make rbac-show USER=…`** — effective access for an identity, with a reason
+  and an inheritance kind (`direct`, `group-inherited`, `derived`) on every
+  grant. `FORMAT=json` for scripting.
+- **`make rbac-diff USER=… OTHER=…`** — what one identity can reach that another
+  cannot, with the source of each difference.
+- **`make rbac-who-can PERMISSION=…`** — reverse lookup across the realm.
+  Resource matching is wildcard-aware in both directions, so a holder of Vault
+  `secret/*` is correctly reported for a question about `secret/data/security/`.
+- **Resolution from live state, not configuration.** Vault policy documents are
+  fetched from the running Vault and parsed into the paths and capabilities they
+  actually grant; Keycloak roles come from the composite mapping; Grafana's role
+  is computed from the deployment's own `role_attribute_path` and only when
+  `GRAFANA_OIDC_ENABLED=true`.
+- **Drift detection.** Actual access is compared with what the identity's role
+  profile expects, and the difference reported as `EXTRA_GITEA_TEAM`,
+  `UNEXPECTED_VAULT_POLICY`, `STALE_GITEA_TEAM`, `MISSING_REALM_ROLE` and
+  similar. Read-only: drift is reported, never corrected.
+- **Honest decisions.** `NOT_IDENTITY_INTEGRATED` and `UNKNOWN` are distinct
+  from `NOT_AUTHORIZED`, so services with no Keycloak integration are labelled
+  rather than silently reported as "no access".
+- **Offboarded identities** report as disabled with their retained downstream
+  accounts listed, never as "user not found".
+- 133 new integration checks (`make jml-test SUITE=rbac`), including a
+  before/after state snapshot proving the simulator mutates nothing.
+- `scripts/lib/engine.sh` — one containerised runner shared by the lifecycle
+  commands, the simulator and both test suites.
 
 #### Identity lifecycle — roadmap `v2-1`
 
@@ -50,6 +79,17 @@ unchanged.
 
 ### Fixed
 
+- **`jml-join` could stack a second role profile onto an existing identity.**
+  The joiner only ever added a group, so joining someone who already held a
+  different profile left them in both — the entitlement accumulation this
+  milestone exists to prevent. It now refuses and points at `jml-move`, which
+  removes the old access first and records a diff. Found by the RBAC simulator
+  while walking all four profiles.
+- **A second engine invocation in one shell reported services as down.**
+  The shared runner exported the MSYS path-conversion switches, which then
+  leaked into the next `docker compose ps` and left its paths unresolvable.
+  They are now scoped to the single `docker run`. Surfaced by running both test
+  suites in one command.
 - **Custom user attributes were silently discarded by the Keycloak Admin API.**
   Keycloak's declarative User Profile is enabled by default and drops any
   attribute that is not declared — no error, the write just succeeds and the
