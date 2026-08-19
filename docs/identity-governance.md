@@ -73,7 +73,7 @@ A profile is the **desired state of an identity**, declared once in
 [`identity/profiles.json`](../identity/profiles.json) and applied everywhere.
 
 | Profile | Keycloak group | Effective realm roles | Vault policy | Gitea team |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | `developer` | `/Application Engineering` | `developer`, `ai-user` | `developer` | `developers` (write) |
 | `platform-admin` | `/Platform Engineering` | `platform-admin`, `developer`, `ai-user` | `platform-admin` | `platform` (admin) |
 | `security` | `/Security` | `security-analyst`, `auditor`, `ai-user` | `security-analyst` | `security` (read) |
@@ -127,7 +127,7 @@ behaves exactly like `alice` or `bob`. It is never written to an artifact.
 Running it twice converges rather than duplicating. Statuses are explicit:
 
 | Status | Meaning |
-|---|---|
+| --- | --- |
 | `CREATED` | The object did not exist and was created |
 | `UPDATED` | It existed but drifted from the profile, and was corrected |
 | `UNCHANGED` | Already matched the desired state; nothing was done |
@@ -223,7 +223,7 @@ Keycloak issues self-contained JWT access tokens. No identity provider can reach
 into a resource server and un-issue one. After `jml-leave`:
 
 | Validation model | Result |
-|---|---|
+| --- | --- |
 | `userinfo` endpoint | Rejected **immediately** |
 | Token introspection (RFC 7662) | Reports `active: false` **immediately** |
 | Forward-auth proxy consulting Keycloak | Rejected **immediately** |
@@ -267,7 +267,7 @@ Each flow verifies by **reading state back from the API**, not by assuming its
 writes worked:
 
 | Flow | Verified |
-|---|---|
+| --- | --- |
 | Joiner | effective roles include the profile's roles; Vault holds exactly one policy; Gitea team membership present |
 | Mover | obsolete roles absent; new roles present; Vault policy list replaced; old team gone, new team present |
 | Leaver | password grant refused; zero active sessions; Vault login refused; Gitea login refused; no team memberships; repository present under the custody account |
@@ -386,7 +386,7 @@ implemented**. See [the roadmap](../roadmap/README.md).
 ## Reference
 
 | Path | Purpose |
-|---|---|
+| --- | --- |
 | `identity/profiles.json` | Declarative role profiles |
 | `scripts/identity/jml.py` | Flow orchestration and operator output |
 | `scripts/identity/keycloak.py` | Keycloak Admin API adapter |
