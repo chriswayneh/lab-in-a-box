@@ -55,7 +55,7 @@ docker-compose.yml            networks, volumes, secrets, and six includes
 The root file uses the Compose Spec [`include:`](https://docs.docker.com/compose/how-tos/multiple-compose-files/include/)
 directive. This is **not** the same as multiple `-f` flags: the fragments merge into a single project with
 one network namespace, one dependency graph and one `up` command. `docker compose ps` shows all
-25 services; `depends_on` works across fragment boundaries.
+28 available services (26 by default); `depends_on` works across fragment boundaries.
 
 Each include sets `project_directory: .` so that a relative path inside a fragment resolves from the
 repository root. Without it, Compose would resolve `./configs/...` relative to `compose/`, and every
@@ -67,7 +67,7 @@ is defined.
 
 ### Why not one file?
 
-A single file containing all 25 services would be around 1,500 lines. That is unreviewable in a pull
+A single file containing all 28 services would be around 1,500 lines. That is unreviewable in a pull
 request and unmergeable when two people touch it at once. The split is by *responsibility*, so a change
 to the AI stack touches one file and conflicts with nothing else.
 

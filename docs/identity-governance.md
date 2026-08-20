@@ -598,13 +598,14 @@ writes worked:
 | Mover | obsolete roles absent; new roles present; Vault policy list replaced; old team gone, new team present |
 | Leaver | password grant refused; zero active sessions; Vault login refused; Gitea login refused; no team memberships; repository present under the custody account |
 
-`make jml-test` runs **387 checks** across three suites: 105 lifecycle, 133 RBAC
-simulator, 149 access review campaign, against the **running lab**. Run one at
-a time with `make jml-test SUITE=lifecycle|rbac|access-review`. Authorization
-and remediation results are verified against the real services. One controlled
-adapter failure is injected to prove a failed entitlement does not stop later
-items and is never reported as revoked. Disposable identities only (`jmltest`,
-`jmltoken`, `campaigntest`, `campaigntest2`, `campaigne2e`); the seeded demo
+`make jml-test` runs **416 checks** across four suites: 105 lifecycle, 133 RBAC
+simulator, 148 access review campaign and 30 SCIM provisioning, against the
+**running lab**. Run one at a time with
+`make jml-test SUITE=lifecycle|rbac|access-review|scim`. Authorization,
+remediation and propagation results are verified against the real services.
+Controlled adapter failures prove a failed target does not stop later work or
+get reported as successful. Disposable identities only (`jmltest`, `jmltoken`,
+`campaigntest`, `campaigntest2`, `campaigne2e`, `scimtest`); the seeded demo
 users are protected by an explicit deny-list and are never modified.
 
 ---
@@ -693,12 +694,77 @@ any artifact on disk.
 
 ---
 
+## SCIM provisioning
+
+Roadmap item `v2-4`. Keycloak exposes the SCIM 2.0 service provider at:
+
+```text
+https://keycloak.lab.localhost/realms/lab/scim/v2
+```
+
+`/Users` and `/Groups` support create, read, replace, PATCH, delete, filtering
+and pagination. Discovery is available through `/ServiceProviderConfig`,
+`/ResourceTypes` and `/Schemas`. Every request requires an OAuth bearer token:
+
+```bash
+TOKEN="$(make -s scim-token)"
+curl -k -H "Authorization: Bearer $TOKEN" \
+  https://keycloak.lab.localhost/realms/lab/scim/v2/Users
+```
+
+Treat the token like a password and let it expire; do not paste it into issue
+reports or commit it. The `lab-scim` service account has only Keycloak's
+`realm-management/manage-users` role. Traefik applies the lab rate limit to the
+external endpoint.
+
+### Downstream reconciliation
+
+Keycloak 26.7 can act as a SCIM service provider, but it cannot yet emit
+outbound SCIM events or federate to another SCIM provider. The
+`scim-provisioner` therefore reads live Keycloak state every 15 seconds and
+reconciles it through the same supported Gitea API used by JML plus a dedicated
+Grafana API adapter. This is convergence, not a claim of real-time push.
+
+- A SCIM client must add the identity to `/SCIM Managed` to give the
+  reconciler explicit ownership, and to exactly one role-profile group (for
+  example `/Application Engineering`) to select access. This prevents the
+  SCIM controller from competing with JML or access-review remediation.
+- Keycloak group membership selects the existing role profile.
+- Gitea accounts and managed team membership follow that profile.
+- Grafana receives the same `Admin`/`Editor`/`Viewer` role the OIDC mapping
+  would assign at login.
+- Disabling or deleting the source identity removes downstream access but
+  retains accounts and attribution for audit.
+- Each target retries independently with exponential backoff capped at five
+  minutes. `make scim-status` shows attempts, the last safe error and the next
+  retry time.
+
+Use `make scim-test` for the 30-check live Users/Groups CRUD, PATCH,
+authentication, ownership, retry and propagation scenario.
+`make scim-conformance` runs the separately published `scim2/test-suite`; it
+requires internet access to fetch that pinned test tool, writes detailed text
+and JSON reports under `artifacts/scim-conformance/`, and is not part of first
+boot. It deliberately returns non-zero while upstream preview gaps remain.
+
+### Preview boundary
+
+Keycloak marks its SCIM API as preview. Bulk operations, sorting, password
+changes and ETags are not advertised. The lab does not pretend those optional
+features exist. At the current pin, the published suite exercises all 145 of
+its checks but Keycloak passes only 16/60 MUST assertions. Many failures cascade
+from unsupported synthetic resources and stricter User payload validation; the
+report is evidence of the preview boundary, not a green compliance badge. A
+future Keycloak upgrade must rerun conformance before the image pin changes.
+
+---
+
 ## Limitations
 
-What v2-1, v2-2 and v2-3 deliberately do **not** do:
+What the implemented identity-governance phases deliberately do **not** do:
 
-- **No authoritative identity source.** The operator's command *is* the request.
-  There is no HR system, no Workday or SCIM feed, no joiner queue.
+- **No HR system.** JML commands and authenticated SCIM clients can both create
+  identities, but there is no Workday feed, approval queue or authoritative
+  employee database.
 - **No approval workflow for provisioning.** Anyone who can run `make` can
   provision or offboard. There is no request, no approver, no segregation of
   duties for the JML commands themselves. A campaign reviews access after the
@@ -764,8 +830,8 @@ Specific to access review campaigns:
   four campaigns"; that comparison would need to be built from the individual
   evidence records by hand.
 
-The remaining v2 roadmap items (a SCIM endpoint, identity audit pipelines,
-alerting and forward-auth) are **not implemented**. See
+The remaining v2 roadmap items (identity audit pipelines, alerting and
+forward-auth) are **not implemented**. See
 [the roadmap](../roadmap/README.md).
 
 ---
@@ -779,6 +845,9 @@ alerting and forward-auth) are **not implemented**. See
 | `scripts/identity/keycloak.py` | Keycloak Admin API adapter |
 | `scripts/identity/vault.py` | Vault userpass and policy adapter |
 | `scripts/identity/gitea.py` | Gitea account, team and custody adapter |
+| `scripts/identity/grafana.py` | Grafana account and organization-role adapter |
+| `scripts/identity/scim_worker.py` | Persistent downstream reconciliation and retry state |
+| `scripts/identity/test_scim.py` | Live SCIM and propagation test suite |
 | `scripts/identity/model.py` | Profiles, validation, change tracking |
 | `scripts/identity/record.py` | Audit records and secret redaction |
 | `scripts/identity/labhttp.py` | Standard-library HTTP helper |

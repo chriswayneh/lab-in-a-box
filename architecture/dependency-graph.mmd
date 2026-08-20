@@ -56,6 +56,9 @@ graph TD
     cadvisor --> prometheus
     loki --> promtail
     socket_proxy --> promtail
+    gitea --> scim_provisioner
+    grafana --> scim_provisioner
+    keycloak_init --> scim_provisioner
     socket_proxy --> traefik
     vault --> vault_init
 

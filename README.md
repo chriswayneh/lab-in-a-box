@@ -4,13 +4,13 @@
 
 **A self-hosted AI, infrastructure and identity lab. One command, no manual configuration.**
 
-Twenty-five containers by default: identity, secrets, observability, object storage, Git hosting and a
+Twenty-six containers by default: identity, secrets, observability, object storage, Git hosting and a
 local LLM. All provisioned and wired together automatically. Two more services, Qdrant and Watchtower,
 are available through optional Compose profiles.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Docker Compose](https://img.shields.io/badge/Docker%20Compose-v2.20%2B-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
-[![Services](https://img.shields.io/badge/services-25-38bdf8)](docs/SERVICES.md)
+[![Services](https://img.shields.io/badge/services-26-38bdf8)](docs/SERVICES.md)
 [![Setup](https://img.shields.io/badge/setup-1%20command-34d399)](#quick-start)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-blueviolet.svg)](CONTRIBUTING.md)
 [![CI](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/ci.yml/badge.svg)](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/ci.yml)
@@ -400,6 +400,10 @@ the whole point of RBAC, and it is what the Joiner/Mover/Leaver demo on the [roa
 | `make access-review-decide` | Approve or revoke one reviewed entitlement | `bash scripts/access-review.sh decide …` |
 | `make access-review-remediate` | Act on revoke decisions (the only mutating campaign command) | `bash scripts/access-review.sh remediate …` |
 | `make access-review-complete` | Close a campaign | `bash scripts/access-review.sh complete …` |
+| `make scim-token` | Print a short-lived SCIM bearer token | `bash scripts/scim.sh token` |
+| `make scim-status` | Show provisioning state and pending retries | `docker compose exec … scim_worker.py status` |
+| `make scim-test` | Test SCIM CRUD and downstream propagation | `bash scripts/test-identity.sh scim` |
+| `make scim-conformance` | Run the published SCIM compliance suite | `bash scripts/scim-conformance.sh` |
 
 **Variables:** `GPU=1` (NVIDIA passthrough for Ollama), `PROFILES=qdrant,watchtower`,
 `SERVICE=<name>`, `BACKUP=<timestamp>`, `FORCE=1`, `USER=`/`ROLE=`/`FROM=`/`TO=` for the `jml-*` targets.
@@ -471,10 +475,23 @@ command reuses the exact same adapter methods the JML commands use, then
 verifies each removal against a fresh read rather than trusting its own report
 of success. Seeded demo identities can be reviewed but never mutated.
 
-`make jml-test` runs 387 checks across three suites against the live lab. Live
-authorization and remediation assertions use the real services; one controlled
-adapter failure proves partial remediation continues without reporting false
-success.
+### SCIM provisioning
+
+Keycloak exposes an authenticated SCIM 2.0 endpoint for external identity
+clients. Add an identity to `/SCIM Managed` plus one role-profile group to
+propagate its account and access into Gitea and Grafana. The ownership group
+keeps SCIM automation separate from JML and access-review remediation.
+
+```bash
+make scim-token       # short-lived bearer token
+make scim-status      # reconciliation state and retries
+make scim-test        # live endpoint and downstream checks
+```
+
+`make jml-test` runs 416 checks across four suites against the live lab. Live
+authorization, remediation and SCIM propagation assertions use the real
+services; controlled adapter failures prove partial failures remain visible
+without reporting false success.
 
 **→ [docs/identity-governance.md](docs/identity-governance.md)** for the full model,
 security implications and limitations.
@@ -747,13 +764,13 @@ More, including how to read the init-job logs and what each provisioning script 
 | Version | Theme | Highlights |
 | --- | --- | --- |
 | **v1** | Foundation ✅ | The stack you are reading about |
-| **v2** | Identity governance 🚧 | v2-1 JML ✅ · v2-2 RBAC simulator ✅ · v2-3 access review campaigns ✅ · SCIM next |
+| **v2** | Identity governance 🚧 | v2-1 JML ✅ · v2-2 RBAC ✅ · v2-3 access reviews ✅ · v2-4 SCIM ✅ · audit events next |
 | **v3** | Infrastructure as code | Terraform and Ansible deployments, a Kubernetes edition, AWS/Azure/GCP targets |
 | **v4** | AI operations | Log analysis, incident response copilot, automatic infrastructure documentation, RAG over your own runbooks |
 | **v5** | Homelab operations | Backup verification, external uptime monitoring and resource presets |
 
-**v2 is in progress.** Identity lifecycle automation, the RBAC simulator and
-access review campaigns have all landed and are usable today. See
+**v2 is in progress.** Identity lifecycle automation, RBAC simulation, access
+review campaigns and SCIM provisioning have landed and are usable today. See
 [Identity lifecycle](#identity-lifecycle) above, or
 [`docs/identity-governance.md`](docs/identity-governance.md) for the full model.
 v1.0.0 remains the only tagged release.

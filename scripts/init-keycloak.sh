@@ -11,7 +11,8 @@
 #
 #   1. Demo user passwords          (from DEMO_USER_PASSWORD)
 #   2. The Grafana OIDC client secret (from KEYCLOAK_GRAFANA_CLIENT_SECRET)
-#   3. Redirect URIs, when LAB_DOMAIN is not the default lab.localhost
+#   3. The SCIM service-account secret and least-privilege realm roles
+#   4. Redirect URIs and the SCIM audience for a custom LAB_DOMAIN
 #
 # Every step is idempotent — running it against an already-provisioned realm
 # converges to the same state rather than failing.
@@ -29,6 +30,7 @@ KC_ADMIN="${KC_ADMIN:-admin}"
 KC_ADMIN_PASSWORD="${KC_ADMIN_PASSWORD:?KC_ADMIN_PASSWORD is required}"
 DEMO_USER_PASSWORD="${DEMO_USER_PASSWORD:?DEMO_USER_PASSWORD is required}"
 GRAFANA_CLIENT_SECRET="${GRAFANA_CLIENT_SECRET:?GRAFANA_CLIENT_SECRET is required}"
+SCIM_CLIENT_SECRET="${SCIM_CLIENT_SECRET:?SCIM_CLIENT_SECRET is required}"
 LAB_DOMAIN="${LAB_DOMAIN:-lab.localhost}"
 
 DEMO_USERS=(alice bob carol dave)
@@ -75,6 +77,24 @@ require_realm() {
         for import errors, then recreate the stack with 'make clean && make up'."
 }
 
+enable_scim_api() {
+  kc update "realms/${KC_REALM}" -s scimApiEnabled=true >/dev/null
+  log "SCIM API enabled for realm '${KC_REALM}'"
+}
+
+ensure_scim_group() {
+  local group_id
+  group_id="$(kc get groups -r "$KC_REALM" -q 'search=SCIM Managed' \
+    --fields id,name --format csv --noquotes 2>/dev/null \
+    | grep ',SCIM Managed$' | head -n1 | cut -d, -f1 | tr -d '\r' || true)"
+  if [[ -z "$group_id" ]]; then
+    kc create groups -r "$KC_REALM" -s 'name=SCIM Managed' >/dev/null
+    log "group '/SCIM Managed' created"
+  else
+    log "group '/SCIM Managed' present"
+  fi
+}
+
 # -----------------------------------------------------------------------------
 # 3. Set demo user passwords
 #
@@ -83,8 +103,18 @@ require_realm() {
 # DEMO_USER_PASSWORD is rejected by Keycloak rather than silently accepted.
 # -----------------------------------------------------------------------------
 set_demo_passwords() {
-  local user failures=0
+  local user user_id credentials failures=0
   for user in "${DEMO_USERS[@]}"; do
+    user_id="$(kc get users -r "$KC_REALM" -q "username=${user}" \
+      --fields id --format csv --noquotes 2>/dev/null | head -n1 | tr -d '\r')"
+    if [[ -n "$user_id" ]]; then
+      credentials="$(kc get "users/${user_id}/credentials" -r "$KC_REALM" \
+        --fields type --format csv --noquotes 2>/dev/null || true)"
+      if grep -qx 'password' <<<"$credentials"; then
+        log "password already present for '$user' (not reset)"
+        continue
+      fi
+    fi
     if kc set-password -r "$KC_REALM" \
          --username "$user" \
          --new-password "$DEMO_USER_PASSWORD" >/dev/null 2>&1; then
@@ -150,6 +180,69 @@ retarget_client_domain() {
 }
 
 # -----------------------------------------------------------------------------
+# 6. SCIM service account
+#
+# Keycloak protects the SCIM API with the same fine-grained realm-management
+# roles as its Admin REST API. Assign only manage-users: it implies the query
+# and view permissions needed by Users, Groups and the discovery endpoints,
+# without granting realm or client administration.
+# -----------------------------------------------------------------------------
+configure_scim_client() {
+  local uuid service_user_id mapper_id audience
+  uuid="$(client_uuid lab-scim)"
+  if [[ -z "$uuid" ]]; then
+    kc create clients -r "$KC_REALM" \
+      -s clientId=lab-scim \
+      -s 'name=Lab SCIM Provisioner' \
+      -s 'description=Confidential service account authorized to manage the lab realm through SCIM 2.0.' \
+      -s enabled=true \
+      -s protocol=openid-connect \
+      -s publicClient=false \
+      -s standardFlowEnabled=false \
+      -s directAccessGrantsEnabled=false \
+      -s serviceAccountsEnabled=true \
+      -s fullScopeAllowed=false >/dev/null
+    uuid="$(client_uuid lab-scim)"
+    log "client 'lab-scim' created for this existing realm"
+  fi
+  [[ -n "$uuid" ]] || { warn "client 'lab-scim' could not be created"; return; }
+
+  set_client_secret lab-scim "$SCIM_CLIENT_SECRET"
+  kc update "clients/${uuid}" -r "$KC_REALM" -s fullScopeAllowed=true >/dev/null
+
+  service_user_id="$(kc get "clients/${uuid}/service-account-user" -r "$KC_REALM" \
+    --fields id --format csv --noquotes 2>/dev/null | head -n1 | tr -d '\r')"
+  if [[ -n "$service_user_id" ]]; then
+    kc add-roles -r "$KC_REALM" --uid "$service_user_id" \
+      --cclientid realm-management --rolename manage-users >/dev/null
+    log "realm-management/manage-users assigned to the SCIM service account"
+  else
+    warn "could not resolve the lab-scim service account user"
+  fi
+
+  # The SCIM API validates the token audience against its externally visible
+  # base URL. Keep the mapper correct when LAB_DOMAIN is customized.
+  audience="https://keycloak.${LAB_DOMAIN}/realms/${KC_REALM}/scim/v2"
+  mapper_id="$(kc get "clients/${uuid}/protocol-mappers/models" -r "$KC_REALM" \
+    -q name=scim-audience --fields id --format csv --noquotes 2>/dev/null | head -n1 | tr -d '\r')"
+  if [[ -z "$mapper_id" ]]; then
+    kc create "clients/${uuid}/protocol-mappers/models" -r "$KC_REALM" \
+      -s name=scim-audience \
+      -s protocol=openid-connect \
+      -s protocolMapper=oidc-audience-mapper \
+      -s consentRequired=false \
+      -s "config.\"included.custom.audience\"=${audience}" \
+      -s 'config."access.token.claim"=true' \
+      -s 'config."id.token.claim"=false' >/dev/null
+    mapper_id="$(kc get "clients/${uuid}/protocol-mappers/models" -r "$KC_REALM" \
+      -q name=scim-audience --fields id --format csv --noquotes 2>/dev/null | head -n1 | tr -d '\r')"
+  fi
+  kc update "clients/${uuid}/protocol-mappers/models/${mapper_id}" -r "$KC_REALM" \
+    -s "config.\"included.custom.audience\"=${audience}" >/dev/null
+  log "SCIM token audience set to ${audience}"
+}
+
+# -----------------------------------------------------------------------------
 # Main
 # -----------------------------------------------------------------------------
 main() {
@@ -157,8 +250,11 @@ main() {
 
   authenticate
   require_realm
+  enable_scim_api
+  ensure_scim_group
   set_demo_passwords
   set_client_secret grafana "$GRAFANA_CLIENT_SECRET"
+  configure_scim_client
 
   if [[ "$LAB_DOMAIN" != "lab.localhost" ]]; then
     log "LAB_DOMAIN is '${LAB_DOMAIN}' — rewriting client redirect URIs"

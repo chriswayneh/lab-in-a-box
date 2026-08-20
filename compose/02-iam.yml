@@ -49,10 +49,14 @@ services:
   # ---------------------------------------------------------------------------
   keycloak:
     <<: [*defaults, *hardened]
-    image: quay.io/keycloak/keycloak:26.1
+    image: quay.io/keycloak/keycloak:26.7.1
     container_name: ${COMPOSE_PROJECT_NAME:-lab}-keycloak
     command:
       - start-dev
+      # Keycloak 26.7's native SCIM 2.0 API is still a preview feature. The lab
+      # enables it deliberately for roadmap v2-4; docs/identity-governance.md
+      # records the supported surface and preview caveat.
+      - --features=scim-api
       # Reads every *.json under /opt/keycloak/data/import on boot. An existing
       # realm is left untouched, so this is safe on every start.
       - --import-realm
@@ -130,7 +134,7 @@ services:
   # ---------------------------------------------------------------------------
   keycloak-init:
     <<: *init-job
-    image: quay.io/keycloak/keycloak:26.1
+    image: quay.io/keycloak/keycloak:26.7.1
     container_name: ${COMPOSE_PROJECT_NAME:-lab}-keycloak-init
     entrypoint: ["/bin/bash", "/scripts/init-keycloak.sh"]
     environment:
@@ -141,6 +145,7 @@ services:
       KC_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin-insecure-dev-only}
       DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-demo-insecure-dev-only}
       GRAFANA_CLIENT_SECRET: ${KEYCLOAK_GRAFANA_CLIENT_SECRET:-grafana-insecure-dev-only}
+      SCIM_CLIENT_SECRET: ${KEYCLOAK_SCIM_CLIENT_SECRET:-scim-insecure-dev-only}
       LAB_DOMAIN: ${LAB_DOMAIN:-lab.localhost}
     volumes:
       - ./scripts/init-keycloak.sh:/scripts/init-keycloak.sh:ro
@@ -149,6 +154,59 @@ services:
     depends_on:
       keycloak:
         condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # SCIM downstream reconciler
+  #
+  # Keycloak owns the SCIM protocol endpoint and remains the identity source.
+  # Its current preview implementation does not emit outbound provisioning
+  # events, so this small worker reconciles live realm state into Gitea and
+  # Grafana. Per-target failures are persisted with bounded exponential retry.
+  # ---------------------------------------------------------------------------
+  scim-provisioner:
+    <<: [*defaults, *hardened]
+    image: python:3.12-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-scim-provisioner
+    command: ["python3", "/engine/scim_worker.py", "serve"]
+    read_only: true
+    cap_drop: [ALL]
+    environment:
+      TZ: ${LAB_TZ:-UTC}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-lab}
+      KEYCLOAK_SCIM_CLIENT_SECRET: ${KEYCLOAK_SCIM_CLIENT_SECRET:-scim-insecure-dev-only}
+      GITEA_URL: http://gitea:3000
+      GITEA_ADMIN_USER: ${GITEA_ADMIN_USER:-labadmin}
+      GITEA_ADMIN_PASSWORD: ${GITEA_ADMIN_PASSWORD:-gitea-insecure-dev-only}
+      GRAFANA_URL: http://grafana:3000
+      GRAFANA_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GRAFANA_ADMIN_PASSWORD_FILE: /run/secrets/grafana_admin_password
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-demo-insecure-dev-only}
+      SCIM_SYNC_INTERVAL: ${SCIM_SYNC_INTERVAL:-15}
+      PYTHONDONTWRITEBYTECODE: "1"
+    secrets:
+      - grafana_admin_password
+    volumes:
+      - ./scripts/identity:/engine:ro
+      - ./identity:/identity:ro
+      - scim_state:/state
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    networks:
+      - lab_edge
+    depends_on:
+      keycloak-init:
+        condition: service_completed_successfully
+      gitea:
+        condition: service_healthy
+      grafana:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "/engine/scim_worker.py", "health", "--max-age", "90"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
 
   # ---------------------------------------------------------------------------
   # HashiCorp Vault — secrets management

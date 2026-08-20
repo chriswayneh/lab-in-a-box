@@ -135,7 +135,8 @@ check_json() {
     else
       fail "invalid JSON: ${file#$LAB_ROOT/}"
     fi
-  done < <(find "$LAB_ROOT" -name '*.json' | grep -v '/\.git/' | grep -v '/backups/' | sort)
+  done < <(find "$LAB_ROOT" -name '*.json' \
+             | grep -v '/\.git/' | grep -v '/backups/' | grep -v '/artifacts/' | sort)
 
   success "${count} JSON file(s) parsed"
 }
@@ -242,7 +243,7 @@ check_makefile_user_guard() {
   heading "Makefile argument guards"
 
   if ! command -v make >/dev/null 2>&1; then
-    log "  ${C_DIM}skipped: make is not installed${C_RESET}"
+    skipped "make is not installed"
     return 0
   fi
 

@@ -130,11 +130,16 @@ issues:
 
       - `/scim/v2/Users` and `/scim/v2/Groups` support create, read, update,
         delete and PATCH
-      - Keycloak is configured to push changes to it
+      - Keycloak's native SCIM API is the endpoint and remains the identity source
+      - An explicit `/SCIM Managed` group prevents competing identity controllers
       - Changes propagate to at least Gitea and Grafana
       - Failed propagation is retried and surfaced, not silently dropped
       - The endpoint requires authentication and is rate limited
       - Conformance is verified against a published SCIM test suite
+
+      Keycloak 26.7 does not yet support outbound SCIM federation or real-time
+      push events. Downstream propagation therefore uses a persistent,
+      idempotent reconciler rather than claiming an unsupported native flow.
 
   - id: v2-5
     title: "Audit event pipeline into Loki"

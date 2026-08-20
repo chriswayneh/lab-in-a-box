@@ -14,9 +14,25 @@ action from someone with an existing lab**: a `make clean`, a manual migration, 
 ## [Unreleased]
 
 Work in progress toward **v2.0, Identity governance**. The milestone is not
-complete: `v2-1`, `v2-2` and `v2-3` have landed, `v2-4` through `v2-7` remain.
+complete: `v2-1` through `v2-4` have landed, `v2-5` through `v2-7` remain.
 
 ### Added
+
+#### SCIM provisioning (roadmap `v2-4`)
+
+- Keycloak 26.7's authenticated SCIM 2.0 Users, Groups and discovery endpoints,
+  enabled explicitly as a documented preview feature.
+- A least-privilege `lab-scim` OAuth service account and `make scim-token` for
+  short-lived bearer tokens.
+- A persistent reconciler that projects explicitly `/SCIM Managed` Keycloak
+  users, group membership and enabled state into Gitea accounts/teams and
+  Grafana organization roles without competing with the JML controller.
+- Independent bounded retries and `make scim-status`; one failed target does
+  not hide or roll back successful propagation to another.
+- Live CRUD, PATCH, authentication, retry and end-to-end downstream tests via
+  `make scim-test`.
+- A pinned published conformance harness that records Keycloak's preview-level
+  RFC gaps without hiding its non-zero result.
 
 #### Access review campaigns (roadmap `v2-3`)
 
