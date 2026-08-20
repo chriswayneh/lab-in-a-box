@@ -26,11 +26,19 @@ MAKEFLAGS += --no-print-directory
 # -----------------------------------------------------------------------------
 GPU        ?= 0
 SERVICE    ?=
-# Identity targets. FORMAT defaults to text; the rbac-* targets also accept json.
+# Identity targets. FORMAT defaults to text; the rbac-* and access-review-*
+# targets also accept json.
 FORMAT     ?= text
 OTHER      ?=
 PERMISSION ?=
 SUITE      ?= all
+# Access review campaign targets.
+CAMPAIGN   ?=
+SCOPE      ?= all
+ENTITLEMENT ?=
+DECISION   ?=
+NOTE       ?=
+REVIEWER   ?=
 BACKUP     ?=
 PROFILES   ?=
 FORCE      ?= 0
@@ -75,7 +83,10 @@ endif
 .PHONY: help up down restart clean logs ps health creds secrets hooks backup \
         restore update pull validate lint docs shell https-on https-off version \
         jml-join jml-move jml-leave jml-show jml-test \
-        rbac-show rbac-diff rbac-who-can
+        rbac-show rbac-diff rbac-who-can \
+        access-review-create access-review-show access-review-list \
+        access-review-decide access-review-complete access-review-cancel \
+        access-review-remediate access-review-test
 
 # =============================================================================
 # Help
@@ -218,7 +229,7 @@ jml-show: ## Print an identity's effective access across all services (USER=erin
 	fi
 	@bash scripts/jml.sh show --user "$(USER)"
 
-jml-test: ## Run the identity test suites against the running lab (SUITE=lifecycle|rbac|all)
+jml-test: ## Run the identity test suites against the running lab (SUITE=lifecycle|rbac|access-review|all)
 	@bash scripts/test-identity.sh $(SUITE)
 
 # -----------------------------------------------------------------------------
@@ -246,6 +257,63 @@ rbac-who-can: ## Every identity that can reach a resource (PERMISSION=vault:secr
 		exit 1; \
 	fi
 	@bash scripts/rbac.sh who-can --permission "$(PERMISSION)" --format "$(FORMAT)"
+
+# -----------------------------------------------------------------------------
+# Access review campaigns, a governance workflow built on the RBAC simulator.
+# Discovery is read-only; only `remediate` changes live access, and only for
+# items decided REVOKE, reusing the same JML adapters as the lifecycle
+# commands. See docs/identity-governance.md.
+# -----------------------------------------------------------------------------
+
+access-review-create: ## Open a campaign (NAME=quarterly-q3 [SCOPE=all|profile:developer|user:erin])
+	@if [[ -z "$(NAME)" ]]; then \
+		printf 'Usage: $(CYAN)make access-review-create NAME=quarterly-q3$(RESET) [SCOPE=all|profile:<name>|user:<name>]\n'; \
+		exit 1; \
+	fi
+	@bash scripts/access-review.sh create --name "$(NAME)" --scope "$(SCOPE)" --reviewer "$(REVIEWER)" --format "$(FORMAT)"
+
+access-review-show: ## Show a campaign's items and decisions (CAMPAIGN=<id> [FORMAT=json])
+	@if [[ -z "$(CAMPAIGN)" ]]; then \
+		printf 'Usage: $(CYAN)make access-review-show CAMPAIGN=<id>$(RESET) [FORMAT=json]\n'; \
+		exit 1; \
+	fi
+	@bash scripts/access-review.sh show --campaign "$(CAMPAIGN)" --format "$(FORMAT)"
+
+access-review-list: ## List all campaigns
+	@bash scripts/access-review.sh list --format "$(FORMAT)"
+
+access-review-decide: ## Record a decision (CAMPAIGN=<id> USER=erin ENTITLEMENT="Gitea:team developers" DECISION=approve)
+	@if [[ -z "$(CAMPAIGN)" || -z "$(USER)" || -z "$(ENTITLEMENT)" || -z "$(DECISION)" ]]; then \
+		printf 'Usage: $(CYAN)make access-review-decide CAMPAIGN=<id> USER=erin ENTITLEMENT="Gitea:team developers" DECISION=approve$(RESET)\n'; \
+		printf 'Decisions: $(DIM)approve, revoke, not-applicable$(RESET)  (NOTE=... optional, FORCE=1 to override an existing decision)\n'; \
+		exit 1; \
+	fi
+	@bash scripts/access-review.sh decide --campaign "$(CAMPAIGN)" --user "$(USER)" --entitlement "$(ENTITLEMENT)" \
+		--decision "$(DECISION)" --note "$(NOTE)" --reviewer "$(REVIEWER)" $(if $(filter 1,$(FORCE)),--force,)
+
+access-review-complete: ## Close a campaign (CAMPAIGN=<id>, refuses undecided items unless FORCE=1)
+	@if [[ -z "$(CAMPAIGN)" ]]; then \
+		printf 'Usage: $(CYAN)make access-review-complete CAMPAIGN=<id>$(RESET) [FORCE=1]\n'; \
+		exit 1; \
+	fi
+	@bash scripts/access-review.sh complete --campaign "$(CAMPAIGN)" --format "$(FORMAT)" $(if $(filter 1,$(FORCE)),--force,)
+
+access-review-cancel: ## Cancel a campaign (CAMPAIGN=<id>)
+	@if [[ -z "$(CAMPAIGN)" ]]; then \
+		printf 'Usage: $(CYAN)make access-review-cancel CAMPAIGN=<id>$(RESET)\n'; \
+		exit 1; \
+	fi
+	@bash scripts/access-review.sh cancel --campaign "$(CAMPAIGN)"
+
+access-review-remediate: ## Act on revoke decisions (CAMPAIGN=<id>); the only mutating campaign command
+	@if [[ -z "$(CAMPAIGN)" ]]; then \
+		printf 'Usage: $(CYAN)make access-review-remediate CAMPAIGN=<id>$(RESET)\n'; \
+		exit 1; \
+	fi
+	@bash scripts/access-review.sh remediate --campaign "$(CAMPAIGN)" --format "$(FORMAT)"
+
+access-review-test: ## Run the access review test suite against the running lab
+	@bash scripts/test-identity.sh access-review
 
 # =============================================================================
 # Credentials

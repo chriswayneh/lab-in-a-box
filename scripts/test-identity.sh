@@ -32,14 +32,16 @@ run_suite() {
 }
 
 case "$SUITE" in
-  lifecycle) run_suite "Lifecycle tests" test_lifecycle.py ;;
-  rbac)      run_suite "RBAC simulator tests" test_rbac.py ;;
+  lifecycle)      run_suite "Lifecycle tests" test_lifecycle.py ;;
+  rbac)           run_suite "RBAC simulator tests" test_rbac.py ;;
+  access-review)  run_suite "Access review campaign tests" test_campaign.py ;;
   all)
     log "${C_DIM}Running against the live lab. This creates and offboards disposable users.${C_RESET}"
     run_suite "Lifecycle tests" test_lifecycle.py
     run_suite "RBAC simulator tests" test_rbac.py
+    run_suite "Access review campaign tests" test_campaign.py
     ;;
-  *) die "unknown suite '${SUITE}' — expected: lifecycle, rbac, all" ;;
+  *) die "unknown suite '${SUITE}'; expected: lifecycle, rbac, access-review, all" ;;
 esac
 
 exit "$STATUS"

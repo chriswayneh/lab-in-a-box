@@ -122,6 +122,51 @@ class Vault:
             f"policies replaced: {', '.join(current) or '(none)'} -> {policy}",
         )
 
+    def set_policies(self, username: str, policies: list, result: ServiceResult) -> None:
+        """
+        Replace the policy list on an existing userpass identity.
+
+        Added for access-review remediation, which needs to drop ONE reviewed
+        policy while leaving any others intact. `reconcile_user` cannot do that:
+        it converges onto exactly one policy, which is right for the lifecycle
+        flows and wrong for a targeted revoke.
+
+        An empty list means the identity has no entitlements left, so the login
+        is removed and its outstanding tokens revoked. Leaving a credential that
+        can authenticate to nothing is worse than removing it: it still appears
+        in an access review as an account, and it can still be used to probe.
+        """
+        current = self.user_policies(username)
+        if current is None:
+            result.record(UNCHANGED, f"no userpass identity for {username!r}")
+            return
+
+        desired = sorted(set(policies))
+        if desired == current:
+            result.record(UNCHANGED, f"Vault policies already {', '.join(desired) or '(none)'}")
+            return
+
+        if not desired:
+            self.revoke_identity(username, result)
+            return
+
+        self._call(
+            "POST",
+            f"/auth/userpass/users/{username}/policies",
+            json_body={"token_policies": ",".join(desired)},
+        )
+        result.record(UPDATED, f"Vault policies {', '.join(current)} -> {', '.join(desired)}")
+
+        # Policies bind at token issue time, so a token minted before this call
+        # still carries the old set until it expires. Revoking now is what makes
+        # the removal take effect for access already in someone's hands.
+        try:
+            self._call("PUT", f"/sys/leases/revoke-prefix/auth/userpass/login/{username}")
+            result.record(UPDATED, "revoked outstanding Vault tokens for this identity")
+        except HttpError as exc:
+            if exc.status not in (400, 404):
+                raise
+
     # -- leaver --------------------------------------------------------------
 
     def revoke_identity(self, username: str, result: ServiceResult) -> None:

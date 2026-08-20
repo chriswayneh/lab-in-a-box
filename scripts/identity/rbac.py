@@ -58,6 +58,18 @@ DERIVED = "derived"
 
 DECISION_ORDER = [ALLOWED, NOT_AUTHORIZED, NOT_INTEGRATED, UNKNOWN]
 
+# -- expectation, used by the access-review campaign (roadmap v2-3) -----------
+#
+# Distinct from Grant.decision: a decision says whether the identity can reach
+# something at all; an expectation says whether that access matches what the
+# identity's role profile actually grants. A held entitlement can be ALLOWED
+# and still UNEXPECTED.
+
+EXPECTED = "EXPECTED"
+UNEXPECTED = "UNEXPECTED"
+NOT_MODELED = "NOT_MODELED"
+NO_PROFILE = "NO_PROFILE"
+
 
 @dataclass
 class Grant:
@@ -216,6 +228,56 @@ class Simulator:
             if profile.keycloak_group == group_path:
                 return profile
         return None
+
+    def classify_expectation(self, report: Report, grant: Grant) -> str:
+        """
+        Compare one held (ALLOWED) grant against the profile the identity's
+        current group implies.
+
+        Used by the access-review campaign to mark each reviewable entitlement.
+        Lives here rather than in the campaign module because it reads exactly
+        the Grant/Report/Catalogue data this class already holds -- duplicating
+        the comparison elsewhere would be a second copy that could drift from
+        what _detect_drift actually checks.
+
+        NOT_MODELED covers grants profiles.json has no opinion about: account
+        sign-in, personally-owned Gitea repositories, and the Grafana role
+        (itself derived from realm roles that are already classified on their
+        own). NO_PROFILE mirrors _detect_drift: an identity in more than one
+        group, or none, does not resolve to a single profile to compare against.
+        """
+        if grant.resource == "account" or grant.service == "Grafana":
+            return NOT_MODELED
+        if grant.service == "Gitea" and grant.resource.startswith("repository "):
+            return NOT_MODELED
+
+        if len(report.groups) != 1:
+            return NO_PROFILE
+        expected = self.profile_for_group(report.groups[0])
+        if not expected:
+            return NO_PROFILE
+
+        if grant.service == "Keycloak" and grant.resource.startswith("group "):
+            return EXPECTED if grant.resource == f"group {expected.keycloak_group}" else UNEXPECTED
+
+        if grant.service == "Keycloak" and grant.resource.startswith("role "):
+            role = grant.resource[len("role "):]
+            return EXPECTED if role in expected.effective_roles else UNEXPECTED
+
+        if grant.service == "Vault" and grant.resource.startswith("policy "):
+            return EXPECTED if grant.resource == f"policy {expected.vault_policy}" else UNEXPECTED
+
+        if grant.service == "Vault" and grant.inheritance == DERIVED:
+            # A resolved Vault path carries no policy identity of its own; its
+            # source is "policy <name>", set in _vault_grants below, and that
+            # name is what the expectation actually follows.
+            source_policy = grant.source[len("policy "):] if grant.source.startswith("policy ") else ""
+            return EXPECTED if source_policy == expected.vault_policy else UNEXPECTED
+
+        if grant.service == "Gitea" and grant.resource.startswith("team "):
+            return EXPECTED if grant.resource == f"team {expected.gitea_team}" else UNEXPECTED
+
+        return NOT_MODELED
 
     # -- the analysis -------------------------------------------------------
 

@@ -1,9 +1,10 @@
 # Identity Governance
 
-Joiner / Mover / Leaver lifecycle automation for the seeded Keycloak realm.
+Joiner / Mover / Leaver lifecycle automation, an RBAC simulator, and access
+review campaigns for the seeded Keycloak realm.
 
-Roadmap item [`v2-1`](../roadmap/README.md). This page documents what is
-implemented, how it works, and what it does not do.
+Roadmap items [`v2-1`, `v2-2` and `v2-3`](../roadmap/README.md). This page
+documents what is implemented, how it works, and what it does not do.
 
 ---
 
@@ -353,6 +354,239 @@ left the identity holding both. The joiner now refuses and points at
 
 ---
 
+## Access review campaigns
+
+Roadmap item `v2-3`. A campaign answers the question the simulator alone
+cannot: who currently has access to what, who reviewed it, what decision was
+made, and what evidence proves the review happened.
+
+```bash
+make access-review-create   NAME=quarterly-q3 [SCOPE=all|profile:developer|user:erin]
+make access-review-show     CAMPAIGN=<id> [FORMAT=json]
+make access-review-list
+make access-review-decide   CAMPAIGN=<id> USER=erin ENTITLEMENT="Service:resource" DECISION=approve
+make access-review-complete CAMPAIGN=<id>
+make access-review-remediate CAMPAIGN=<id>
+make access-review-cancel   CAMPAIGN=<id>
+```
+
+### Architecture
+
+```mermaid
+flowchart TD
+    CREATE["access-review-create<br/>SCOPE resolved to a list of identities"] --> ANALYSE
+    ANALYSE["rbac.Simulator.analyse()<br/>the SAME engine make rbac-show uses"] --> SNAPSHOT
+    SNAPSHOT["Snapshot written<br/>campaign.json + opened evidence"] --> DECIDE
+    DECIDE["access-review-decide<br/>APPROVE / REVOKE / NOT_APPLICABLE, per item"] --> COMPLETE
+    DECIDE -->|REVOKE| REMEDIATE
+    REMEDIATE["access-review-remediate<br/>Keycloak / Vault / Gitea adapters, reused from JML"] --> VERIFY
+    VERIFY["fresh Simulator read<br/>confirms the entitlement is actually gone"] --> DECIDE
+    COMPLETE["access-review-complete<br/>refuses undecided items unless FORCE=1"] --> EVIDENCE
+    EVIDENCE["completed evidence record<br/>+ post-snapshot drift, if access changed since opening"]
+```
+
+The campaign engine does not discover access on its own. Every entitlement it
+reviews comes from `rbac.Simulator`, the same engine behind `rbac-show`. A
+campaign is a workflow layered on top of that engine, not a second
+authorization model. Remediation reuses the exact `keycloak.py` /
+`vault.py` / `gitea.py` adapter methods the JML commands use. There is no
+second implementation of "remove a group" or "drop a policy" here.
+
+### Role profiles feed the review
+
+A campaign is only useful if it can say *why* an entitlement is or is not
+expected. That comes directly from the role profile system v2-1 already
+established: `rbac.Simulator.classify_expectation()` compares each held grant
+against the profile implied by the identity's current group and marks it
+`EXPECTED`, `UNEXPECTED`, `NOT_MODELED` (account sign-in, personally-owned
+Gitea repositories, the Grafana role: nothing `profiles.json` has an opinion
+about), or `NO_PROFILE` (an identity in more than one group, or none, does not
+resolve to a single profile to compare against).
+
+### Lifecycle
+
+`draft -> open -> completed`, with `cancelled` reachable from either of the
+first two. `access-review-create` moves straight from draft to open in one
+step: nothing in this feature needs a scope to sit undecided before its
+snapshot is captured, so there is no separate "open" command.
+
+| State | Meaning |
+| --- | --- |
+| `draft` | Scope defined, snapshot not yet taken (internal only; no command stops here) |
+| `open` | Snapshot captured, items can be decided |
+| `completed` | Closed. Idempotent: completing an already-completed campaign is a no-op, not an error |
+| `cancelled` | Closed without review. Idempotent the same way; cannot later be completed |
+
+### Snapshot immutability
+
+The entitlements a campaign reviews are captured once, at creation, and never
+re-fetched to answer "what does this item currently show." Re-running
+`access-review-show` on the same campaign returns the same item list even if
+live access has changed since. A **new** campaign created after that change
+does see it. The snapshot is a point-in-time record, not a live view.
+
+If access genuinely changes after a campaign opens, that is not hidden: at
+`access-review-complete`, every identity in scope is re-analysed and the
+difference against the original snapshot is recorded as `post_snapshot_drift`
+(gained / lost, per identity), alongside the untouched original items.
+
+### Decisions
+
+Every item starts `UNDECIDED`, an explicit value written into the record, not
+an absence of one, so an item nobody has looked at cannot be mistaken for one
+that was approved. Three decisions:
+
+| Decision | Meaning | Remediation |
+| --- | --- | --- |
+| `APPROVE` | Access confirmed correct | `NOT_REQUIRED` |
+| `REVOKE` | Access should be removed | `PENDING`, until `access-review-remediate` runs |
+| `NOT_APPLICABLE` | Reviewed, no action needed | `NOT_REQUIRED` |
+
+A second decision on the same item is refused unless `FORCE=1` is passed, and
+the refusal names the existing decision, its timestamp and who made it.
+`access-review-complete` refuses to close a campaign with undecided items
+unless `FORCE=1`, and forcing does **not** mark them approved; they stay
+recorded as `UNDECIDED` in the completed record, with a note that items were
+left undecided.
+
+### Remediation is not the same act as deciding
+
+Recording `REVOKE` is a governance decision. It changes nothing live. It only
+sets the item's remediation status to `PENDING`. Nothing about Keycloak, Vault
+or Gitea changes until `access-review-remediate` runs, and that command is the
+**only** campaign command that mutates anything.
+
+The rule that keeps remediation safe: every action mutates an **attachment**
+(a group membership, a policy binding, a team membership), never a **shared
+definition** (a Vault policy document, a Keycloak group itself). A policy or a
+group can be relied on by other identities; the attachment between one person
+and one of those objects cannot be.
+
+| Item type | Remediation |
+| --- | --- |
+| Keycloak group membership | `keycloak.remove_group` |
+| Keycloak role, directly assigned (not via a group) | `keycloak.remove_direct_realm_role` |
+| Keycloak role, granted by a group | `MANUAL_ACTION_REQUIRED`. Revoke the group item instead; stripping the role directly would silently no-op, since the endpoint only touches direct assignments |
+| Vault policy attachment | `vault.set_policies`, computed as *current policies minus the one revoked*, never a blind replace |
+| Vault path inside a policy | `MANUAL_ACTION_REQUIRED`. The path is not removable on its own without rewriting a policy document other identities may share |
+| Gitea team membership | `gitea.remove_team_membership` |
+| Gitea repository ownership | `MANUAL_ACTION_REQUIRED`. Points at `jml-leave`, which transfers rather than orphans |
+| Anything else (Grafana, account sign-in) | `MANUAL_ACTION_REQUIRED` |
+
+Every remediation attempt is verified against a **fresh** `Simulator.analyse()`
+call afterward, never trusted from the adapter's own report of success. This
+is what catches an entitlement surviving through a different inheritance path:
+if the same grant key is still present, the fresh read shows its new source,
+and that source is what explains the failure instead of a bare "still
+present." An already-absent entitlement (removed some other way, or the
+identity offboarded entirely before remediation ran) resolves to `VERIFIED`
+with "already absent" rather than an error. The removal calls are the same
+idempotent adapter methods JML already relies on.
+
+Remediation is safe to re-run: an item already `VERIFIED`, `NOT_REQUIRED` or
+`MANUAL_ACTION_REQUIRED` is skipped; only `PENDING` or `FAILED` items are
+attempted again.
+
+### Protected identities
+
+`access-review-remediate` refuses to mutate a seeded demo identity
+(`alice`, `bob`, `carol`, `dave`, `admin`, `labadmin`) unless
+`LAB_ALLOW_PROTECTED=1` is set, the same escape hatch the JML commands already
+use. A campaign may still **review** a protected identity: reading access and
+recording a decision never mutates anything. The guard applies only at the
+point something would actually change.
+
+### Scope
+
+Three forms, deliberately not a query language:
+
+| Scope | Resolves to |
+| --- | --- |
+| `all` (default) | Every identity in the realm |
+| `profile:<name>` | Everyone currently in that role profile's Keycloak group |
+| `user:<name>` | Exactly one identity |
+
+"One system" scoping (review only Vault entitlements, say) was considered and
+left out: every item already carries its own `service` field, so filtering by
+system is a one-line `jq`/`FORMAT=json` operation on the output rather than a
+second dimension the campaign model needs to understand.
+
+### Evidence
+
+Every campaign writes to `artifacts/access-review/<id>/`:
+
+```text
+artifacts/access-review/quarterly-q3-20260820T191744Z/
+  campaign.json                     the live working document
+  20260820T191744Z-opened.json      immutable: the snapshot as captured
+  20260820T192333Z-remediated.json  immutable: what remediation attempted and verified
+  20260820T192333Z-001-remediated.json  a second same-type event in that second
+  20260820T192333Z-completed.json   immutable: the final decision record
+```
+
+`campaign.json` is the live document, atomically replaced by every decide /
+complete / remediate call. The timestamped files beside it are opened in
+exclusive-create mode and never rewritten. If an event name and timestamp
+collide, the later file receives `-001`, `-002` and so on. That makes "what did
+this review actually decide" answerable months later even if `campaign.json`
+has since changed (it does not, once a campaign is completed, but the
+distinction matters while one is still open). Both pass through the same
+redaction chokepoint `record.py` uses; the test suite asserts directly that no
+credential from the environment appears in either.
+
+### A real demo, not a synthetic one
+
+```bash
+make jml-join USER=erin ROLE=developer
+```
+
+Adding erin to the `security` Gitea team directly (bypassing JML, the way a
+real misconfiguration or manual fix would) creates genuine drift:
+
+```bash
+make access-review-create NAME=quarterly-q3 SCOPE=user:erin
+```
+
+```text
+UNDECIDED      Gitea:team security [read]
+    why: team membership in lab-engineering  (direct)
+    expectation: UNEXPECTED
+
+Drift (context, not a decidable item):
+  EXTRA_GITEA_TEAM: Member of Gitea team 'security', which profile 'developer' does not grant
+```
+
+Approving the thirteen legitimate entitlements and revoking the one
+unexpected team, then remediating:
+
+```bash
+make access-review-remediate CAMPAIGN=quarterly-q3-<timestamp>
+```
+
+```text
+erin  Gitea:team security  VERIFIED
+    removed from team 'security'
+```
+
+`make access-review-complete` then closes the campaign: 13 `APPROVE`, 1
+`REVOKE`, remediation `VERIFIED`. Re-running `access-review-show` on that
+campaign continues to show the same 14 items and the same decisions;
+`rbac-show USER=erin` independently confirms the security team is gone and
+the developer team is not.
+
+### The seeded-user drift is context, not a fabricated item
+
+v2-2 found real drift on the seeded realm: `alice`, `bob`, `carol` and `dave`
+have no Gitea account, because v1 provisioning only ever created `labadmin`.
+That drift is a **missing** entitlement, not a held one, so it cannot become a
+review item. Items are built from grants an identity actually has. A
+campaign reviewing these users still surfaces it, in `drift_context`, exactly
+as `rbac-show` would report it; it is simply not something `access-review-decide`
+can act on. Provisioning the missing account is `jml-join`'s job, not a
+revoke decision's.
+
+---
+
 ## Verification
 
 Each flow verifies by **reading state back from the API**, not by assuming its
@@ -364,12 +598,14 @@ writes worked:
 | Mover | obsolete roles absent; new roles present; Vault policy list replaced; old team gone, new team present |
 | Leaver | password grant refused; zero active sessions; Vault login refused; Gitea login refused; no team memberships; repository present under the custody account |
 
-`make jml-test` runs **238 checks** across two suites, 105 lifecycle and 133 RBAC
-simulator, against the **running lab**. Run one at a time with
-`make jml-test SUITE=lifecycle` or `SUITE=rbac`. Nothing is mocked:
-the feature being verified is whether revocation actually revokes, which a mock
-cannot answer. It uses disposable identities (`jmltest`, `jmltoken`); the seeded
-demo users are protected by an explicit deny-list and are never modified.
+`make jml-test` runs **387 checks** across three suites: 105 lifecycle, 133 RBAC
+simulator, 149 access review campaign, against the **running lab**. Run one at
+a time with `make jml-test SUITE=lifecycle|rbac|access-review`. Authorization
+and remediation results are verified against the real services. One controlled
+adapter failure is injected to prove a failed entitlement does not stop later
+items and is never reported as revoked. Disposable identities only (`jmltest`,
+`jmltoken`, `campaigntest`, `campaigntest2`, `campaigne2e`); the seeded demo
+users are protected by an explicit deny-list and are never modified.
 
 ---
 
@@ -395,6 +631,19 @@ re-run completes exactly the parts still outstanding and leaves the rest alone.
 Before making any change, all three services are health-checked. A leaver that
 disabled Keycloak but never reached Vault is worse than one that refused to
 start, because the operator believes it finished.
+
+Access-review remediation handles failure per entitlement. A failed adapter
+call is retained as `FAILED`, later items still run, and only a fresh RBAC read
+can produce `VERIFIED`. Fix the failed service and rerun remediation; verified
+items are left alone while failed items are retried. Commands that only use the
+stored snapshot (`list`, `show`, `decide`, `cancel`) remain available during a
+downstream outage and run their engine container with networking disabled.
+`create`, `complete` and `remediate` require live services.
+
+Persisted campaign data is schema-validated before use. Malformed JSON,
+inconsistent item identifiers, unknown lifecycle values and invalid remediation
+states fail with a controlled validation error. `list` skips a damaged campaign
+so the remaining records stay usable; it never treats damaged state as success.
 
 ---
 
@@ -446,14 +695,14 @@ any artifact on disk.
 
 ## Limitations
 
-What v2-1 and v2-2 deliberately do **not** do:
+What v2-1, v2-2 and v2-3 deliberately do **not** do:
 
 - **No authoritative identity source.** The operator's command *is* the request.
   There is no HR system, no Workday or SCIM feed, no joiner queue.
-- **No approval workflow.** Anyone who can run `make` can provision or offboard.
-  There is no request, no approver, no segregation of duties.
-- **No access certification or review campaigns.** Nothing periodically asks
-  whether existing access is still warranted.
+- **No approval workflow for provisioning.** Anyone who can run `make` can
+  provision or offboard. There is no request, no approver, no segregation of
+  duties for the JML commands themselves. A campaign reviews access after the
+  fact, it does not gate access before it is granted.
 - **No offline-JWT revocation.** As described above, bounded by a 300-second
   token lifespan.
 - **No email.** The "welcome summary" prints to the terminal. The lab has no
@@ -492,9 +741,32 @@ Specific to the RBAC simulator:
   `rbac.py` is hand-written. A newly added service will not appear in the report
   until it is listed there.
 
-The remaining v2 roadmap items (access review campaigns, a SCIM endpoint,
-identity audit pipelines, alerting and forward-auth) are **not implemented**.
-See [the roadmap](../roadmap/README.md).
+Specific to access review campaigns:
+
+- **No scheduling or recurrence.** A campaign is created on demand. There is
+  no "quarterly, automatically" mechanism; running one on a cadence is an
+  operator or cron responsibility outside this feature.
+- **No notification.** Nobody is emailed that a campaign exists or that an
+  item is waiting on them. The lab has no mail server, the same constraint
+  the joiner's "welcome summary" already lives with.
+- **Remediation is limited to what the JML adapters already support.** A role
+  granted by a group, a single Vault path inside a policy, and repository
+  ownership all resolve to `MANUAL_ACTION_REQUIRED` rather than an automated
+  fix, deliberately, since none of those can be safely narrowed to "this one
+  attachment" without risking a shared object or a colleague's access. See
+  the remediation table above.
+- **`FORCE=1` on `access-review-complete` closes a campaign with items still
+  `UNDECIDED`.** It never marks them approved, but a completed campaign with
+  undecided items is a real gap in the review, not merely a formality. Reading
+  the `notes` field on a completed campaign is how that gap is surfaced.
+- **No cross-campaign history.** Each campaign is an independent, self-contained
+  record. There is no view of "how has alice's access changed across the last
+  four campaigns"; that comparison would need to be built from the individual
+  evidence records by hand.
+
+The remaining v2 roadmap items (a SCIM endpoint, identity audit pipelines,
+alerting and forward-auth) are **not implemented**. See
+[the roadmap](../roadmap/README.md).
 
 ---
 
@@ -510,12 +782,16 @@ See [the roadmap](../roadmap/README.md).
 | `scripts/identity/model.py` | Profiles, validation, change tracking |
 | `scripts/identity/record.py` | Audit records and secret redaction |
 | `scripts/identity/labhttp.py` | Standard-library HTTP helper |
-| `scripts/identity/rbac.py` | RBAC analysis: effective access and drift (read-only) |
+| `scripts/identity/rbac.py` | RBAC analysis: effective access, drift and expectation classification (read-only) |
 | `scripts/identity/rbac_cli.py` | Simulator CLI, rendering, diff and who-can |
+| `scripts/identity/campaign.py` | Access review workflow: snapshot, decide, complete, remediate |
+| `scripts/identity/campaign_cli.py` | Campaign CLI and rendering |
 | `scripts/identity/test_lifecycle.py` | Lifecycle integration test suite |
 | `scripts/identity/test_rbac.py` | Simulator integration test suite |
+| `scripts/identity/test_campaign.py` | Access review integration test suite |
 | `scripts/jml.sh` | Lifecycle entry point |
 | `scripts/rbac.sh` | Simulator entry point |
+| `scripts/access-review.sh` | Access review campaign entry point |
 | `scripts/lib/engine.sh` | Shared containerised runner for all of the above |
 | `scripts/test-identity.sh` | Containerised test entry point |
 | `configs/vault/policies/contractor.hcl` | Vault policy added for the contractor profile |
