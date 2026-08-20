@@ -520,16 +520,19 @@ artifacts/access-review/quarterly-q3-20260820T191744Z/
   campaign.json                     the live working document
   20260820T191744Z-opened.json      immutable: the snapshot as captured
   20260820T192333Z-remediated.json  immutable: what remediation attempted and verified
+  20260820T192333Z-001-remediated.json  a second same-type event in that second
   20260820T192333Z-completed.json   immutable: the final decision record
 ```
 
-`campaign.json` is the live document, rewritten by every decide / complete /
-remediate call. The timestamped files beside it are never rewritten, which is
-what makes "what did this review actually decide" answerable months later
-even if `campaign.json` has since changed (it does not, once a campaign is
-completed, but the distinction matters while one is still open). Both pass
-through the same redaction chokepoint `record.py` uses; the test suite asserts
-directly that no credential from the environment appears in either.
+`campaign.json` is the live document, atomically replaced by every decide /
+complete / remediate call. The timestamped files beside it are opened in
+exclusive-create mode and never rewritten. If an event name and timestamp
+collide, the later file receives `-001`, `-002` and so on. That makes "what did
+this review actually decide" answerable months later even if `campaign.json`
+has since changed (it does not, once a campaign is completed, but the
+distinction matters while one is still open). Both pass through the same
+redaction chokepoint `record.py` uses; the test suite asserts directly that no
+credential from the environment appears in either.
 
 ### A real demo, not a synthetic one
 
@@ -595,14 +598,14 @@ writes worked:
 | Mover | obsolete roles absent; new roles present; Vault policy list replaced; old team gone, new team present |
 | Leaver | password grant refused; zero active sessions; Vault login refused; Gitea login refused; no team memberships; repository present under the custody account |
 
-`make jml-test` runs **371 checks** across three suites: 105 lifecycle, 133 RBAC
-simulator, 133 access review campaign, against the **running lab**. Run one at
-a time with `make jml-test SUITE=lifecycle|rbac|access-review`. Nothing is
-mocked: the feature being verified is whether revocation actually revokes and
-whether a campaign's remediation actually changes live access, neither of
-which a mock can answer. Disposable identities only (`jmltest`, `jmltoken`,
-`campaigntest`, `campaigntest2`, `campaigne2e`); the seeded demo users are
-protected by an explicit deny-list and are never modified.
+`make jml-test` runs **387 checks** across three suites: 105 lifecycle, 133 RBAC
+simulator, 149 access review campaign, against the **running lab**. Run one at
+a time with `make jml-test SUITE=lifecycle|rbac|access-review`. Authorization
+and remediation results are verified against the real services. One controlled
+adapter failure is injected to prove a failed entitlement does not stop later
+items and is never reported as revoked. Disposable identities only (`jmltest`,
+`jmltoken`, `campaigntest`, `campaigntest2`, `campaigne2e`); the seeded demo
+users are protected by an explicit deny-list and are never modified.
 
 ---
 
@@ -628,6 +631,19 @@ re-run completes exactly the parts still outstanding and leaves the rest alone.
 Before making any change, all three services are health-checked. A leaver that
 disabled Keycloak but never reached Vault is worse than one that refused to
 start, because the operator believes it finished.
+
+Access-review remediation handles failure per entitlement. A failed adapter
+call is retained as `FAILED`, later items still run, and only a fresh RBAC read
+can produce `VERIFIED`. Fix the failed service and rerun remediation; verified
+items are left alone while failed items are retried. Commands that only use the
+stored snapshot (`list`, `show`, `decide`, `cancel`) remain available during a
+downstream outage and run their engine container with networking disabled.
+`create`, `complete` and `remediate` require live services.
+
+Persisted campaign data is schema-validated before use. Malformed JSON,
+inconsistent item identifiers, unknown lifecycle values and invalid remediation
+states fail with a controlled validation error. `list` skips a damaged campaign
+so the remaining records stay usable; it never treats damaged state as success.
 
 ---
 

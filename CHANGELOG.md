@@ -65,10 +65,12 @@ complete: `v2-1`, `v2-2` and `v2-3` have landed, `v2-4` through `v2-7` remain.
   group granting it (an anomaly `rbac.py` already detects) requires a
   different removal call than a group-granted one, and using the wrong one
   would silently no-op.
-- 133 new integration checks (`make jml-test SUITE=access-review`), including
+- 149 new checks (`make jml-test SUITE=access-review`), including
   an end-to-end join → inject drift → review → approve → revoke → remediate →
-  verify → complete scenario, and a dedicated test proving a multi-policy
-  Vault identity keeps its other policy when only one is revoked.
+  verify → complete scenario, a dedicated test proving a multi-policy Vault
+  identity keeps its other policy when only one is revoked, deterministic
+  partial-failure injection, malformed artifact handling, offline snapshot
+  operations and append-only evidence collisions.
 
 #### RBAC simulator (roadmap `v2-2`)
 
@@ -131,6 +133,19 @@ unchanged.
 
 ### Fixed
 
+- **Campaign evidence could be overwritten by a second event of the same type
+  in the same second.** Evidence files are now created exclusively, with a
+  sequence suffix on collision, and the live `campaign.json` is replaced
+  atomically so an interrupted write cannot leave a partial document.
+- **Malformed campaign data produced an unhandled traceback.** Campaign loads
+  now validate the schema, identifiers, lifecycle state, review items and
+  remediation states before any command can act on persisted data. `list`
+  skips a damaged record while `show` reports a controlled validation error.
+- **Snapshot-only campaign commands unnecessarily required every downstream
+  service to be available.** `show`, `decide` and `cancel` now operate from the
+  persisted snapshot during an outage. Together with `list`, their engine
+  container runs with Docker networking disabled. Commands that read or change
+  live state still perform the full service preflight.
 - **A long-running caller of the Keycloak adapter could hit a stale admin
   token.** `_authenticate()` caches its token "for the life of one command",
   true for every short-lived `jml`/`rbac` invocation, but not for the new

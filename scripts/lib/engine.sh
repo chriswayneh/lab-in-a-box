@@ -36,11 +36,18 @@ engine_host_path() {
 }
 
 # -----------------------------------------------------------------------------
-# Refuse to run against a lab that is not up, so a DNS failure inside the
-# container becomes a clear message out here instead.
+# Refuse live-state commands when the lab is not up, so a DNS failure inside
+# the container becomes a clear message out here instead. Snapshot-only access
+# review commands set LAB_ENGINE_OFFLINE=1 and run with Docker networking
+# disabled because they only need the artifact mount.
 # -----------------------------------------------------------------------------
 engine_preflight() {
   require_docker
+
+  if [[ "${LAB_ENGINE_OFFLINE:-0}" == "1" ]]; then
+    printf 'none'
+    return 0
+  fi
 
   local project network
   project="$(project_name)"

@@ -27,12 +27,13 @@ import json
 import os
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import campaign
 from gitea import Gitea
 from keycloak import Keycloak
-from labhttp import HttpError
+from labhttp import HttpError, Unavailable
 from model import PROTECTED_USERNAMES, ServiceResult, load_catalogue
 from rbac import Simulator
 from vault import Vault
@@ -50,7 +51,7 @@ def check(name: str, condition: bool, detail: str = "") -> bool:
         PASSED.append(name)
         print(f"  \033[32mPASS\033[0m  {name}")
     else:
-        FAILED.append(f"{name} — {detail}" if detail else name)
+        FAILED.append(f"{name}: {detail}" if detail else name)
         print(f"  \033[31mFAIL\033[0m  {name}" + (f"\n        {detail}" if detail else ""))
     return bool(condition)
 
@@ -191,6 +192,45 @@ def test_validation() -> None:
     # looked at.
     check("a campaign may include a protected identity for read-only review", proc.returncode == 0)
     check("protected identity is in PROTECTED_USERNAMES", "alice" in PROTECTED_USERNAMES)
+
+
+def test_corrupted_campaign_data() -> None:
+    section("Corrupted campaign data fails cleanly")
+
+    campaign_id = "corrupt-test-20990101T000000Z"
+    directory = campaign.ARTIFACT_ROOT / campaign_id
+    path = directory / "campaign.json"
+    directory.mkdir(parents=True, exist_ok=True)
+
+    try:
+        path.write_text("{not-json\n", encoding="utf-8")
+        try:
+            campaign.load(campaign_id)
+            malformed_rejected = False
+        except campaign.ValidationError as exc:
+            malformed_rejected = "malformed" in str(exc)
+        check("invalid JSON is rejected as malformed campaign data", malformed_rejected)
+
+        proc = run_ar("show", "--campaign", campaign_id, expect_rc=2)
+        check("the CLI reports corrupted data without a Python traceback",
+              proc.returncode == 2 and "Traceback" not in proc.stderr)
+
+        path.write_text(json.dumps({"schemaVersion": 1, "id": campaign_id}) + "\n", encoding="utf-8")
+        try:
+            campaign.load(campaign_id)
+            invalid_schema_rejected = False
+        except campaign.ValidationError:
+            invalid_schema_rejected = True
+        check("structurally incomplete campaign data is rejected", invalid_schema_rejected)
+
+        listed = run_json("list")
+        check("a corrupted campaign is skipped without breaking campaign list",
+              listed is not None and all(item["id"] != campaign_id for item in listed))
+    finally:
+        if path.exists():
+            path.unlink()
+        if directory.exists():
+            directory.rmdir()
 
 
 # =============================================================================
@@ -344,6 +384,42 @@ def test_duplicate_decision_guard() -> None:
     shown = run_json("show", "--campaign", campaign_id)
     item = next(it for it in shown["items"] if it["resource"] == "team developers")
     check("the forced decision actually changed the stored value", item["decision"] == "REVOKE")
+
+
+def test_snapshot_commands_work_during_downstream_outage() -> None:
+    section("Snapshot-only commands remain available during downstream outage")
+
+    doc = run_json("create", "--name", "offline-snapshot-test", "--scope", f"user:{SUBJECT}")
+    campaign_id = doc["id"]
+    target = doc["items"][0]
+    offline_env = {
+        **os.environ,
+        "NO_COLOR": "1",
+        "KEYCLOAK_URL": "http://127.0.0.1:1",
+        "VAULT_ADDR": "http://127.0.0.1:1",
+        "GITEA_URL": "http://127.0.0.1:1",
+    }
+
+    def offline(*args):
+        return subprocess.run(
+            [sys.executable, AR, *args], capture_output=True, text=True, env=offline_env,
+        )
+
+    shown = offline("show", "--campaign", campaign_id, "--format", "json")
+    check("show reads the persisted snapshot without contacting services",
+          shown.returncode == 0 and json.loads(shown.stdout)["id"] == campaign_id)
+
+    decided = offline(
+        "decide", "--campaign", campaign_id, "--user", SUBJECT,
+        "--entitlement", f"{target['service']}:{target['resource']}", "--decision", "approve",
+    )
+    check("decide records a snapshot decision without contacting services", decided.returncode == 0)
+    check("the offline decision persisted",
+          campaign.load(campaign_id).find_item(SUBJECT, f"{target['service']}:{target['resource']}").decision
+          == campaign.APPROVE)
+
+    cancelled = offline("cancel", "--campaign", campaign_id)
+    check("cancel updates the persisted campaign without contacting services", cancelled.returncode == 0)
 
 
 def test_decide_unknown_entitlement_and_closed_campaign() -> None:
@@ -535,6 +611,46 @@ def test_remediation_idempotent(sim, gt) -> None:
 
     proc = run_ar("remediate", "--campaign", campaign_id)
     check("a third run still exits cleanly", proc.returncode == 0)
+
+
+def test_partial_downstream_failure_continues(sim, gt) -> None:
+    section("Partial downstream failure is retained and later items continue")
+
+    scratch = ServiceResult("fixture")
+    gt.ensure_team_membership(SUBJECT, "security", "read", scratch)
+    gt.ensure_team_membership(SUBJECT, "platform", "admin", scratch)
+
+    doc = run_json("create", "--name", "partial-failure-test", "--scope", f"user:{SUBJECT}")
+    campaign_id = doc["id"]
+    security_item = next(it for it in doc["items"] if it["resource"] == "team security")
+    platform_item = next(it for it in doc["items"] if it["resource"] == "team platform")
+    current = campaign.load(campaign_id)
+    campaign.decide(current, SUBJECT, "Gitea:team security", campaign.REVOKE,
+                    "simulated outage", "test-harness", False)
+    campaign.decide(current, SUBJECT, "Gitea:team platform", campaign.REVOKE,
+                    "continue after failure", "test-harness", False)
+
+    class FailOneTeam:
+        def remove_team_membership(self, username, team_name, result):
+            if team_name == "security":
+                raise Unavailable("simulated Gitea failure for one entitlement")
+            return gt.remove_team_membership(username, team_name, result)
+
+    result = campaign.remediate(current, sim, None, None, FailOneTeam())
+    failed = result.find_item(SUBJECT, f"{security_item['service']}:{security_item['resource']}")
+    succeeded = result.find_item(SUBJECT, f"{platform_item['service']}:{platform_item['resource']}")
+
+    check("a downstream exception is recorded as FAILED without aborting the campaign",
+          failed.remediation_status == campaign.REM_FAILED, failed.remediation_detail)
+    check("the failure detail preserves the service error", "simulated Gitea failure" in failed.remediation_detail)
+    check("a later remediation item still executes and verifies",
+          succeeded.remediation_status == campaign.REM_VERIFIED, succeeded.remediation_detail)
+
+    live = allowed_keys(sim, SUBJECT)
+    check("the failed entitlement remains live and is not reported revoked", "Gitea:team security" in live)
+    check("the independently successful entitlement is absent live", "Gitea:team platform" not in live)
+
+    gt.remove_team_membership(SUBJECT, "security", scratch)
 
 
 def test_remediation_manual_action_paths(vt) -> None:
@@ -731,6 +847,45 @@ def test_audit_evidence(catalogue) -> None:
         check(f"campaign evidence does not contain the {label}", value not in haystack)
     for token in ("access_token", "refresh_token", "client_secret", "X-Vault-Token"):
         check(f"campaign evidence does not contain {token!r}", token not in haystack)
+
+
+def test_evidence_filename_collisions_are_append_only() -> None:
+    section("Evidence remains append-only when events share a timestamp")
+
+    campaign_id = "evidence-collision-20990101T000000Z"
+    review = campaign.Campaign(
+        id=campaign_id,
+        name="evidence-collision",
+        status=campaign.OPEN,
+        scope="all",
+        reviewer="test-harness",
+        created_at="2099-01-01T00:00:00+00:00",
+    )
+    directory = campaign.ARTIFACT_ROOT / campaign_id
+    fixed = datetime(2099, 1, 1, tzinfo=timezone.utc)
+    real_datetime = campaign.datetime
+
+    class FrozenDateTime:
+        @classmethod
+        def now(cls, tz=None):
+            return fixed
+
+    try:
+        campaign.datetime = FrozenDateTime
+        first = campaign.write_evidence(review, "collision", {"sequence": 1})
+        second = campaign.write_evidence(review, "collision", {"sequence": 2})
+    finally:
+        campaign.datetime = real_datetime
+
+    check("same-second evidence events receive distinct filenames", first != second)
+    check("both same-second evidence records remain on disk", first.exists() and second.exists())
+    check("neither evidence payload overwrote the other",
+          json.loads(first.read_text(encoding="utf-8"))["sequence"] == 1
+          and json.loads(second.read_text(encoding="utf-8"))["sequence"] == 2)
+
+    first.unlink()
+    second.unlink()
+    directory.rmdir()
 
 
 def test_deterministic_item_id() -> None:
@@ -930,11 +1085,13 @@ def main() -> int:
     sim = Simulator(kc, vt, gt, catalogue)
 
     test_validation()
+    test_corrupted_campaign_data()
     test_create_and_snapshot(sim, catalogue, kc)
     test_expectation_classification_with_real_drift(sim, gt)
     test_snapshot_immutability(sim, gt)
     test_decide_approve_and_revoke()
     test_duplicate_decision_guard()
+    test_snapshot_commands_work_during_downstream_outage()
     test_decide_unknown_entitlement_and_closed_campaign()
     test_complete_refuses_undecided()
     test_complete_idempotent()
@@ -942,12 +1099,14 @@ def main() -> int:
     test_remediation_reuses_adapters_and_verifies(sim, gt)
     test_remediation_removes_one_vault_policy_leaves_others(sim, vt, catalogue, kc)
     test_remediation_idempotent(sim, gt)
+    test_partial_downstream_failure_continues(sim, gt)
     test_remediation_manual_action_paths(vt)
     test_remediation_does_not_accumulate_or_leak_across_entitlements(sim)
     test_remediation_protected_identity_guard(kc)
     test_identity_removed_after_snapshot(sim, catalogue, kc)
     test_access_changed_after_snapshot_surfaced_at_complete(sim, catalogue, kc)
     test_audit_evidence(catalogue)
+    test_evidence_filename_collisions_are_append_only()
     test_deterministic_item_id()
     test_list_command()
     test_scope_forms(kc, catalogue)

@@ -471,8 +471,10 @@ command reuses the exact same adapter methods the JML commands use, then
 verifies each removal against a fresh read rather than trusting its own report
 of success. Seeded demo identities can be reviewed but never mutated.
 
-`make jml-test` runs 371 integration checks across three suites against the
-live lab. Nothing is mocked.
+`make jml-test` runs 387 checks across three suites against the live lab. Live
+authorization and remediation assertions use the real services; one controlled
+adapter failure proves partial remediation continues without reporting false
+success.
 
 **→ [docs/identity-governance.md](docs/identity-governance.md)** for the full model,
 security implications and limitations.

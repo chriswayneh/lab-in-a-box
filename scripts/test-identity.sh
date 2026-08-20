@@ -41,7 +41,7 @@ case "$SUITE" in
     run_suite "RBAC simulator tests" test_rbac.py
     run_suite "Access review campaign tests" test_campaign.py
     ;;
-  *) die "unknown suite '${SUITE}' — expected: lifecycle, rbac, access-review, all" ;;
+  *) die "unknown suite '${SUITE}'; expected: lifecycle, rbac, access-review, all" ;;
 esac
 
 exit "$STATUS"

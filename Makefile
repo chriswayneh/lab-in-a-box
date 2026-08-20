@@ -259,7 +259,7 @@ rbac-who-can: ## Every identity that can reach a resource (PERMISSION=vault:secr
 	@bash scripts/rbac.sh who-can --permission "$(PERMISSION)" --format "$(FORMAT)"
 
 # -----------------------------------------------------------------------------
-# Access review campaigns — governance workflow built on the RBAC simulator.
+# Access review campaigns, a governance workflow built on the RBAC simulator.
 # Discovery is read-only; only `remediate` changes live access, and only for
 # items decided REVOKE, reusing the same JML adapters as the lifecycle
 # commands. See docs/identity-governance.md.
@@ -305,7 +305,7 @@ access-review-cancel: ## Cancel a campaign (CAMPAIGN=<id>)
 	fi
 	@bash scripts/access-review.sh cancel --campaign "$(CAMPAIGN)"
 
-access-review-remediate: ## Act on revoke decisions (CAMPAIGN=<id>) — the only mutating campaign command
+access-review-remediate: ## Act on revoke decisions (CAMPAIGN=<id>); the only mutating campaign command
 	@if [[ -z "$(CAMPAIGN)" ]]; then \
 		printf 'Usage: $(CYAN)make access-review-remediate CAMPAIGN=<id>$(RESET)\n'; \
 		exit 1; \

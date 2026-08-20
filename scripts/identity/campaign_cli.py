@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Access review campaign — command line interface (roadmap v2-3).
+Access review campaign command line interface (roadmap v2-3).
 
 Rendering and argument handling live here; the workflow itself is in
 campaign.py. Same split as rbac.py / rbac_cli.py.
@@ -52,7 +52,7 @@ def heading(text: str) -> None:
 
 
 def render_campaign(c: "campaign.Campaign") -> None:
-    print(f"\n{BOLD('Access review campaign')} — {CYAN(c.name)}  ({c.id})")
+    print(f"\n{BOLD('Access review campaign')}: {CYAN(c.name)}  ({c.id})")
     print(f"  {'Status':<14} {c.status}")
     print(f"  {'Scope':<14} {c.scope}")
     print(f"  {'Reviewer':<14} {c.reviewer}")
@@ -118,7 +118,7 @@ def render_campaign(c: "campaign.Campaign") -> None:
 def render_list(campaigns: list) -> None:
     heading("Access review campaigns")
     if not campaigns:
-        print(f"  {DIM('none yet — make access-review-create NAME=...')}")
+        print(f"  {DIM('none yet; make access-review-create NAME=...')}")
         return
     for c in campaigns:
         s = c.summary()
@@ -212,7 +212,7 @@ def cmd_complete(args, sim) -> int:
     if before_status == campaign.COMPLETED:
         print(f"\n{DIM('campaign already completed at ' + str(c.completed_at))}")
     else:
-        print(f"\n{GREEN('Campaign completed')} — {c.id}")
+        print(f"\n{GREEN('Campaign completed')}: {c.id}")
     render_campaign(c)
     return 0
 
@@ -220,7 +220,7 @@ def cmd_complete(args, sim) -> int:
 def cmd_cancel(args) -> int:
     c = campaign.load(args.campaign)
     c = campaign.cancel(c)
-    print(f"\n{YELLOW('Campaign cancelled')} — {c.id}")
+    print(f"\n{YELLOW('Campaign cancelled')}: {c.id}")
     return 0
 
 
@@ -296,7 +296,12 @@ def main(argv=None) -> int:
         if args.command == "list":
             return cmd_list(args)
 
-        preflight(kc, vt, gt)
+        # show, decide and cancel only touch the persisted snapshot. Keeping
+        # them available during a downstream outage is part of the value of an
+        # auditable review record. Commands that read or mutate live state still
+        # require every integrated service up front.
+        if args.command in ("create", "complete", "remediate"):
+            preflight(kc, vt, gt)
         sim = Simulator(kc, vt, gt, catalogue)
 
         if args.command == "create":

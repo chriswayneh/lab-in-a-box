@@ -35,6 +35,7 @@ import hashlib
 import json
 import os
 import re
+import tempfile
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -105,6 +106,17 @@ CAMPAIGN_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9-]{1,60}$")
 # them and this needs its own pattern.
 CAMPAIGN_ID_PATTERN = re.compile(r"^[a-z][a-z0-9-]{1,60}-[0-9]{8}T[0-9]{6}Z$")
 ENTITLEMENT_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9 _-]*:[\x20-\x7e]{1,180}$")
+ITEM_ID_PATTERN = re.compile(r"^[0-9a-f]{12}$")
+CAMPAIGN_STATUSES = {DRAFT, OPEN, COMPLETED, CANCELLED}
+ITEM_DECISIONS = {UNDECIDED, APPROVE, REVOKE, NOT_APPLICABLE}
+REMEDIATION_STATUSES = {
+    REM_NOT_REQUIRED,
+    REM_PENDING,
+    REM_VERIFIED,
+    REM_FAILED,
+    REM_MANUAL,
+    REM_SKIPPED_PROTECTED,
+}
 
 
 def validate_campaign_name(value: str) -> str:
@@ -285,8 +297,139 @@ def save(campaign: Campaign) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / "campaign.json"
     document = redact({"schemaVersion": 1, **campaign.to_dict()})
-    path.write_text(json.dumps(document, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+    rendered = json.dumps(document, indent=2, sort_keys=False) + "\n"
+
+    # A killed process must not leave half a JSON document behind. The temporary
+    # file lives beside the destination so os.replace remains atomic on the
+    # mounted artifact filesystem.
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=directory,
+            prefix=".campaign-", suffix=".tmp", delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(rendered)
+            handle.flush()
+            os.fsync(handle.fileno())
+        # NamedTemporaryFile defaults to 0600. Preserve the 0644 mode the
+        # previous direct write produced so a non-root Linux host user can read
+        # the bind-mounted evidence after the root-run engine container exits.
+        os.chmod(temporary, 0o644)
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None and temporary.exists():
+            temporary.unlink()
     return path
+
+
+def _validate_loaded_campaign(campaign: Campaign, expected_id: str | None) -> None:
+    """Reject malformed persisted state before any command can act on it."""
+    validate_campaign_id(campaign.id)
+    validate_campaign_name(campaign.name)
+    if expected_id is not None and campaign.id != expected_id:
+        raise ValueError(f"document id {campaign.id!r} does not match directory {expected_id!r}")
+    if not campaign.id.startswith(f"{campaign.name}-"):
+        raise ValueError("campaign id does not belong to the stored campaign name")
+    if campaign.status not in CAMPAIGN_STATUSES:
+        raise ValueError(f"unknown campaign status {campaign.status!r}")
+    if not isinstance(campaign.scope, str) or not campaign.scope:
+        raise ValueError("scope must be a non-empty string")
+    if not isinstance(campaign.reviewer, str):
+        raise ValueError("reviewer must be a string")
+
+    for field_name in ("created_at", "opened_at", "completed_at", "cancelled_at"):
+        value = getattr(campaign, field_name)
+        if value is not None and not isinstance(value, str):
+            raise ValueError(f"{field_name} must be a string or null")
+
+    if not isinstance(campaign.identities, list):
+        raise ValueError("identities must be a list")
+    for username in campaign.identities:
+        if not isinstance(username, str):
+            raise ValueError("every identity must be a string")
+        validate_username(username)
+    if len(set(campaign.identities)) != len(campaign.identities):
+        raise ValueError("identities contains duplicates")
+
+    if not isinstance(campaign.items, list):
+        raise ValueError("items must be a list")
+    seen_items = set()
+    for item in campaign.items:
+        for field_name in (
+            "item_id", "username", "service", "resource", "permission", "source",
+            "inheritance", "expectation", "decision", "note", "remediation_status",
+            "remediation_detail",
+        ):
+            if not isinstance(getattr(item, field_name), str):
+                raise ValueError(f"item {field_name} must be a string")
+        validate_username(item.username)
+        if item.username not in campaign.identities:
+            raise ValueError(f"item identity {item.username!r} is outside the campaign scope")
+        validate_entitlement(item.key())
+        if not ITEM_ID_PATTERN.match(item.item_id):
+            raise ValueError(f"invalid item id {item.item_id!r}")
+        if item.item_id != compute_item_id(item.username, item.key()):
+            raise ValueError(f"item id {item.item_id!r} does not match its identity and entitlement")
+        if item.expectation not in {
+            rbac.EXPECTED, rbac.UNEXPECTED, rbac.NOT_MODELED, rbac.NO_PROFILE,
+        }:
+            raise ValueError(f"unknown expectation {item.expectation!r}")
+        if item.decision not in ITEM_DECISIONS:
+            raise ValueError(f"unknown decision {item.decision!r}")
+        if item.remediation_status not in REMEDIATION_STATUSES:
+            raise ValueError(f"unknown remediation status {item.remediation_status!r}")
+        if item.decision == REVOKE and item.remediation_status == REM_NOT_REQUIRED:
+            raise ValueError("a revoke decision cannot have NOT_REQUIRED remediation")
+        if item.decision != REVOKE and item.remediation_status != REM_NOT_REQUIRED:
+            raise ValueError("only a revoke decision may carry remediation state")
+        for field_name in ("decided_at", "decided_by"):
+            value = getattr(item, field_name)
+            if value is not None and not isinstance(value, str):
+                raise ValueError(f"item {field_name} must be a string or null")
+        identity = (item.username, item.key())
+        if identity in seen_items:
+            raise ValueError(f"duplicate review item {item.username}/{item.key()}")
+        seen_items.add(identity)
+
+    if not isinstance(campaign.drift_context, dict):
+        raise ValueError("drift_context must be an object")
+    for username, drift in campaign.drift_context.items():
+        if username not in campaign.identities or not isinstance(drift, list):
+            raise ValueError("drift_context must map reviewed identities to lists")
+        if any(not isinstance(entry, dict) for entry in drift):
+            raise ValueError("each drift_context entry must be an object")
+
+    if not isinstance(campaign.post_snapshot_drift, dict):
+        raise ValueError("post_snapshot_drift must be an object")
+    for username, delta in campaign.post_snapshot_drift.items():
+        if username not in campaign.identities or not isinstance(delta, dict):
+            raise ValueError("post_snapshot_drift must map reviewed identities to objects")
+        for direction in ("gained", "lost"):
+            values = delta.get(direction, [])
+            if not isinstance(values, list) or any(not isinstance(value, str) for value in values):
+                raise ValueError(f"post_snapshot_drift {direction} must be a list of strings")
+
+    if not isinstance(campaign.notes, list) or any(not isinstance(note, str) for note in campaign.notes):
+        raise ValueError("notes must be a list of strings")
+
+
+def _load_document(path: Path, expected_id: str | None = None) -> Campaign:
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValidationError(f"campaign data in {path} is unreadable or malformed: {exc}") from exc
+
+    try:
+        if not isinstance(document, dict):
+            raise ValueError("top-level value must be an object")
+        if document.get("schemaVersion") != 1:
+            raise ValueError(f"unsupported or missing schemaVersion {document.get('schemaVersion')!r}")
+        loaded = Campaign.from_dict(document)
+        _validate_loaded_campaign(loaded, expected_id)
+        return loaded
+    except (TypeError, KeyError, ValueError, ValidationError) as exc:
+        raise ValidationError(f"campaign data in {path} is malformed: {exc}") from exc
 
 
 def load(campaign_id: str) -> Campaign:
@@ -296,7 +439,7 @@ def load(campaign_id: str) -> Campaign:
         raise ValidationError(
             f"no campaign {campaign_id!r}\n  Run 'make access-review-list' to see what exists."
         )
-    return Campaign.from_dict(json.loads(path.read_text(encoding="utf-8")))
+    return _load_document(path, campaign_id)
 
 
 def list_campaigns() -> list:
@@ -307,8 +450,8 @@ def list_campaigns() -> list:
         path = entry / "campaign.json"
         if path.exists():
             try:
-                campaigns.append(Campaign.from_dict(json.loads(path.read_text(encoding="utf-8"))))
-            except (json.JSONDecodeError, TypeError, KeyError):
+                campaigns.append(_load_document(path, entry.name))
+            except ValidationError:
                 continue
     return campaigns
 
@@ -332,9 +475,18 @@ def write_evidence(campaign: Campaign, event: str, payload: dict) -> Path:
     })
     directory = _campaign_dir(campaign.id)
     directory.mkdir(parents=True, exist_ok=True)
-    path = directory / f"{now.strftime('%Y%m%dT%H%M%SZ')}-{event}.json"
-    path.write_text(json.dumps(document, indent=2, sort_keys=False) + "\n", encoding="utf-8")
-    return path
+    rendered = json.dumps(document, indent=2, sort_keys=False) + "\n"
+    timestamp = now.strftime("%Y%m%dT%H%M%SZ")
+    for sequence in range(1000):
+        suffix = "" if sequence == 0 else f"-{sequence:03d}"
+        path = directory / f"{timestamp}{suffix}-{event}.json"
+        try:
+            with path.open("x", encoding="utf-8") as handle:
+                handle.write(rendered)
+            return path
+        except FileExistsError:
+            continue
+    raise ValidationError(f"could not allocate a unique evidence filename for {event!r}")
 
 
 # -----------------------------------------------------------------------------

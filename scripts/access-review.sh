@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Access review campaigns — containerised entry point
+# Access review campaigns, containerised entry point
 # =============================================================================
 #   bash scripts/access-review.sh create   --name quarterly-q3
 #   bash scripts/access-review.sh show     --campaign quarterly-q3-20260820T010000Z
@@ -21,5 +21,12 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/lib/engine.sh"
 
 [[ $# -ge 1 ]] || die "usage: access-review.sh {create|show|list|decide|complete|cancel|remediate} ..."
+
+# These commands operate only on persisted campaign data. Running their engine
+# container with no network proves they remain available during a service outage
+# and prevents an accidental live-state dependency from creeping back in.
+case "$1" in
+  show|list|decide|cancel) export LAB_ENGINE_OFFLINE=1 ;;
+esac
 
 run_engine campaign_cli.py "$@"
