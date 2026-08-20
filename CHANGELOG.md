@@ -14,9 +14,61 @@ action from someone with an existing lab**: a `make clean`, a manual migration, 
 ## [Unreleased]
 
 Work in progress toward **v2.0, Identity governance**. The milestone is not
-complete: `v2-1` and `v2-2` have landed, `v2-3` through `v2-7` remain.
+complete: `v2-1`, `v2-2` and `v2-3` have landed, `v2-4` through `v2-7` remain.
 
 ### Added
+
+#### Access review campaigns (roadmap `v2-3`)
+
+- **Campaign workflow built on the v2-2 RBAC simulator**, not a second
+  authorization model. Every entitlement a campaign reviews comes from
+  `rbac.Simulator.analyse()`, the same engine `make rbac-show` uses.
+  - `make access-review-create NAME=… [SCOPE=all|profile:<name>|user:<name>]`:
+    snapshots access for every identity in scope and opens the campaign in one
+    step
+  - `make access-review-decide CAMPAIGN=… USER=… ENTITLEMENT=… DECISION=approve|revoke|not-applicable`:
+    records a decision. A second decision on the same item is refused unless
+    `FORCE=1`
+  - `make access-review-complete CAMPAIGN=…`: closes the campaign. Refuses if
+    items are still undecided unless `FORCE=1`, and forcing never marks them
+    approved
+  - `make access-review-remediate CAMPAIGN=…`: the only command that mutates
+    live access. Acts on `REVOKE` decisions by reusing the exact Keycloak/Vault/Gitea
+    adapters the JML commands use, then verifies each removal against a fresh
+    RBAC read rather than trusting the adapter's own report of success
+  - `make access-review-show` / `access-review-list` / `access-review-cancel`
+- **Snapshot immutability.** A campaign's captured items never change after
+  the fact; re-showing the same campaign always returns what it saw at open
+  time. If live access changes afterward, `access-review-complete` reports the
+  difference as `post_snapshot_drift` alongside the untouched original record.
+- **Expectation classification.** `rbac.Simulator.classify_expectation()`
+  marks every held entitlement `EXPECTED`, `UNEXPECTED`, `NOT_MODELED` or
+  `NO_PROFILE` against the identity's current role profile, reusing the exact
+  comparison `_detect_drift` already makes rather than a second copy of it.
+- **Remediation never touches a shared definition, only an attachment.**
+  Revoking a Vault policy computes *current policies minus the one revoked*
+  (`vault.set_policies`, new), never a blind replace, so an identity holding
+  more than one policy keeps the others. A role granted by a group, a single
+  Vault path inside a policy, and Gitea repository ownership all resolve to
+  `MANUAL_ACTION_REQUIRED` rather than an automated guess, because none of
+  them can be safely narrowed to one attachment without risking a shared
+  object or someone else's access.
+- **Protected identities can be reviewed but never mutated.** Remediation
+  against a seeded demo identity is skipped by default (`SKIPPED_PROTECTED_IDENTITY`),
+  reusing the same `LAB_ALLOW_PROTECTED` escape hatch the JML commands already have.
+- **Redacted evidence**, immutable per transition (`opened`, `remediated`,
+  `completed`), written under `artifacts/access-review/<id>/` alongside the
+  live working document, through the same `record.py` redaction chokepoint the
+  lifecycle records use.
+- `keycloak.py`: `group_members`, `all_usernames`, `direct_realm_roles`,
+  `remove_direct_realm_role`. The last two are needed because a role held with no
+  group granting it (an anomaly `rbac.py` already detects) requires a
+  different removal call than a group-granted one, and using the wrong one
+  would silently no-op.
+- 133 new integration checks (`make jml-test SUITE=access-review`), including
+  an end-to-end join → inject drift → review → approve → revoke → remediate →
+  verify → complete scenario, and a dedicated test proving a multi-policy
+  Vault identity keeps its other policy when only one is revoked.
 
 #### RBAC simulator (roadmap `v2-2`)
 
@@ -79,6 +131,12 @@ unchanged.
 
 ### Fixed
 
+- **A long-running caller of the Keycloak adapter could hit a stale admin
+  token.** `_authenticate()` caches its token "for the life of one command",
+  true for every short-lived `jml`/`rbac` invocation, but not for the new
+  access-review test suite, which runs for several minutes across dozens of
+  API calls and can outlive the admin token's own expiry inside that single
+  process. `_call()` now retries once after a fresh login on a 401.
 - **`jml-join` could stack a second role profile onto an existing identity.**
   The joiner only ever added a group, so joining someone who already held a
   different profile left them in both, which is the entitlement accumulation this

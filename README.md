@@ -56,7 +56,8 @@ trade-offs that a lab makes against production are stated plainly rather than hi
 | --- | --- |
 | **Identity** | Keycloak with a seeded realm: 4 users, 4 groups, 6 roles, 4 OIDC clients, brute-force protection and a password policy |
 | **Identity lifecycle** | Joiner/Mover/Leaver automation across Keycloak, Vault and Gitea. Group-based RBAC, access diffing, session and refresh-token revocation, repository custody transfer, redacted audit records |
-| **Access review** | A read-only RBAC simulator that answers "what can this person reach, and why?" It resolves live Keycloak, Vault and Gitea state, explains every grant's source, and surfaces entitlement drift |
+| **RBAC simulator** | Read-only: answers "what can this person reach, and why?" Resolves live Keycloak, Vault and Gitea state, explains every grant's source, surfaces entitlement drift |
+| **Access review** | Campaign-based recertification built on the simulator above: snapshot, approve/revoke per entitlement, remediate through the same JML adapters, retained evidence |
 | **Secrets** | Vault with KV v2, transit encryption, AppRole for machines, userpass for humans, and least-privilege ACL policies |
 | **Observability** | Prometheus, Grafana, Loki and Promtail: 3 provisioned dashboards, 9 alert rules, metrics and logs correlated |
 | **AI** | Ollama with a model pulled automatically, Open WebUI wired to it, optional Qdrant for retrieval |
@@ -395,6 +396,10 @@ the whole point of RBAC, and it is what the Joiner/Mover/Leaver demo on the [roa
 | `make rbac-show` | Effective access for one identity, with reasons | `bash scripts/rbac.sh show …` |
 | `make rbac-diff` | What one identity can reach that another cannot | `bash scripts/rbac.sh diff …` |
 | `make rbac-who-can` | Every identity that can reach a resource | `bash scripts/rbac.sh who-can …` |
+| `make access-review-create` | Open a campaign and snapshot access | `bash scripts/access-review.sh create …` |
+| `make access-review-decide` | Approve or revoke one reviewed entitlement | `bash scripts/access-review.sh decide …` |
+| `make access-review-remediate` | Act on revoke decisions (the only mutating campaign command) | `bash scripts/access-review.sh remediate …` |
+| `make access-review-complete` | Close a campaign | `bash scripts/access-review.sh complete …` |
 
 **Variables:** `GPU=1` (NVIDIA passthrough for Ollama), `PROFILES=qdrant,watchtower`,
 `SERVICE=<name>`, `BACKUP=<timestamp>`, `FORCE=1`, `USER=`/`ROLE=`/`FROM=`/`TO=` for the `jml-*` targets.
@@ -424,7 +429,7 @@ grants a role directly to a user.
 
 Every run writes a redacted JSON record to `artifacts/identity/<user>/`.
 
-### Access review: what can this person reach?
+### RBAC simulator: what can this person reach?
 
 ```bash
 make rbac-show    USER=erin                              # effective access, with reasons
@@ -442,13 +447,32 @@ the difference as drift: an extra Gitea team, an unexpected Vault policy, an
 entitlement that survived an offboarding. Services with no identity integration
 are labelled as such, not reported as "no access".
 
-`make jml-test` runs 238 integration checks across both suites against the live
-lab. Nothing is mocked.
-
 Revocation behaviour is documented precisely. Refresh tokens are invalidated
 immediately, and the access token is rejected by anything that consults Keycloak.
 A resource server validating a JWT purely offline would still accept it until
 `exp`, bounded to 300 seconds by the realm's `accessTokenLifespan`.
+
+### Access review campaigns
+
+```bash
+make access-review-create   NAME=quarterly-q3 SCOPE=all       # snapshot, built on the simulator above
+make access-review-decide   CAMPAIGN=<id> USER=erin ENTITLEMENT="Gitea:team security" DECISION=revoke
+make access-review-remediate CAMPAIGN=<id>                    # only command that changes live access
+make access-review-complete CAMPAIGN=<id>
+```
+
+Governance, not just a report. A campaign snapshots entitlements once, at
+creation, so later access changes never silently rewrite what was reviewed.
+Every item starts `UNDECIDED`, an explicit value, not an absence of one, and a
+campaign refuses to close with items still undecided unless the operator
+deliberately forces it. `REVOKE` is a decision, not a mutation: nothing about
+Keycloak, Vault or Gitea changes until `access-review-remediate` runs, and that
+command reuses the exact same adapter methods the JML commands use, then
+verifies each removal against a fresh read rather than trusting its own report
+of success. Seeded demo identities can be reviewed but never mutated.
+
+`make jml-test` runs 371 integration checks across three suites against the
+live lab. Nothing is mocked.
 
 **→ [docs/identity-governance.md](docs/identity-governance.md)** for the full model,
 security implications and limitations.
@@ -721,14 +745,15 @@ More, including how to read the init-job logs and what each provisioning script 
 | Version | Theme | Highlights |
 | --- | --- | --- |
 | **v1** | Foundation ✅ | The stack you are reading about |
-| **v2** | Identity governance 🚧 | v2-1 JML ✅ · v2-2 RBAC simulator ✅ · v2-3 access reviews next · SCIM and audit pipeline planned |
+| **v2** | Identity governance 🚧 | v2-1 JML ✅ · v2-2 RBAC simulator ✅ · v2-3 access review campaigns ✅ · SCIM next |
 | **v3** | Infrastructure as code | Terraform and Ansible deployments, a Kubernetes edition, AWS/Azure/GCP targets |
 | **v4** | AI operations | Log analysis, incident response copilot, automatic infrastructure documentation, RAG over your own runbooks |
 | **v5** | Homelab operations | Backup verification, external uptime monitoring and resource presets |
 
-**v2 is in progress.** Identity lifecycle automation and the RBAC simulator have
-landed and are usable today. See [Identity lifecycle](#identity-lifecycle) above,
-or [`docs/identity-governance.md`](docs/identity-governance.md) for the full model.
+**v2 is in progress.** Identity lifecycle automation, the RBAC simulator and
+access review campaigns have all landed and are usable today. See
+[Identity lifecycle](#identity-lifecycle) above, or
+[`docs/identity-governance.md`](docs/identity-governance.md) for the full model.
 v1.0.0 remains the only tagged release.
 
 Full detail, including ready-to-file issues with acceptance criteria, is in

@@ -53,12 +53,21 @@ class Keycloak:
         return token
 
     def _call(self, method: str, path: str, **kwargs):
-        return request(
-            method,
-            f"{self.base}/admin/realms/{self.realm}{path}",
-            headers={"Authorization": f"Bearer {self._authenticate()}"},
-            **kwargs,
-        )
+        url = f"{self.base}/admin/realms/{self.realm}{path}"
+        try:
+            return request(method, url, headers={"Authorization": f"Bearer {self._authenticate()}"}, **kwargs)
+        except HttpError as exc:
+            if exc.status != 401:
+                raise
+            # The cached token is "for the life of one command" per
+            # _authenticate's own contract, which every short-lived jml/rbac
+            # invocation satisfies trivially. A long-lived caller -- the
+            # access-review test suite runs for several minutes across dozens
+            # of API calls -- can outlive the admin token's own expiry inside
+            # that single process. One retry after a fresh login covers that
+            # case without turning every call into a token-freshness check.
+            self._token = None
+            return request(method, url, headers={"Authorization": f"Bearer {self._authenticate()}"}, **kwargs)
 
     def ping(self) -> None:
         """Fail early and clearly if Keycloak is unreachable or credentials are wrong."""
@@ -97,6 +106,35 @@ class Keycloak:
             if r["name"] not in ("default-roles-" + self.realm, "offline_access", "uma_authorization")
         )
 
+    def direct_realm_roles(self, user_id: str) -> list:
+        """
+        Realm roles assigned directly to the user, not inherited via a group.
+
+        Distinct from effective_realm_roles, which is composite and includes
+        group-inherited roles. This is the plain (non-composite) endpoint, and
+        it returns full role representations -- including the id Keycloak
+        requires to delete one -- rather than just names.
+        """
+        return self._call("GET", f"/users/{user_id}/role-mappings/realm") or []
+
+    def remove_direct_realm_role(self, user_id: str, role_name: str, result: ServiceResult) -> None:
+        """
+        Remove a realm role assigned directly to the user.
+
+        This realm's model is group-based: a role a group grants cannot be
+        removed by this call, because DELETE on this endpoint only ever touches
+        a DIRECT assignment. That is deliberate -- it is reserved for the
+        anomaly _keycloak_grants() in rbac.py already detects, a role held with
+        no group granting it. Revoking a group-granted role means removing the
+        group (remove_group), not this.
+        """
+        direct = {r["name"]: r for r in self.direct_realm_roles(user_id)}
+        if role_name not in direct:
+            result.record(UNCHANGED, f"role {role_name!r} is not a direct assignment (nothing to remove)")
+            return
+        self._call("DELETE", f"/users/{user_id}/role-mappings/realm", json_body=[direct[role_name]])
+        result.record(UPDATED, f"removed direct role assignment {role_name!r}")
+
     def group_by_path(self, path: str) -> dict:
         groups = self._call("GET", "/groups?briefRepresentation=false") or []
 
@@ -114,6 +152,23 @@ class Keycloak:
             available = ", ".join(sorted(g.get("path", "?") for g in groups))
             raise LookupError(f"realm has no group at path {path!r}. Available: {available}")
         return group
+
+    def group_members(self, group_path: str) -> list:
+        """
+        Usernames belonging to a group, for scoping an access review to a
+        profile rather than the whole realm.
+
+        Raises the same LookupError as group_by_path for an unknown path, so a
+        typo in a campaign's scope fails loudly instead of reviewing nobody.
+        """
+        group = self.group_by_path(group_path)
+        members = self._call("GET", f"/groups/{group['id']}/members?briefRepresentation=true") or []
+        return sorted(m["username"] for m in members)
+
+    def all_usernames(self) -> list:
+        """Every username in the realm. Used for a realm-wide review scope."""
+        users = self._call("GET", "/users?briefRepresentation=true&max=500") or []
+        return sorted(u["username"] for u in users)
 
     def active_session_count(self, user_id: str) -> int:
         sessions = self._call("GET", f"/users/{user_id}/sessions") or []

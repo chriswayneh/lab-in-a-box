@@ -70,7 +70,7 @@ run_engine() {
   network="$(engine_preflight)"
   host_root="$(engine_host_path "$LAB_ROOT")"
 
-  mkdir -p "${LAB_ROOT}/artifacts/identity"
+  mkdir -p "${LAB_ROOT}/artifacts/identity" "${LAB_ROOT}/artifacts/access-review"
 
   # The Vault root token is exported rather than written as --env NAME=VALUE.
   # A value on the command line lands in argv, which any process on the host can
