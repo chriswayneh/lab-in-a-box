@@ -8,7 +8,7 @@
 
 Every container in the lab, grouped by the compose fragment that defines it. Hostnames assume `LAB_DOMAIN=lab.localhost`.
 
-**27 available services** across **6 layers**. **25 start by default**; `qdrant`, `watchtower` require their optional Compose profiles. Services whose name ends in `-init` are one-shot provisioning jobs: they run once, do their work, and exit. A stopped `-init` container is a success, not a fault.
+**28 available services** across **6 layers**. **26 start by default**; `qdrant`, `watchtower` require their optional Compose profiles. Services whose name ends in `-init` are one-shot provisioning jobs: they run once, do their work, and exit. A stopped `-init` container is a success, not a fault.
 
 ## Core
 
@@ -28,8 +28,8 @@ _Who you are, and what you are allowed to know_
 
 | Service | Image | URL | Host ports | Networks | Health | Privileges |
 | --- | --- | --- | --- | --- | :---: | --- |
-| `keycloak` | `quay.io/keycloak/keycloak:26.1` | `keycloak.lab.localhost` | — | data, edge, observability | ✅ | — |
-| `keycloak-init` | `quay.io/keycloak/keycloak:26.1` | — | — | edge | n/a | — |
+| `keycloak` | `quay.io/keycloak/keycloak:26.7.1` | `keycloak.lab.localhost` | — | data, edge, observability | ✅ | — |
+| `keycloak-init` | `quay.io/keycloak/keycloak:26.7.1` | — | — | edge | n/a | — |
 | `vault` | `hashicorp/vault:1.18` | `vault.lab.localhost` | — | edge, observability | ✅ | cap `IPC_LOCK` |
 | `vault-init` | `hashicorp/vault:1.18` | — | — | edge | n/a | — |
 
@@ -79,6 +79,14 @@ _Operator conveniences_
 | `adminer` | `adminer:4.8.1` | `adminer.lab.localhost` | — | data, edge | ✅ | — |
 | `watchtower` | `containrrr/watchtower:1.7.1` | — | — | edge | ✅ | **docker socket (rw)** |
 
+## Other
+
+_Not yet categorised_
+
+| Service | Image | URL | Host ports | Networks | Health | Privileges |
+| --- | --- | --- | --- | --- | :---: | --- |
+| `scim-provisioner` | `python:3.12-alpine` | — | — | edge | ✅ | read-only fs |
+
 ## Networks
 
 | Network | Isolated | Purpose |
@@ -91,6 +99,6 @@ _Operator conveniences_
 
 ## Volumes
 
-16 named volumes hold all persistent state: `gitea_data`, `grafana_data`, `keycloak_data`, `loki_data`, `minio_data`, `ollama_models`, `openwebui_data`, `pgadmin_data`, `portainer_data`, `postgres_data`, `prometheus_data`, `promtail_positions`, `qdrant_data`, `redis_data`, `vault_data`, `vault_logs`.
+17 named volumes hold all persistent state: `gitea_data`, `grafana_data`, `keycloak_data`, `loki_data`, `minio_data`, `ollama_models`, `openwebui_data`, `pgadmin_data`, `portainer_data`, `postgres_data`, `prometheus_data`, `promtail_positions`, `qdrant_data`, `redis_data`, `scim_state`, `vault_data`, `vault_logs`.
 
 `make down` preserves every one of them. Only `make clean` removes them, and it asks first.

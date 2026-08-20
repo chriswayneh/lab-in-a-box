@@ -114,6 +114,7 @@ volumes:
   minio_data:
   portainer_data:
   pgadmin_data:
+  scim_state:
 
 # -----------------------------------------------------------------------------
 # Secrets

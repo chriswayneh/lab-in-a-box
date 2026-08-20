@@ -229,7 +229,7 @@ jml-show: ## Print an identity's effective access across all services (USER=erin
 	fi
 	@bash scripts/jml.sh show --user "$(USER)"
 
-jml-test: ## Run the identity test suites against the running lab (SUITE=lifecycle|rbac|access-review|all)
+jml-test: ## Run identity tests (SUITE=lifecycle|rbac|access-review|scim|all)
 	@bash scripts/test-identity.sh $(SUITE)
 
 # -----------------------------------------------------------------------------
@@ -314,6 +314,24 @@ access-review-remediate: ## Act on revoke decisions (CAMPAIGN=<id>); the only mu
 
 access-review-test: ## Run the access review test suite against the running lab
 	@bash scripts/test-identity.sh access-review
+
+# -----------------------------------------------------------------------------
+# SCIM provisioning. Keycloak serves SCIM; the long-running provisioner
+# reconciles those identities into Gitea and Grafana automatically.
+# -----------------------------------------------------------------------------
+
+scim-token: ## Print a short-lived bearer token for the Keycloak SCIM API
+	@bash scripts/scim.sh token
+
+scim-status: ## Show downstream provisioning state and pending retries
+	@docker compose --project-directory "$(CURDIR)" exec -T scim-provisioner \
+		python3 engine/scim_worker.py status
+
+scim-test: ## Run SCIM endpoint and downstream propagation tests
+	@bash scripts/test-identity.sh scim
+
+scim-conformance: ## Run the published SCIM 2.0 compliance suite (requires internet)
+	@bash scripts/scim-conformance.sh
 
 # =============================================================================
 # Credentials

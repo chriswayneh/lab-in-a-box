@@ -740,7 +740,13 @@ def test_remediation_protected_identity_guard(kc) -> None:
 
     before_groups = sorted(kc.user_groups(kc.require_user("alice")["id"]))
     result = run_json("remediate", "--campaign", campaign_id)
-    item = next(it for it in result["items"] if it["resource"] == target["resource"])
+    # Resource names are only unique within a service (for example both
+    # Keycloak and Gitea expose an "account" item). Match the full entitlement
+    # so the guard remains valid when a seeded user already has a Gitea account.
+    item = next(
+        it for it in result["items"]
+        if it["service"] == target["service"] and it["resource"] == target["resource"]
+    )
 
     check("remediation against a protected identity is skipped by default",
           item["remediation_status"] == "SKIPPED_PROTECTED_IDENTITY", str(item))

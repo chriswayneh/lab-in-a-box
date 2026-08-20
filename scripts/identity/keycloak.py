@@ -17,11 +17,22 @@ from model import CREATED, UNCHANGED, UPDATED, ServiceResult
 
 
 class Keycloak:
-    def __init__(self, base_url: str, admin_user: str, admin_password: str, realm: str):
+    def __init__(
+        self,
+        base_url: str,
+        admin_user: str,
+        admin_password: str,
+        realm: str,
+        *,
+        client_id: str | None = None,
+        client_secret: str | None = None,
+    ):
         self.base = base_url.rstrip("/")
         self.realm = realm
         self._admin_user = admin_user
         self._admin_password = admin_password
+        self._client_id = client_id
+        self._client_secret = client_secret
         self._token: str | None = None
 
     # -- auth ----------------------------------------------------------------
@@ -36,16 +47,27 @@ class Keycloak:
         if self._token:
             return self._token
 
-        data = request(
-            "POST",
-            f"{self.base}/realms/master/protocol/openid-connect/token",
-            form_body={
-                "client_id": "admin-cli",
-                "username": self._admin_user,
-                "password": self._admin_password,
-                "grant_type": "password",
-            },
-        )
+        if self._client_id:
+            data = request(
+                "POST",
+                f"{self.base}/realms/{self.realm}/protocol/openid-connect/token",
+                form_body={
+                    "client_id": self._client_id,
+                    "client_secret": self._client_secret or "",
+                    "grant_type": "client_credentials",
+                },
+            )
+        else:
+            data = request(
+                "POST",
+                f"{self.base}/realms/master/protocol/openid-connect/token",
+                form_body={
+                    "client_id": "admin-cli",
+                    "username": self._admin_user,
+                    "password": self._admin_password,
+                    "grant_type": "password",
+                },
+            )
         token = (data or {}).get("access_token")
         if not token:
             raise Unavailable("Keycloak returned no admin access token")
@@ -167,8 +189,13 @@ class Keycloak:
 
     def all_usernames(self) -> list:
         """Every username in the realm. Used for a realm-wide review scope."""
-        users = self._call("GET", "/users?briefRepresentation=true&max=500") or []
+        users = self.all_users(brief=True)
         return sorted(u["username"] for u in users)
+
+    def all_users(self, brief: bool = False) -> list:
+        """Every realm user with enough detail for downstream reconciliation."""
+        flag = "true" if brief else "false"
+        return self._call("GET", f"/users?briefRepresentation={flag}&max=500") or []
 
     def active_session_count(self, user_id: str) -> int:
         sessions = self._call("GET", f"/users/{user_id}/sessions") or []
