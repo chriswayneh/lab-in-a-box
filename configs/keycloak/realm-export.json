@@ -28,6 +28,7 @@
 
   "eventsEnabled": true,
   "eventsExpiration": 604800,
+  "eventsListeners": ["jboss-logging"],
   "adminEventsEnabled": true,
   "adminEventsDetailsEnabled": true,
   "scimApiEnabled": true,

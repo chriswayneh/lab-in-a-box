@@ -7,6 +7,8 @@ The metrics and logs pipeline: what collects what, how it is provisioned, and ho
 - [Alert rules](#alert-rules)
 - [Metrics](#metrics)
 - [Logs](#logs)
+- [Identity audit pipeline](#identity-audit-pipeline)
+- [Audit alerts](#audit-alerts)
 - [Adding a scrape target](#adding-a-scrape-target)
 - [Adding a dashboard](#adding-a-dashboard)
 - [Enabling Vault metrics](#enabling-vault-metrics)
@@ -33,14 +35,14 @@ The metrics and logs pipeline: what collects what, how it is provisioned, and ho
    │   Traefik   │───┤           │                            │
    │  requests   │   │           │                     ┌──────▼─────┐
    └─────────────┘   │           │                     │    Loki    │
-   ┌─────────────┐   │           │                     │  168h      │
+   ┌─────────────┐   │           │                     │  7d / 30d  │
    │  Keycloak   │───┤           │                     └──────┬─────┘
    │  JVM/logins │   │           │                            │
    └─────────────┘   │           └──────────┬─────────────────┘
    ┌─────────────┐   │                      │
    │ Loki, MinIO │───┘              ┌───────▼────────┐
    └─────────────┘                  │    Grafana     │
-                                    │  3 dashboards  │
+                                    │  4 dashboards  │
                                     │  provisioned   │
                                     └────────────────┘
 ```
@@ -52,7 +54,7 @@ alert rules are all files in this repository, mounted read-only.
 
 ## Dashboards
 
-Three, provisioned into a **Lab-in-a-Box** folder and read-only in the UI. `allowUiUpdates: false` is
+Four, provisioned into a **Lab-in-a-Box** folder and read-only in the UI. `allowUiUpdates: false` is
 deliberate: the files are the source of truth, and an edit made in the browser that vanishes on the next
 deploy is worse than one the UI refused to make.
 
@@ -87,6 +89,13 @@ it line up visually.
   actually had
 - Keycloak JVM heap, and a live panel of identity events (logins, token grants, admin changes)
 
+### Identity Audit Trail (`lab-identity-audit`)
+
+- Keycloak authentication volume split by event type and outcome
+- Failures grouped by source, plus focused administrative-change records
+- Vault KV secret reads with request paths and operations
+- The complete Keycloak and Vault evidence stream for investigation
+
 ---
 
 ## Alert rules
@@ -112,8 +121,10 @@ or a container restart is normal.
 `ContainerHighMemory` guards against a zero limit (`and container_spec_memory_limit_bytes > 0`). Without
 that, every unlimited container divides by zero and reports `+Inf`, and the alert fires constantly.
 
-**There is no Alertmanager yet.** Rules evaluate and appear in Grafana's alert list, but nothing routes
-them anywhere. Adding Alertmanager is on the v2 roadmap.
+Two additional Loki-managed audit rules evaluate brute-force login patterns and
+privileged Vault policy changes. **There is no Alertmanager yet.** All eleven
+rules evaluate and appear in Grafana's alert list, but nothing routes them
+anywhere. Adding Alertmanager is the next v2 roadmap item.
 
 Validate rule changes before starting anything:
 
@@ -204,6 +215,85 @@ sum by (service) (rate({job="lab-containers"}[5m]))
 
 {job="lab-containers", detected_level="error"} != "healthcheck"
 ```
+
+---
+
+## Identity audit pipeline
+
+The audit path deliberately uses the native formats of both identity systems:
+
+```text
+Keycloak jboss-logging ──JSON stdout──┐
+                                     ├── Promtail ──labelled streams── Loki ── Grafana
+Vault file audit device ─JSON volume─┘
+```
+
+Keycloak's realm has the built-in `jboss-logging` listener enabled. Successful
+events are raised from `DEBUG` to `INFO`, the console emits JSON, and Promtail
+selects only `org.keycloak.events` records. Vault continues writing its native
+JSON audit file. Promtail mounts the named `vault_logs` volume read-only, which
+works the same way on Docker Desktop and Linux.
+
+Only bounded fields become labels:
+
+| Source | Label | Meaning |
+| --- | --- | --- |
+| Both | `audit_source` | `keycloak` or `vault` |
+| Both | `event_type` | Keycloak user event, or Vault `request` / `response` |
+| Both | `outcome` | `success` or `failure` |
+| Keycloak | `operation_type` | Administrative `CREATE`, `UPDATE`, `DELETE` or `ACTION` |
+| Vault | `operation` | Request operation such as `read`, `list`, `create`, `update` or `delete` |
+
+User ids, IP addresses, resource paths and entity names stay in the log body or
+structured metadata. Promoting them would create an unbounded number of Loki
+streams. This is an intentional cardinality boundary, not missing parsing.
+
+Vault HMAC-hashes sensitive request and response values before it writes the
+file. Promtail forwards the original JSON; it never sees or reconstructs the
+plaintext. `make audit-test` proves that behavior with a unique secret and also
+checks that the active root token is absent from the raw audit file.
+
+Useful investigation queries:
+
+```logql
+{audit_source="keycloak", event_type="LOGIN_ERROR", outcome="failure"}
+
+{audit_source="keycloak", operation_type=~"CREATE|UPDATE|DELETE"}
+
+{audit_source="vault", event_type="request", operation=~"read|list"}
+| json request_path="request.path"
+| request_path=~"secret/.*"
+
+sum by (audit_source) (
+  count_over_time({audit_source=~"keycloak|vault", outcome="failure"}[5m])
+)
+```
+
+Run the end-to-end test against a live lab:
+
+```bash
+make audit-test
+```
+
+The test generates rejected logins, a disposable Keycloak admin change, Vault
+secret access and a policy change. It waits for parsed records in Loki, verifies
+HMAC redaction and confirms both audit rules reach `firing` before cleaning up.
+
+---
+
+## Audit alerts
+
+Loki loads `monitoring/loki/rules/fake/identity-audit.yml`; `fake` is Loki's
+tenant id when authentication is disabled.
+
+| Alert | Fires when | First response |
+| --- | --- | --- |
+| `KeycloakBruteForcePattern` | At least 5 `LOGIN_ERROR` events occur in 5 minutes | Inspect usernames and source addresses, then check Keycloak brute-force lockout state |
+| `VaultPrivilegedPolicyChange` | An ACL or password policy is created, updated or deleted | Identify the token accessor and path, compare the policy with source control, then revoke unexplained credentials |
+
+These rules evaluate locally in Loki today. Notification routing, grouping and
+inhibition arrive with roadmap `v2-6`; until then, inspect rule state in Grafana
+or with Loki's `/prometheus/api/v1/rules` endpoint.
 
 ---
 
@@ -317,6 +407,7 @@ Use a scoped MinIO service account rather than the root credentials. `init-minio
 | Prometheus | `PROMETHEUS_RETENTION_TIME` | `15d` |
 | Prometheus | `PROMETHEUS_RETENTION_SIZE` | `4GB` |
 | Loki | `LOKI_RETENTION_PERIOD` | `168h` (7 days) |
+| Loki identity audit streams | `LOKI_AUDIT_RETENTION_PERIOD` | `720h` (30 days) |
 
 The Prometheus **size** limit matters more than the time limit on a laptop: without it, a lab left
 running over a long weekend quietly consumes every free gigabyte.

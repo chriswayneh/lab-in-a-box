@@ -1,0 +1,204 @@
+{
+  "uid": "lab-identity-audit",
+  "title": "Identity Audit Trail",
+  "description": "Keycloak authentication and administration events correlated with Vault secret and policy activity.",
+  "tags": ["lab-in-a-box", "identity", "audit", "loki"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "15s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "source",
+        "label": "Audit source",
+        "type": "custom",
+        "query": "keycloak,vault",
+        "multi": true,
+        "includeAll": true,
+        "allValue": "keycloak|vault",
+        "current": { "text": "All", "value": "$__all" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Audit events",
+      "description": "All Keycloak and Vault request/response audit records in the selected window.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(count_over_time({audit_source=~\"$source\"}[$__range]))",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value"
+      },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } }, "overrides": [] }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Failures",
+      "description": "Events classified as failures by the ingestion pipeline.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(count_over_time({audit_source=~\"$source\", outcome=\"failure\"}[$__range]))",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value"
+      },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Admin changes",
+      "description": "Keycloak events with an administrative operation type.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(count_over_time({audit_source=\"keycloak\", operation_type=~\".+\"}[$__range]))",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value"
+      },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" } }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Secret reads",
+      "description": "Vault read or list requests against the KV secret engine.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(count_over_time({audit_source=\"vault\", event_type=\"request\", operation=~\"read|list\"} | json request_path=\"request.path\" | request_path=~\"secret/.*\" [$__range]))",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value"
+      },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "purple" } }, "overrides": [] }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Authentication activity",
+      "description": "Successful and failed Keycloak user events by event type.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 15, "x": 0, "y": 5 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (event_type, outcome) (count_over_time({audit_source=\"keycloak\", event_type=~\".+\"}[$__auto]))",
+          "legendFormat": "{{event_type}} · {{outcome}}",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum"], "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0, "custom": { "drawStyle": "bars", "fillOpacity": 45, "lineWidth": 1, "showPoints": "never", "stacking": { "mode": "normal" } } }, "overrides": [] }
+    },
+    {
+      "id": 6,
+      "type": "barchart",
+      "title": "Failures by source",
+      "description": "Failed audit events grouped by their originating system.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 9, "x": 15, "y": 5 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (audit_source) (count_over_time({audit_source=~\"$source\", outcome=\"failure\"}[$__auto]))",
+          "legendFormat": "{{audit_source}}",
+          "queryType": "range"
+        }
+      ],
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "orientation": "auto", "showValue": "auto", "stacking": "normal" },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 }, "overrides": [] }
+    },
+    {
+      "id": 7,
+      "type": "logs",
+      "title": "Keycloak administrative changes",
+      "description": "Role, user, group and client changes made through the Admin Console or Admin API.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 12, "w": 12, "x": 0, "y": 13 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{audit_source=\"keycloak\", operation_type=~\".+\"}",
+          "queryType": "range"
+        }
+      ],
+      "options": { "showTime": true, "showLabels": false, "showCommonLabels": true, "wrapLogMessage": true, "prettifyLogMessage": true, "enableLogDetails": true, "dedupStrategy": "none", "sortOrder": "Descending" }
+    },
+    {
+      "id": 8,
+      "type": "logs",
+      "title": "Vault secret access",
+      "description": "Read and list requests against the KV engine. Vault keeps sensitive values HMAC-hashed in every record.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 12, "w": 12, "x": 12, "y": 13 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{audit_source=\"vault\", event_type=\"request\", operation=~\"read|list\"} | json request_path=\"request.path\" | request_path=~\"secret/.*\"",
+          "queryType": "range"
+        }
+      ],
+      "options": { "showTime": true, "showLabels": false, "showCommonLabels": true, "wrapLogMessage": true, "prettifyLogMessage": true, "enableLogDetails": true, "dedupStrategy": "none", "sortOrder": "Descending" }
+    },
+    {
+      "id": 9,
+      "type": "logs",
+      "title": "Complete identity audit trail",
+      "description": "The unfiltered evidence stream for investigations and demonstrations.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 25 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{audit_source=~\"$source\"}",
+          "queryType": "range"
+        }
+      ],
+      "options": { "showTime": true, "showLabels": true, "showCommonLabels": true, "wrapLogMessage": true, "prettifyLogMessage": true, "enableLogDetails": true, "dedupStrategy": "none", "sortOrder": "Descending" }
+    }
+  ]
+}

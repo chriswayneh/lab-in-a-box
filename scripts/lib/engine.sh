@@ -49,15 +49,16 @@ engine_preflight() {
     return 0
   fi
 
-  local project network
+  local project network network_name
   project="$(project_name)"
-  network="${project}_edge"
+  network_name="${LAB_ENGINE_NETWORK:-edge}"
+  network="${project}_${network_name}"
 
   docker network inspect "$network" >/dev/null 2>&1 \
     || die "the lab network '${network}' does not exist — start the lab with 'make up'"
 
   local service
-  for service in keycloak vault gitea; do
+  for service in ${LAB_ENGINE_SERVICES:-keycloak vault gitea}; do
     compose ps --status running --services 2>/dev/null | grep -qx "$service" \
       || die "service '${service}' is not running — check 'make health', then 'make up'"
   done

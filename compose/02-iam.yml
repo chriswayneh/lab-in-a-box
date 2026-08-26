@@ -89,6 +89,16 @@ services:
       # is separate from the traffic port and is never routed by Traefik.
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
+
+      # --- Identity audit stream ------------------------------------------
+      # Keep the container stream machine-readable and make both successful
+      # and failed realm events visible at normal operating log levels.
+      # Promtail only promotes the bounded event fields; user ids, addresses
+      # and resource paths remain in the log body to avoid unbounded labels.
+      KC_LOG_CONSOLE_OUTPUT: json
+      KC_SPI_EVENTS_LISTENER__JBOSS_LOGGING__SUCCESS_LEVEL: info
+      KC_SPI_EVENTS_LISTENER__JBOSS_LOGGING__ERROR_LEVEL: warn
+      KC_SPI_EVENTS_LISTENER__JBOSS_LOGGING__QUOTES: none
     volumes:
       - ./configs/keycloak/realm-export.json:/opt/keycloak/data/import/lab-realm.json:ro
       - keycloak_data:/opt/keycloak/data/h2

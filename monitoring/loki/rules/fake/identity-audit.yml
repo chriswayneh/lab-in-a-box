@@ -1,0 +1,31 @@
+groups:
+  - name: identity-audit
+    interval: 30s
+    rules:
+      - alert: KeycloakBruteForcePattern
+        expr: >-
+          sum(count_over_time({audit_source="keycloak", event_type="LOGIN_ERROR"}[5m])) >= 5
+        for: 0m
+        labels:
+          severity: warning
+          category: identity
+        annotations:
+          summary: Repeated Keycloak login failures
+          description: Five or more failed logins were recorded in five minutes.
+          runbook_url: >-
+            https://github.com/chriswayneh/lab-in-a-box/blob/main/docs/observability.md#audit-alerts
+
+      - alert: VaultPrivilegedPolicyChange
+        expr: >-
+          sum(count_over_time({audit_source="vault", event_type="request", operation=~"create|update|delete"}
+          | json request_path="request.path"
+          | request_path=~"sys/policies/(acl|password)/.+" [5m])) > 0
+        for: 0m
+        labels:
+          severity: critical
+          category: identity
+        annotations:
+          summary: A privileged Vault policy changed
+          description: A create, update or delete request touched a Vault ACL or password policy.
+          runbook_url: >-
+            https://github.com/chriswayneh/lab-in-a-box/blob/main/docs/observability.md#audit-alerts

@@ -174,13 +174,17 @@ services:
     command:
       - -config.file=/etc/loki/loki-config.yml
       # Lets ${LOKI_RETENTION_PERIOD} inside the config resolve from the
-      # environment, so retention is tunable from .env.
+      # environment, so both application and audit retention are tunable.
       - -config.expand-env=true
     environment:
       TZ: ${LAB_TZ:-UTC}
       LOKI_RETENTION_PERIOD: ${LOKI_RETENTION_PERIOD:-168h}
+      LOKI_AUDIT_RETENTION_PERIOD: ${LOKI_AUDIT_RETENTION_PERIOD:-720h}
     volumes:
       - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      # Local rule storage is read-only by design. In single-tenant mode Loki
+      # loads rules from the fake/ child directory.
+      - ./monitoring/loki/rules:/etc/loki/rules:ro
       - loki_data:/loki
     networks:
       - lab_observability
@@ -210,6 +214,10 @@ services:
     volumes:
       - ./monitoring/promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
       - promtail_positions:/promtail
+      # Vault writes JSON audit events into a named volume. Mounting that
+      # volume here preserves Windows/macOS portability and keeps it read-only
+      # from the shipper's point of view.
+      - vault_logs:/vault-audit:ro
     networks:
       - lab_observability
       - lab_socket

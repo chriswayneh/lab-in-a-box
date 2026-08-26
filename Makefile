@@ -86,7 +86,7 @@ endif
         rbac-show rbac-diff rbac-who-can \
         access-review-create access-review-show access-review-list \
         access-review-decide access-review-complete access-review-cancel \
-        access-review-remediate access-review-test
+        access-review-remediate access-review-test audit-test
 
 # =============================================================================
 # Help
@@ -229,8 +229,11 @@ jml-show: ## Print an identity's effective access across all services (USER=erin
 	fi
 	@bash scripts/jml.sh show --user "$(USER)"
 
-jml-test: ## Run identity tests (SUITE=lifecycle|rbac|access-review|scim|all)
+jml-test: ## Run identity tests (SUITE=lifecycle|rbac|access-review|scim|audit|all)
 	@bash scripts/test-identity.sh $(SUITE)
+
+audit-test: ## Generate and verify Keycloak/Vault audit events in Loki
+	@bash scripts/test-identity.sh audit
 
 # -----------------------------------------------------------------------------
 # RBAC simulator — read-only. Answers "what can this person actually reach?"

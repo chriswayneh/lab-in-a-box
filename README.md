@@ -21,6 +21,7 @@ are available through optional Compose profiles.
 [Services](#services) ·
 [Security](#security) ·
 [AI](#ai) ·
+[Demo](docs/demo.md) ·
 [Roadmap](#roadmap) ·
 [Contributing](CONTRIBUTING.md)
 
@@ -59,7 +60,7 @@ trade-offs that a lab makes against production are stated plainly rather than hi
 | **RBAC simulator** | Read-only: answers "what can this person reach, and why?" Resolves live Keycloak, Vault and Gitea state, explains every grant's source, surfaces entitlement drift |
 | **Access review** | Campaign-based recertification built on the simulator above: snapshot, approve/revoke per entitlement, remediate through the same JML adapters, retained evidence |
 | **Secrets** | Vault with KV v2, transit encryption, AppRole for machines, userpass for humans, and least-privilege ACL policies |
-| **Observability** | Prometheus, Grafana, Loki and Promtail: 3 provisioned dashboards, 9 alert rules, metrics and logs correlated |
+| **Observability** | Prometheus, Grafana, Loki and Promtail: 4 provisioned dashboards, 11 evaluating rules, and parsed Keycloak/Vault audit evidence |
 | **AI** | Ollama with a model pulled automatically, Open WebUI wired to it, optional Qdrant for retrieval |
 | **Platform** | Gitea with Actions enabled, MinIO with buckets, policies, versioning and lifecycle rules |
 | **Edge** | Traefik with automatic service discovery, TLS, rate limiting and security headers |
@@ -629,9 +630,11 @@ Grafana comes up already populated. There is no datasource to add and no dashboa
 | **Lab Overview** | CPU, memory, network and disk per container; restart counts; host resources; recent errors |
 | **Lab Logs** | Log volume by service, error and warning rates, and a filterable log explorer |
 | **Lab Edge** | Request rate, latency percentiles and status codes per routed service, plus identity events |
+| **Identity Audit Trail** | Authentication failures, Keycloak admin changes, Vault secret access and the correlated evidence stream |
 
-Nine alert rules cover availability (targets down, restart loops), saturation (CPU, memory, disk) and the
-edge (error rate, latency). Every rule carries a description that says what to *do*, not just what fired.
+Nine Prometheus rules cover availability, saturation and the edge. Two Loki
+rules detect repeated login failures and privileged Vault policy changes. Every
+rule carries a description that says what to *do*, not just what fired.
 
 Logs are collected through the Docker API rather than by tailing host paths, which is why log collection
 works identically on Linux, macOS and Windows. Details, plus how to enable Vault metrics and move Loki's
@@ -764,15 +767,17 @@ More, including how to read the init-job logs and what each provisioning script 
 | Version | Theme | Highlights |
 | --- | --- | --- |
 | **v1** | Foundation ✅ | The stack you are reading about |
-| **v2** | Identity governance 🚧 | v2-1 JML ✅ · v2-2 RBAC ✅ · v2-3 access reviews ✅ · v2-4 SCIM ✅ · audit events next |
+| **v2** | Identity governance 🚧 | v2-1 JML ✅ · v2-2 RBAC ✅ · v2-3 access reviews ✅ · v2-4 SCIM ✅ · v2-5 audit pipeline ✅ · Alertmanager next |
 | **v3** | Infrastructure as code | Terraform and Ansible deployments, a Kubernetes edition, AWS/Azure/GCP targets |
 | **v4** | AI operations | Log analysis, incident response copilot, automatic infrastructure documentation, RAG over your own runbooks |
 | **v5** | Homelab operations | Backup verification, external uptime monitoring and resource presets |
 
 **v2 is in progress.** Identity lifecycle automation, RBAC simulation, access
-review campaigns and SCIM provisioning have landed and are usable today. See
+review campaigns, SCIM provisioning and the identity audit pipeline have landed
+and are usable today. See
 [Identity lifecycle](#identity-lifecycle) above, or
 [`docs/identity-governance.md`](docs/identity-governance.md) for the full model.
+For a reviewer-friendly walkthrough, use the [10-minute demo](docs/demo.md).
 v1.0.0 remains the only tagged release.
 
 Full detail, including ready-to-file issues with acceptance criteria, is in

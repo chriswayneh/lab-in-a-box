@@ -1,0 +1,5 @@
+# No Grafana app plugins are required. This explicit empty declaration keeps
+# startup logs clean and makes that decision visible in source control.
+apiVersion: 1
+
+apps: []

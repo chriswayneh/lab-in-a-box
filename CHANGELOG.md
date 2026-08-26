@@ -14,9 +14,28 @@ action from someone with an existing lab**: a `make clean`, a manual migration, 
 ## [Unreleased]
 
 Work in progress toward **v2.0, Identity governance**. The milestone is not
-complete: `v2-1` through `v2-4` have landed, `v2-5` through `v2-7` remain.
+complete: `v2-1` through `v2-5` have landed, `v2-6` and `v2-7` remain.
 
 ### Added
+
+#### Identity audit pipeline (roadmap `v2-5`)
+
+- Keycloak user and administrative events emitted as structured console JSON,
+  parsed by Promtail and shipped to Loki with bounded source, type, operation
+  and outcome labels.
+- Vault's native JSON audit device shipped from its named volume without
+  weakening Vault's HMAC treatment of sensitive fields.
+- A provisioned **Identity Audit Trail** dashboard for authentication activity,
+  failures, Keycloak administrative changes and Vault secret access.
+- Loki-managed rules for brute-force login patterns and privileged Vault policy
+  changes, ready for Alertmanager routing in roadmap `v2-6`.
+- Separate 30-day audit retention through `LOKI_AUDIT_RETENTION_PERIOD`, while
+  routine container logs remain at 7 days by default.
+- `make audit-test`: generates successful and failed identity activity, waits
+  for parsed Loki streams, checks raw Vault redaction and proves both alert
+  rules reach the firing state.
+- A reviewer-oriented [10-minute demo](docs/demo.md) that connects the
+  architecture decisions to platform-engineering and identity outcomes.
 
 #### SCIM provisioning (roadmap `v2-4`)
 
@@ -148,6 +167,9 @@ standard library, so it adds no host dependency and leaves `docker compose up -d
 unchanged.
 
 ### Fixed
+
+- Documentation link checks now retry transient third-party failures instead of
+  turning a momentary upstream 502 or connection reset into a red main branch.
 
 - **Campaign evidence could be overwritten by a second event of the same type
   in the same second.** Evidence files are now created exclusively, with a

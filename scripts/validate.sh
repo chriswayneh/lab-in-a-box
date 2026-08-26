@@ -195,6 +195,8 @@ check_with_upstream_tools() {
 
   promtool_check "prometheus.yml" config /cfg/prometheus.yml
   promtool_check "alert rules"    rules  /cfg/rules/lab-alerts.yml
+  promtail_check
+  loki_check
 }
 
 # Runs `promtool check <what> <path>` against the mounted monitoring directory.
@@ -215,6 +217,45 @@ promtool_check() {
     success "${label} accepted by promtool"
   else
     fail "promtool rejected ${label}"
+    MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "${cmd[@]}" 2>&1 | tail -12 | sed 's/^/    /'
+  fi
+}
+
+promtail_check() {
+  local -a cmd=(
+    docker run --rm --entrypoint /usr/bin/promtail
+    -e COMPOSE_PROJECT_NAME=lab
+    -v "${LAB_ROOT}/monitoring/promtail:/cfg:ro"
+    grafana/promtail:3.3.2
+    -config.file=/cfg/promtail-config.yml
+    -config.expand-env=true
+    -check-syntax
+  )
+
+  if MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "${cmd[@]}" >/dev/null 2>&1; then
+    success "promtail configuration accepted"
+  else
+    fail "Promtail rejected its configuration"
+    MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "${cmd[@]}" 2>&1 | tail -12 | sed 's/^/    /'
+  fi
+}
+
+loki_check() {
+  local -a cmd=(
+    docker run --rm --entrypoint /usr/bin/loki
+    -e LOKI_RETENTION_PERIOD=168h
+    -e LOKI_AUDIT_RETENTION_PERIOD=720h
+    -v "${LAB_ROOT}/monitoring/loki:/cfg:ro"
+    grafana/loki:3.3.2
+    -config.file=/cfg/loki-config.yml
+    -config.expand-env=true
+    -verify-config=true
+  )
+
+  if MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "${cmd[@]}" >/dev/null 2>&1; then
+    success "Loki configuration accepted"
+  else
+    fail "Loki rejected its configuration"
     MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "${cmd[@]}" 2>&1 | tail -12 | sed 's/^/    /'
   fi
 }
