@@ -54,6 +54,13 @@ storage_config:
 
 limits_config:
   retention_period: ${LOKI_RETENTION_PERIOD:-168h}
+  # Identity audit evidence lives longer than routine application logs. The
+  # selector is intentionally label-only because Loki retention does not
+  # accept arbitrary LogQL expressions here.
+  retention_stream:
+    - selector: '{audit_source=~"keycloak|vault"}'
+      priority: 1
+      period: ${LOKI_AUDIT_RETENTION_PERIOD:-720h}
   # A laptop lab does not need to defend against a firehose, but an unbounded
   # ingestion rate turns a runaway container into a full disk.
   ingestion_rate_mb: 8
@@ -81,7 +88,7 @@ ruler:
   storage:
     type: local
     local:
-      directory: /loki/rules
+      directory: /etc/loki/rules
   rule_path: /loki/rules-temp
   ring:
     kvstore:

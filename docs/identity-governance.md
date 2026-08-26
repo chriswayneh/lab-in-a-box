@@ -3,7 +3,7 @@
 Joiner / Mover / Leaver lifecycle automation, an RBAC simulator, and access
 review campaigns for the seeded Keycloak realm.
 
-Roadmap items [`v2-1`, `v2-2` and `v2-3`](../roadmap/README.md). This page
+Roadmap items [`v2-1` through `v2-4`](../roadmap/README.md). This page
 documents what is implemented, how it works, and what it does not do.
 
 ---

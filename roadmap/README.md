@@ -18,7 +18,7 @@ Where this project is going, and how to file the work.
 | Milestone | Theme | Status | Issues |
 | --- | --- | --- | :---: |
 | **v1.0** | Foundation, the working lab | ✅ Shipped | n/a |
-| **v2.0** | Identity governance | 🚧 In progress, 4 of 7 done | 7 |
+| **v2.0** | Identity governance | 🚧 In progress, 5 of 7 done | 7 |
 | **v3.0** | Infrastructure as code | Planned | 7 |
 | **v4.0** | AI operations | Planned | 6 |
 | **v5.0** | Homelab operations | Planned | 3 |
@@ -45,7 +45,7 @@ The theme: **turn the seeded Keycloak realm into a working demonstration of iden
 access governance.** This is the area where most self-hosted labs stop at "we installed an IdP", and it
 is where the genuinely interesting problems are.
 
-**Status: in progress.** `v2-1` through `v2-4` are complete; `v2-5` is next. The milestone itself is not done.
+**Status: in progress.** `v2-1` through `v2-5` are complete; `v2-6` is next. The milestone itself is not done.
 
 | | Issue | Status |
 | --- | --- | --- |
@@ -53,8 +53,8 @@ is where the genuinely interesting problems are.
 | `v2-2` | RBAC simulator: answer "what can this person actually reach?" across every service | ✅ **Complete**. See [docs/identity-governance.md](../docs/identity-governance.md#rbac-simulator) |
 | `v2-3` | Access review campaign: periodic recertification with an approve/revoke workflow | ✅ **Complete**. See [docs/identity-governance.md](../docs/identity-governance.md#access-review-campaigns) |
 | `v2-4` | SCIM provisioning endpoint: propagate identity changes to downstream services | ✅ **Complete**. See [docs/identity-governance.md](../docs/identity-governance.md#scim-provisioning) |
-| `v2-5` | Audit event pipeline: ship Keycloak and Vault audit events into Loki with a dashboard | ⬅ **Next** |
-| `v2-6` | Alertmanager: route the alert rules that currently evaluate into nothing | |
+| `v2-5` | Audit event pipeline: ship Keycloak and Vault audit events into Loki with a dashboard | ✅ **Complete**. See [docs/observability.md](../docs/observability.md#identity-audit-pipeline) |
+| `v2-6` | Alertmanager: route the alert rules that currently evaluate into nothing | ⬅ **Next** |
 | `v2-7` | Forward-auth for unauthenticated services: Prometheus and the Traefik dashboard behind SSO | |
 
 **Why this first.** The lab already models RBAC correctly, with roles granted to groups and users joining

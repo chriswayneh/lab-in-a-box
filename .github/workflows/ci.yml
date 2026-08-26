@@ -213,6 +213,8 @@ jobs:
             --exclude '^https?://localhost'
             --exclude '^https?://127\.0\.0\.1'
             --exclude-path ./screenshots
+            --max-retries 5
+            --retry-wait-time 2
             --accept 200,204,206,301,302,403,429
             .
           fail: true
@@ -239,6 +241,27 @@ jobs:
           docker run --rm --entrypoint promtool \
             -v "${{ github.workspace }}/monitoring/prometheus:/cfg:ro" \
             prom/prometheus:v3.1.0 check rules /cfg/rules/lab-alerts.yml
+
+      - name: Promtail — pipeline configuration
+        run: |
+          docker run --rm --entrypoint /usr/bin/promtail \
+            -e COMPOSE_PROJECT_NAME=lab \
+            -v "${{ github.workspace }}/monitoring/promtail:/cfg:ro" \
+            grafana/promtail:3.3.2 \
+            -config.file=/cfg/promtail-config.yml \
+            -config.expand-env=true \
+            -check-syntax
+
+      - name: Loki — storage, retention and ruler configuration
+        run: |
+          docker run --rm --entrypoint /usr/bin/loki \
+            -e LOKI_RETENTION_PERIOD=168h \
+            -e LOKI_AUDIT_RETENTION_PERIOD=720h \
+            -v "${{ github.workspace }}/monitoring/loki:/cfg:ro" \
+            grafana/loki:3.3.2 \
+            -config.file=/cfg/loki-config.yml \
+            -config.expand-env=true \
+            -verify-config=true
 
   # ---------------------------------------------------------------------------
   docs:

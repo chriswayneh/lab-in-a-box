@@ -13,6 +13,7 @@
 #   2. The Grafana OIDC client secret (from KEYCLOAK_GRAFANA_CLIENT_SECRET)
 #   3. The SCIM service-account secret and least-privilege realm roles
 #   4. Redirect URIs and the SCIM audience for a custom LAB_DOMAIN
+#   5. Audit listener settings for both fresh and persistent realms
 #
 # Every step is idempotent — running it against an already-provisioned realm
 # converges to the same state rather than failing.
@@ -80,6 +81,19 @@ require_realm() {
 enable_scim_api() {
   kc update "realms/${KC_REALM}" -s scimApiEnabled=true >/dev/null
   log "SCIM API enabled for realm '${KC_REALM}'"
+}
+
+ensure_audit_events() {
+  # Realm import is intentionally IGNORE_EXISTING. Converge this separately so
+  # an existing lab gains v2-5 without deleting its database and a fresh lab
+  # keeps the same settings declared in realm-export.json.
+  kc update events/config -r "$KC_REALM" \
+    -s eventsEnabled=true \
+    -s eventsExpiration=604800 \
+    -s 'eventsListeners=["jboss-logging"]' \
+    -s adminEventsEnabled=true \
+    -s adminEventsDetailsEnabled=true >/dev/null
+  log "user and admin audit events enabled for realm '${KC_REALM}'"
 }
 
 ensure_scim_group() {
@@ -251,6 +265,7 @@ main() {
   authenticate
   require_realm
   enable_scim_api
+  ensure_audit_events
   ensure_scim_group
   set_demo_passwords
   set_client_secret grafana "$GRAFANA_CLIENT_SECRET"

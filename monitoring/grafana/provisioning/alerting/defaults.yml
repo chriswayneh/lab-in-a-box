@@ -1,0 +1,8 @@
+# The lab's log alerts are evaluated by Loki's ruler. Keeping an explicit empty
+# Grafana alerting document prevents a misleading missing-directory error while
+# leaving notification routing for roadmap v2-6.
+apiVersion: 1
+
+groups: []
+contactPoints: []
+policies: []

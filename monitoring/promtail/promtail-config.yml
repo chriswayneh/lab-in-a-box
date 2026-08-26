@@ -96,6 +96,44 @@ scrape_configs:
                 expression: ".*(GET /healthz|GET /health/ready|GET /-/healthy|pg_isready).*"
                 drop_counter_reason: healthcheck_noise
 
+      # Keycloak emits JSON at the container boundary. Only records from its
+      # built-in event listener become audit streams; ordinary server logs
+      # retain the normal container labels.
+      - match:
+          selector: '{service="keycloak"}'
+          stages:
+            - json:
+                expressions:
+                  keycloak_logger: loggerName
+                  keycloak_level: level
+                  keycloak_message: message
+            - labels:
+                keycloak_logger:
+            - match:
+                selector: '{keycloak_logger="org.keycloak.events"}'
+                stages:
+                  - static_labels:
+                      audit_source: keycloak
+                  # User events begin with type=; administrative events begin
+                  # with operationType=. Values are unquoted by Keycloak so
+                  # parsing does not depend on escaped JSON inside JSON.
+                  - regex:
+                      source: keycloak_message
+                      expression: '(?:^|, )type=(?P<event_type>[^, ]+)'
+                  - regex:
+                      source: keycloak_message
+                      expression: '(?:^|, )operationType=(?P<operation_type>[^, ]+)'
+                  - regex:
+                      source: keycloak_message
+                      expression: '(?:^|, )error=(?P<audit_error>[^, ]+)'
+                  - template:
+                      source: outcome
+                      template: '{{ if .audit_error }}failure{{ else }}success{{ end }}'
+                  - labels:
+                      event_type:
+                      operation_type:
+                      outcome:
+
       # Promote a detected level to a label so Grafana can colour-code rows and
       # dashboards can chart error rates without a full-text search.
       - match:
@@ -112,3 +150,40 @@ scrape_configs:
       - labeldrop:
           - filename
           - __meta_docker_container_id
+          - keycloak_logger
+
+  # ---------------------------------------------------------------------------
+  # Vault audit device.
+  #
+  # Vault writes one JSON object per request and response. The original line is
+  # retained so nested fields remain queryable; only bounded dimensions become
+  # Loki labels. Vault's HMAC hashing therefore reaches Loki unchanged.
+  # ---------------------------------------------------------------------------
+  - job_name: vault-audit
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: identity-audit
+          service: vault
+          component: identity
+          audit_source: vault
+          __path__: /vault-audit/audit.log
+
+    pipeline_stages:
+      - json:
+          expressions:
+            event_type: type
+            operation: request.operation
+            request_path: request.path
+            audit_error: error
+      - template:
+          source: outcome
+          template: '{{ if .audit_error }}failure{{ else }}success{{ end }}'
+      - labels:
+          event_type:
+          operation:
+          outcome:
+      # Paths, display names and entity identifiers are useful query fields but
+      # unsafe labels because their value set grows without bound.
+      - structured_metadata:
+          request_path:

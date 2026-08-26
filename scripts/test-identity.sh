@@ -2,11 +2,12 @@
 # =============================================================================
 # Identity test suites — containerised entry point
 # =============================================================================
-#   make jml-test          all four suites
+#   make jml-test          all five suites
 #   bash scripts/test-identity.sh lifecycle
 #   bash scripts/test-identity.sh rbac
 #   bash scripts/test-identity.sh access-review
 #   bash scripts/test-identity.sh scim
+#   bash scripts/test-identity.sh audit
 #
 # Runs against the RUNNING lab. These are integration tests by design: the
 # things being verified are whether revocation actually revokes and whether the
@@ -43,19 +44,37 @@ run_scim_suite() {
   STATUS=1
 }
 
+run_audit_suite() {
+  heading "Identity audit pipeline tests"
+
+  local project
+  project="$(project_name)"
+  # This suite needs the telemetry network to query Loki and read-only access
+  # to Vault's audit volume to prove sensitive values remain HMAC-hashed.
+  if LAB_ENGINE_NETWORK=observability \
+     LAB_ENGINE_SERVICES="keycloak vault loki promtail" \
+     LAB_ENGINE_DOCKER_ARGS="--volume ${project}_vault_logs:/vault-audit:ro --env LOKI_URL=http://loki:3100 --env PYTHONUNBUFFERED=1" \
+     run_engine test_audit.py; then
+    return 0
+  fi
+  STATUS=1
+}
+
 case "$SUITE" in
   lifecycle)      run_suite "Lifecycle tests" test_lifecycle.py ;;
   rbac)           run_suite "RBAC simulator tests" test_rbac.py ;;
   access-review)  run_suite "Access review campaign tests" test_campaign.py ;;
   scim)           run_scim_suite ;;
+  audit)          run_audit_suite ;;
   all)
     log "${C_DIM}Running against the live lab. This creates and offboards disposable users.${C_RESET}"
     run_suite "Lifecycle tests" test_lifecycle.py
     run_suite "RBAC simulator tests" test_rbac.py
     run_suite "Access review campaign tests" test_campaign.py
     run_scim_suite
+    run_audit_suite
     ;;
-  *) die "unknown suite '${SUITE}'; expected: lifecycle, rbac, access-review, scim, all" ;;
+  *) die "unknown suite '${SUITE}'; expected: lifecycle, rbac, access-review, scim, audit, all" ;;
 esac
 
 exit "$STATUS"
