@@ -184,6 +184,30 @@ jobs:
           scandir: ./scripts
 
   # ---------------------------------------------------------------------------
+  # ---------------------------------------------------------------------------
+  # The identity engine is the largest body of code in the repository and, until
+  # this job existed, the only part CI never opened. Compose, YAML, JSON, shell
+  # and Markdown were all checked; several thousand lines of Python were not, so
+  # a refactor that broke the RBAC simulator would have merged with every check
+  # green.
+  #
+  # This is deliberately the fast half. It needs no running lab and finishes in
+  # about a minute. The live integration suites (scripts/test-identity.sh) prove
+  # things this cannot, such as whether revocation actually revokes, but they
+  # need the full stack and belong in a scheduled run rather than on every push.
+  # ---------------------------------------------------------------------------
+  python:
+    name: Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Same pinned container `make validate` uses, for the same reason the
+      # Markdown job stopped using an action: a tool version that differs
+      # between local and CI turns a green local run into a surprise failure.
+      - name: Lint, type check and unit tests
+        run: bash scripts/check-python.sh
+
   markdown:
     name: Markdown
     runs-on: ubuntu-latest

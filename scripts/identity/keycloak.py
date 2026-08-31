@@ -292,7 +292,12 @@ class Keycloak:
             return user
 
         # Converge: re-enable a returning identity, fix drifted attributes.
-        patch, reasons = {}, []
+        # `patch` is annotated because it is deliberately heterogeneous: it
+        # carries a bool under "enabled" and a dict under "attributes".
+        # Without this, the type checker infers dict[str, bool] from the first
+        # assignment and then rejects the second.
+        patch: dict = {}
+        reasons: list = []
         if not user.get("enabled"):
             patch["enabled"] = True
             reasons.append("re-enabled")

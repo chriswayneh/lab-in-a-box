@@ -38,7 +38,6 @@ from model import (
     PROTECTED_USERNAMES,
     SUCCESS,
     UNCHANGED,
-    UPDATED,
     ServiceResult,
     ValidationError,
     load_catalogue,
