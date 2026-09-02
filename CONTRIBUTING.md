@@ -70,16 +70,24 @@ make validate
 ```
 
 That covers the compose project (including profiles and the GPU override), every YAML and JSON file,
-shell syntax, healthcheck coverage, and `promtool` over the Prometheus configuration and alert rules.
+shell syntax, healthcheck coverage, `promtool` over the Prometheus configuration and alert rules, and
+the identity engine's Python: ruff, mypy and the unit tests.
 
 Useful during development:
 
 ```bash
 SKIP_UPSTREAM=1 make validate    # skip the checks that pull a container image
+make python-check                # just the Python: ruff, mypy, unit tests
+make python-check MODE=unit      # or MODE=lint, MODE=types
 make docs                        # regenerate the service catalogue and graph
 make logs SERVICE=keycloak
 make shell SERVICE=postgres
 ```
+
+`make python-check` needs no running lab and finishes in about a minute, which
+makes it the fast loop while working on the identity engine. The live suites
+(`make jml-test`) prove things it cannot, such as whether revocation actually
+revokes, but they need the full stack up.
 
 Optional, and worth having:
 
@@ -87,6 +95,10 @@ Optional, and worth having:
 pip install yamllint
 brew install shellcheck    # or: apt install shellcheck
 ```
+
+Python needs no entry above either. ruff, mypy and pytest all run inside the
+same pinned container `make python-check` uses, at versions fixed in
+`scripts/check-python.sh`, for the same reason the Markdown note below gives.
 
 Markdown has no entry above. `make validate` lints it through a
 pinned container, so it needs nothing on your machine and runs the exact linter

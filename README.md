@@ -386,6 +386,7 @@ the whole point of RBAC, and it is what the Joiner/Mover/Leaver demo on the [roa
 | `make restore` | Restore a backup, newest by default | `bash scripts/restore.sh` |
 | `make update` | Pull newer images and recreate what changed | `docker compose pull && docker compose up -d` |
 | `make validate` | Everything CI checks, locally | `bash scripts/validate.sh` |
+| `make python-check` | Lint, type check and unit test the engine (no lab needed) | `bash scripts/check-python.sh` |
 | `make docs` | Regenerate the catalogue and dependency graph | `bash scripts/generate-docs.sh` |
 | `make shell SERVICE=x` | Shell inside a container | `docker compose exec x sh` |
 | `make https-on` / `off` | Toggle the HTTP→HTTPS redirect | n/a |
