@@ -598,10 +598,10 @@ writes worked:
 | Mover | obsolete roles absent; new roles present; Vault policy list replaced; old team gone, new team present |
 | Leaver | password grant refused; zero active sessions; Vault login refused; Gitea login refused; no team memberships; repository present under the custody account |
 
-`make jml-test` runs **416 checks** across four suites: 105 lifecycle, 133 RBAC
-simulator, 148 access review campaign and 30 SCIM provisioning, against the
-**running lab**. Run one at a time with
-`make jml-test SUITE=lifecycle|rbac|access-review|scim`. Authorization,
+`make jml-test` runs **430 checks** across five suites: 105 lifecycle, 133 RBAC
+simulator, 148 access review campaign, 30 SCIM provisioning and 14 identity
+audit pipeline, against the **running lab**. Run one at a time with
+`make jml-test SUITE=lifecycle|rbac|access-review|scim|audit`. Authorization,
 remediation and propagation results are verified against the real services.
 Controlled adapter failures prove a failed target does not stop later work or
 get reported as successful. Disposable identities only (`jmltest`, `jmltoken`,
