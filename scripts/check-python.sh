@@ -69,6 +69,23 @@ esac
 # this under a minute; three `docker run` invocations would pay the pip cost
 # three times.
 #
+# The source tree is mounted read-only, and that is load-bearing rather than
+# decorative. All three tools want to write caches next to the source: mypy a
+# ~25 MB .mypy_cache, pytest a .pytest_cache, and pytest's import hook a
+# __pycache__ of every engine module it loads. That last one ignores both
+# PYTHONDONTWRITEBYTECODE and PYTHONPYCACHEPREFIX, so chasing it with env vars
+# does not work. A read-only mount makes "this check does not modify your
+# working tree" true by construction instead of by keeping up with three tools'
+# cache settings. Caches that belong somewhere go to /tmp inside the container
+# and vanish with it; the cost is a cold cache each run, which at this size is
+# a few seconds.
+#
+# Every tool that keeps a cache therefore needs it pointed at /tmp explicitly.
+# ruff is the easy one to miss: it only writes .ruff_cache on some paths, so it
+# can pass repeatedly against a read-only mount and then fail the first time a
+# file actually changes. It fails loudly rather than silently passing, but the
+# place to find that out is not somebody's first real lint error.
+#
 # pytest is pointed at scripts/identity/unit/ explicitly. The suites beside it
 # (test_lifecycle.py, test_rbac.py, test_campaign.py, test_scim.py,
 # test_audit.py) are live integration harnesses with their own main() and
@@ -81,7 +98,7 @@ run_in_container() {
   docker run --rm \
     --env PYTHONDONTWRITEBYTECODE=1 \
     --env "MODE=${MODE}" \
-    --volume "$(host_path "$LAB_ROOT"):/workdir" \
+    --volume "$(host_path "$LAB_ROOT"):/workdir:ro" \
     --workdir /workdir \
     "$PYTHON_IMAGE" \
     sh -euc '
@@ -94,7 +111,7 @@ run_in_container() {
 
       if [ "$MODE" = all ] || [ "$MODE" = lint ]; then
         echo "--- ruff ---"
-        ruff check scripts/identity || status=1
+        ruff check --cache-dir=/tmp/ruff-cache scripts/identity || status=1
       fi
 
       if [ "$MODE" = all ] || [ "$MODE" = types ]; then
@@ -105,12 +122,22 @@ run_in_container() {
         # (`import rbac`), which only resolves when that directory is the
         # root of the check. Checking from above would both miss the config
         # and model the imports differently from how they actually run.
-        ( cd scripts/identity && mypy . ) || status=1
+        #
+        # --cache-dir points outside the bind mount on purpose. mypy otherwise
+        # writes ~25 MB of cache into scripts/identity/ on the host, inside the
+        # source tree. It self-ignores (mypy drops a .gitignore in there), so
+        # nothing would be committed, but leaving a large build artifact in
+        # somebody working copy to be cleaned up by hand is still the wrong
+        # default. The container is discarded, so the cache goes with it.
+        ( cd scripts/identity && mypy --cache-dir=/tmp/mypy-cache . ) || status=1
       fi
 
       if [ "$MODE" = all ] || [ "$MODE" = unit ]; then
         echo "--- pytest ---"
-        pytest -q scripts/identity/unit || status=1
+        # -p no:cacheprovider stops .pytest_cache being created at all, rather
+        # than relying on the read-only mount to reject it and having pytest
+        # report the failure as a warning on every run.
+        pytest -q -p no:cacheprovider scripts/identity/unit || status=1
       fi
 
       exit $status

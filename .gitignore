@@ -63,5 +63,11 @@ desktop.ini
 node_modules/
 .venv/
 __pycache__/
+# `make python-check` keeps these out of the source tree by pointing the tools
+# at a path inside the throwaway container. These entries cover running ruff,
+# mypy or pytest directly, which is a reasonable thing to do while iterating.
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
 *.log
 .tmp/
