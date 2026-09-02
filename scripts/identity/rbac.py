@@ -27,17 +27,13 @@ Two things separate this from a prettier `jml-show`:
 
 from __future__ import annotations
 
-import argparse
-import json
 import os
 import re
-import sys
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 
 from gitea import Gitea
 from keycloak import Keycloak
 from labhttp import HttpError, Unavailable
-from model import ValidationError, load_catalogue, validate_username
 from vault import Vault
 
 # -- decisions ----------------------------------------------------------------
@@ -148,7 +144,7 @@ def resource_matches(granted: str, query: str) -> bool:
     return g.startswith(q) or q.startswith(g)
 
 
-def parse_vault_policy(document: str) -> list:
+def parse_vault_policy(document: str | None) -> list:
     """
     Turn a policy document into (path, capabilities) pairs.
 

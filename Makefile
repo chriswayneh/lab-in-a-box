@@ -32,6 +32,8 @@ FORMAT     ?= text
 OTHER      ?=
 PERMISSION ?=
 SUITE      ?= all
+# python-check: all (default), lint, types or unit.
+MODE       ?= all
 # Access review campaign targets.
 CAMPAIGN   ?=
 SCOPE      ?= all
@@ -81,7 +83,7 @@ RESET := \033[0m
 endif
 
 .PHONY: help up down restart clean logs ps health creds secrets hooks backup \
-        restore update pull validate lint docs shell https-on https-off version \
+        restore update pull validate lint python-check docs shell https-on https-off version \
         jml-join jml-move jml-leave jml-show jml-test \
         rbac-show rbac-diff rbac-who-can \
         access-review-create access-review-show access-review-list \
@@ -382,6 +384,9 @@ validate: ## Check that the compose project and every config file parse
 
 lint: validate ## Alias for validate
 	@true
+
+python-check: ## Lint, type check and unit test the identity engine (no lab needed)
+	@bash scripts/check-python.sh $(MODE)
 
 docs: ## Regenerate the service catalogue and dependency graph from compose
 	@bash scripts/generate-docs.sh

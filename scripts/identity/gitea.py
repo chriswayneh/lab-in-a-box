@@ -135,7 +135,13 @@ class Gitea:
 
     # -- joiner --------------------------------------------------------------
 
-    def reconcile_user(self, username: str, password: str, full_name: str, result: ServiceResult) -> dict:
+    # Returns the account record, or None if Gitea does not return one after a
+    # reactivation. Declared honestly rather than as `dict`: the reactivation
+    # branch re-reads through find_user, which is genuinely Optional. No caller
+    # consumes the return value, so this is a truthful annotation rather than a
+    # promise anything relies on.
+    def reconcile_user(self, username: str, password: str, full_name: str,
+                       result: ServiceResult) -> dict | None:
         user = self.find_user(username)
 
         if user is None:

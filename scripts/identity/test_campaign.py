@@ -28,12 +28,11 @@ import os
 import subprocess
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
 import campaign
 from gitea import Gitea
 from keycloak import Keycloak
-from labhttp import HttpError, Unavailable
+from labhttp import Unavailable
 from model import PROTECTED_USERNAMES, ServiceResult, load_catalogue
 from rbac import Simulator
 from vault import Vault
@@ -558,10 +557,10 @@ def test_remediation_removes_one_vault_policy_leaves_others(sim, vt, catalogue, 
     section("Remediation removes one Vault policy, leaves the other attached")
 
     reset_to_profile(SUBJECT, "developer", catalogue, kc)
-    scratch = ServiceResult("fixture")
     # Bypass jml deliberately, the same way test_rbac.py's drift injection
     # does, to attach a second policy without going through reconcile_user's
-    # single-policy convergence.
+    # single-policy convergence. Called directly rather than through an
+    # adapter method, so no ServiceResult is needed to collect changes.
     vt._call("POST", f"/auth/userpass/users/{SUBJECT}/policies",
              json_body={"token_policies": "developer,security-analyst"})
 

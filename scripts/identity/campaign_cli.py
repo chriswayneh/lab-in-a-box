@@ -265,7 +265,10 @@ def main(argv=None) -> int:
     p_show = sub.add_parser("show", parents=[common])
     p_show.add_argument("--campaign", required=True)
 
-    p_list = sub.add_parser("list", parents=[common])
+    # Not bound to a name: `list` takes no arguments of its own, so unlike the
+    # others there is nothing to call add_argument on. The call still has to
+    # happen, because it is what registers the subcommand.
+    sub.add_parser("list", parents=[common])
 
     p_decide = sub.add_parser("decide", parents=[common])
     p_decide.add_argument("--campaign", required=True)

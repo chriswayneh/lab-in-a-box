@@ -318,6 +318,26 @@ check_markdown() {
   bash "${LAB_SCRIPT_DIR}/check-markdown.sh" 2>&1 | sed 's/^/  /' || true
 }
 
+check_python() {
+  # Same delegation as check_markdown: one script, pinned tool versions, run
+  # by both `make validate` and CI, so a clean local run means a clean CI run.
+  #
+  # This is the fast half of the Python testing story. The live suites
+  # (scripts/test-identity.sh) need a running lab and take minutes; these
+  # checks need neither and run in under a minute, which is what makes them
+  # usable on every change.
+  heading "Python"
+
+  local output
+  if output="$(bash "${LAB_SCRIPT_DIR}/check-python.sh" 2>&1)"; then
+    success "ruff, mypy and unit tests clean"
+    return 0
+  fi
+
+  fail "Python checks reported problems"
+  printf '%s\n' "$output" | grep -v '^WARNING' | sed 's/^/  /'
+}
+
 main() {
   log "${C_BOLD}Validating Lab-in-a-Box${C_RESET}"
 
@@ -329,6 +349,7 @@ main() {
   check_json
   check_shell
   check_markdown
+  check_python
 
   # Pulls a container image, so it is opt-out for a fast inner loop.
   if [[ "${SKIP_UPSTREAM:-0}" != "1" ]]; then

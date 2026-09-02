@@ -25,9 +25,8 @@ import sys
 import rbac
 from gitea import Gitea
 from keycloak import Keycloak
-from labhttp import HttpError
 from model import ServiceResult, load_catalogue
-from rbac import ALLOWED, NOT_AUTHORIZED, NOT_INTEGRATED, Simulator
+from rbac import ALLOWED, NOT_AUTHORIZED, Simulator
 from vault import Vault
 
 SUBJECT = "rbactest"
@@ -238,9 +237,9 @@ def test_drift_unexpected_vault_policy(sim, catalogue, vt) -> None:
     section("Drift: unexpected Vault policy")
 
     move_to("contractor")
-    scratch = ServiceResult("fixture")
 
-    # Attach a policy the contractor profile does not grant.
+    # Attach a policy the contractor profile does not grant. Called directly
+    # rather than through an adapter method, so no ServiceResult is needed.
     vt._call("POST", f"/auth/userpass/users/{SUBJECT}/policies",
              json_body={"token_policies": "platform-admin"})
 
