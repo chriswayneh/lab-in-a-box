@@ -490,7 +490,7 @@ make scim-status      # reconciliation state and retries
 make scim-test        # live endpoint and downstream checks
 ```
 
-`make jml-test` runs 416 checks across four suites against the live lab. Live
+`make jml-test` runs 430 checks across five suites against the live lab. Live
 authorization, remediation and SCIM propagation assertions use the real
 services; controlled adapter failures prove partial failures remain visible
 without reporting false success.
