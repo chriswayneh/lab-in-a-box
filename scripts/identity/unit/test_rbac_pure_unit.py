@@ -10,10 +10,14 @@ dangerous direction, which is why both directions are pinned here.
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 import pytest
 
 from rbac import (
     GRAFANA_FALLBACK_ROLE,
+    GRAFANA_ROLE_RULES,
     grafana_role,
     parse_vault_policy,
     resource_matches,
@@ -113,10 +117,9 @@ def test_capabilities_are_unquoted_and_stripped():
 # -----------------------------------------------------------------------------
 # grafana_role
 #
-# This mirrors GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH in
-# compose/03-observability.yml. The duplication is a known and documented
-# hazard; these tests at least pin the behaviour so a change to one side is a
-# visible test failure rather than a silent divergence.
+# The mapping is duplicated in GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH in
+# compose/03-observability.yml. The final test in this section reads that
+# expression and keeps the deployment configuration and Python model aligned.
 # -----------------------------------------------------------------------------
 
 
@@ -149,3 +152,24 @@ def test_everything_else_falls_through_to_viewer(roles):
     role, why = grafana_role(roles)
     assert role == GRAFANA_FALLBACK_ROLE == "Viewer"
     assert "no matching realm role" in why
+
+
+def test_python_mapping_matches_grafana_compose_expression():
+    repo_root = Path(__file__).resolve().parents[3]
+    compose = (repo_root / "compose" / "03-observability.yml").read_text(encoding="utf-8")
+    match = re.search(
+        r"GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH: >-\s*\n"
+        r"(?P<expression>(?:\s{8}.+\n)+)",
+        compose,
+    )
+    assert match, "Grafana role_attribute_path expression is missing from Compose"
+
+    expression = match.group("expression")
+    configured_rules = re.findall(
+        r"contains\(roles\[\*\], '([^']+)'\)\s*&&\s*'([^']+)'",
+        expression,
+    )
+    fallback = re.search(r"\|\|\s*'([^']+)'\s*$", expression)
+
+    assert configured_rules == GRAFANA_ROLE_RULES
+    assert fallback and fallback.group(1) == GRAFANA_FALLBACK_ROLE

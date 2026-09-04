@@ -10,8 +10,10 @@ failing loudly.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
+from pathlib import Path
 
 import campaign
 import jml
@@ -49,11 +51,16 @@ def test_employee_id_is_stable_across_a_separate_interpreter():
     hash still looks stable, so this has to cross a process boundary with a
     fresh PYTHONHASHSEED to be a real check.
     """
+    engine_root = Path(__file__).resolve().parent.parent
+    code = (
+        f"import sys; sys.path.insert(0, {str(engine_root)!r}); "
+        "import jml; print(jml.employee_id('erin'))"
+    )
+    env = os.environ.copy()
+    env["PYTHONHASHSEED"] = "random"
     out = subprocess.run(
-        [sys.executable, "-c",
-         "import sys; sys.path.insert(0, '/workdir/scripts/identity'); "
-         "import jml; print(jml.employee_id('erin'))"],
-        capture_output=True, text=True, env={"PYTHONHASHSEED": "random", "PATH": "/usr/local/bin:/usr/bin:/bin"},
+        [sys.executable, "-c", code],
+        capture_output=True, text=True, env=env,
     )
     assert out.stdout.strip() == jml.employee_id("erin"), out.stderr
 
