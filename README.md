@@ -804,9 +804,13 @@ Two placeholders need replacing after you fork:
 
 ---
 
-## Licence
+## License
 
-[MIT](LICENSE). Use it, fork it, put it in your portfolio, build a product on it.
+Licensed under the MIT License. Use it, fork it, modify it, or build something of your own. See [LICENSE](LICENSE) for the terms.
+
+---
+
+If this project helped you, a ⭐ is appreciated.
 
 ### Built with
 
@@ -826,8 +830,3 @@ Two placeholders need replacing after you fork:
 [Portainer](https://www.portainer.io) ·
 [pgAdmin](https://www.pgadmin.org) ·
 [Adminer](https://www.adminer.org)
-
-<div align="center">
-<br>
-<sub>If this saved you a weekend of wiring containers together, a ⭐ is appreciated.</sub>
-</div>
