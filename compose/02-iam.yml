@@ -207,7 +207,8 @@ services:
       - --oidc-jwks-url=http://keycloak:8080/realms/${KEYCLOAK_REALM:-lab}/protocol/openid-connect/certs
       - --profile-url=http://keycloak:8080/realms/${KEYCLOAK_REALM:-lab}/protocol/openid-connect/userinfo
       - --redirect-url=https://oauth.${LAB_DOMAIN:-lab.localhost}/oauth2/callback
-      - --scope=openid email profile roles
+      - --scope=openid
+      - --oidc-email-claim=email
       - --code-challenge-method=S256
       - --email-domain=*
       - --allowed-role=platform-admin
