@@ -10,7 +10,7 @@ are available through optional Compose profiles.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Docker Compose](https://img.shields.io/badge/Docker%20Compose-v2.20%2B-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
-[![Services](https://img.shields.io/badge/services-26-38bdf8)](docs/SERVICES.md)
+[![Services](https://img.shields.io/badge/services-28-38bdf8)](docs/SERVICES.md)
 [![Setup](https://img.shields.io/badge/setup-1%20command-34d399)](#quick-start)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-blueviolet.svg)](CONTRIBUTING.md)
 [![CI](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/ci.yml/badge.svg)](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/ci.yml)
@@ -60,7 +60,7 @@ trade-offs that a lab makes against production are stated plainly rather than hi
 | **RBAC simulator** | Read-only: answers "what can this person reach, and why?" Resolves live Keycloak, Vault and Gitea state, explains every grant's source, surfaces entitlement drift |
 | **Access review** | Campaign-based recertification built on the simulator above: snapshot, approve/revoke per entitlement, remediate through the same JML adapters, retained evidence |
 | **Secrets** | Vault with KV v2, transit encryption, AppRole for machines, userpass for humans, and least-privilege ACL policies |
-| **Observability** | Prometheus, Grafana, Loki and Promtail: 4 provisioned dashboards, 11 evaluating rules, and parsed Keycloak/Vault audit evidence |
+| **Observability** | Prometheus, Alertmanager, Grafana, Loki and Promtail: 4 provisioned dashboards, 11 evaluating rules routed with grouping and inhibition, and parsed Keycloak/Vault audit evidence |
 | **AI** | Ollama with a model pulled automatically, Open WebUI wired to it, optional Qdrant for retrieval |
 | **Platform** | Gitea with Actions enabled, MinIO with buckets, policies, versioning and lifecycle rules |
 | **Edge** | Traefik with automatic service discovery, TLS, rate limiting and security headers |
@@ -218,6 +218,7 @@ graph TB
 
     subgraph obs["lab_observability"]
         Prometheus["Prometheus"]
+        Alertmanager["Alertmanager"]
         Grafana["<b>Grafana</b>"]
         Loki["Loki"]
         Promtail["Promtail"]
@@ -239,7 +240,7 @@ graph TB
     end
 
     User -->|"443"| Traefik
-    Traefik --> Landing & Keycloak & Vault & Grafana & OpenWebUI & Gitea & MinIO & Prometheus
+    Traefik --> Landing & Keycloak & Vault & Grafana & OpenWebUI & Gitea & MinIO & Prometheus & Alertmanager
 
     Keycloak --> Postgres
     Gitea --> Postgres & Redis
@@ -249,6 +250,7 @@ graph TB
 
     cAdvisor --> Prometheus
     Promtail --> Loki
+    Prometheus --> Alertmanager
     Prometheus --> Grafana
     Loki --> Grafana
 
@@ -309,7 +311,7 @@ the stack is one project with one dependency graph, split into fragments you can
 docker-compose.yml            networks, volumes, secrets, includes
 ├── compose/01-core.yml           Traefik, socket proxy, PostgreSQL, Redis, landing page
 ├── compose/02-iam.yml            Keycloak, Vault, and their provisioning jobs
-├── compose/03-observability.yml  Prometheus, Grafana, Loki, Promtail, cAdvisor, node-exporter
+├── compose/03-observability.yml  Prometheus, Alertmanager, Grafana, Loki, Promtail, cAdvisor, node-exporter
 ├── compose/04-ai.yml             Ollama, Open WebUI, Qdrant
 ├── compose/05-platform.yml       Gitea, MinIO, and their provisioning jobs
 └── compose/06-tools.yml          Portainer, pgAdmin, Adminer, Watchtower
@@ -330,6 +332,7 @@ Full generated catalogue, including images, networks and privileges:
 | **Vault** | <https://vault.lab.localhost> | Secrets management, dynamic credentials, encryption as a service |
 | **Grafana** | <https://grafana.lab.localhost> | Dashboards. Datasources and panels provisioned from files |
 | **Prometheus** | <https://prometheus.lab.localhost> | Metrics collection and alert rule evaluation |
+| **Alertmanager** | <https://alertmanager.lab.localhost> | Alert routing, grouping and inhibition |
 | **Open WebUI** | <https://chat.lab.localhost> | Chat interface for the local models |
 | **Ollama** | <https://ollama.lab.localhost> | Local LLM runtime and API |
 | **Gitea** | <https://git.lab.localhost> | Git hosting with issues, pull requests and CI |
@@ -559,7 +562,7 @@ This is a **development lab**, not a production deployment, and it is explicit a
   a container
 - **Docker secrets** for the images with real `_FILE` support. Credentials do not appear in
   `docker inspect`, the process table or shell history
-- **Non-root containers** wherever the image allows: Traefik (`1000`), Prometheus (`65534`),
+- **Non-root containers** wherever the image allows: Traefik (`1000`), Prometheus (`65534`), Alertmanager (`65534`),
   Grafana (`472`), Loki (`10001`), Gitea (`1000`), nginx (unprivileged variant)
 - **`no-new-privileges`** on every container; a read-only root filesystem on the landing page
 - **Per-service database roles.** Keycloak and Gitea each get their own PostgreSQL login, scoped to
@@ -584,7 +587,7 @@ This is a **development lab**, not a production deployment, and it is explicit a
 > **Warning**
 > Do not expose this lab to the internet as-is. It is designed for `localhost`. If you need it reachable,
 > read [`docs/security.md`](docs/security.md) first. At minimum you need real certificates, generated
-> credentials, `LAB_FORCE_HTTPS=true`, and authentication in front of Traefik, Prometheus and Portainer.
+> credentials, `LAB_FORCE_HTTPS=true`, and authentication in front of Traefik, Prometheus, Alertmanager and Portainer.
 
 ### Trusted local HTTPS (Windows)
 
@@ -646,7 +649,9 @@ Grafana comes up already populated. There is no datasource to add and no dashboa
 
 Nine Prometheus rules cover availability, saturation and the edge. Two Loki
 rules detect repeated login failures and privileged Vault policy changes. Every
-rule carries a description that says what to *do*, not just what fired.
+rule carries a description and a `runbook_url`. Alertmanager groups by category
+and severity, inhibits container noise when the host is out of memory, and
+delivers to an in-lab webhook sink by default.
 
 Logs are collected through the Docker API rather than by tailing host paths, which is why log collection
 works identically on Linux, macOS and Windows. Details, plus how to enable Vault metrics and move Loki's
@@ -779,14 +784,14 @@ More, including how to read the init-job logs and what each provisioning script 
 | Version | Theme | Highlights |
 | --- | --- | --- |
 | **v1** | Foundation ✅ | The stack you are reading about |
-| **v2** | Identity governance 🚧 | v2-1 JML ✅ · v2-2 RBAC ✅ · v2-3 access reviews ✅ · v2-4 SCIM ✅ · v2-5 audit pipeline ✅ · Alertmanager next |
+| **v2** | Identity governance 🚧 | v2-1 JML ✅ · v2-2 RBAC ✅ · v2-3 access reviews ✅ · v2-4 SCIM ✅ · v2-5 audit pipeline ✅ · v2-6 Alertmanager ✅ · forward-auth next |
 | **v3** | Infrastructure as code | Terraform and Ansible deployments, a Kubernetes edition, AWS/Azure/GCP targets |
 | **v4** | AI operations | Log analysis, incident response copilot, automatic infrastructure documentation, RAG over your own runbooks |
 | **v5** | Homelab operations | Backup verification, external uptime monitoring and resource presets |
 
 **v2 is in progress.** Identity lifecycle automation, RBAC simulation, access
-review campaigns, SCIM provisioning and the identity audit pipeline have landed
-and are usable today. See
+review campaigns, SCIM provisioning, the identity audit pipeline and
+Alertmanager have landed and are usable today. See
 [Identity lifecycle](#identity-lifecycle) above, or
 [`docs/identity-governance.md`](docs/identity-governance.md) for the full model.
 For a reviewer-friendly walkthrough, use the [10-minute demo](docs/demo.md).
@@ -831,6 +836,7 @@ If this project helped you, a ⭐ is appreciated.
 [Keycloak](https://www.keycloak.org) ·
 [Vault](https://www.vaultproject.io) ·
 [Prometheus](https://prometheus.io) ·
+[Alertmanager](https://prometheus.io/docs/alerting/latest/alertmanager/) ·
 [Grafana](https://grafana.com) ·
 [Loki](https://grafana.com/oss/loki/) ·
 [Ollama](https://ollama.com) ·

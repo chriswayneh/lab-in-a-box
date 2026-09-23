@@ -16,6 +16,8 @@ graph TD
     end
     subgraph Observability["Observability"]
         prometheus["prometheus"]
+        alertmanager["alertmanager"]
+        alert_webhook["alert-webhook"]
         grafana["grafana"]
         loki["loki"]
         promtail["promtail"]
@@ -42,6 +44,7 @@ graph TD
     end
 
     postgres --> adminer
+    alert_webhook --> alertmanager
     postgres --> gitea
     redis --> gitea
     gitea --> gitea_init
@@ -53,6 +56,7 @@ graph TD
     ollama --> ollama_init
     ollama --> open_webui
     postgres --> pgadmin
+    alertmanager --> prometheus
     cadvisor --> prometheus
     loki --> promtail
     socket_proxy --> promtail

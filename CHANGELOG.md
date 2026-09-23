@@ -14,9 +14,29 @@ action from someone with an existing lab**: a `make clean`, a manual migration, 
 ## [Unreleased]
 
 Work in progress toward **v2.0, Identity governance**. The milestone is not
-complete: `v2-1` through `v2-5` have landed, `v2-6` and `v2-7` remain.
+complete: `v2-1` through `v2-6` have landed, `v2-7` remains.
 
 ### Added
+
+#### Alertmanager (roadmap `v2-6`)
+
+- Alertmanager (`prom/alertmanager:v0.28.1`) wired to Prometheus and routed at
+  `alertmanager.${LAB_DOMAIN}`, with silences and notification log on a named
+  volume.
+- Routing grouped by `category` and `severity`, with laptop-friendly
+  `group_wait` / `group_interval` / `repeat_interval` timings.
+- Inhibition: `HostMemoryPressure` suppresses `ContainerHighCPU`,
+  `ContainerHighMemory`, `ContainerUnhealthy` and `ContainerRestartLoop`.
+- In-lab `alert-webhook` sink (`mendhak/http-https-echo:41`) so notifications
+  work with no external account; `docker compose logs -f alert-webhook` shows
+  every POST.
+- Optional email, Slack and Discord receivers documented in
+  `monitoring/alertmanager/alertmanager.yml` and `docs/observability.md`, off
+  by default.
+- `runbook_url` annotations on every Prometheus alert rule pointing at
+  `docs/observability.md#alert-rules` (Loki audit rules already had them).
+- `amtool check-config` in `make validate` and CI, pinned to the same image
+  compose runs.
 
 #### Identity audit pipeline (roadmap `v2-5`)
 
@@ -28,7 +48,7 @@ complete: `v2-1` through `v2-5` have landed, `v2-6` and `v2-7` remain.
 - A provisioned **Identity Audit Trail** dashboard for authentication activity,
   failures, Keycloak administrative changes and Vault secret access.
 - Loki-managed rules for brute-force login patterns and privileged Vault policy
-  changes, ready for Alertmanager routing in roadmap `v2-6`.
+  changes, now routed through Alertmanager alongside the Prometheus rules.
 - Separate 30-day audit retention through `LOKI_AUDIT_RETENTION_PERIOD`, while
   routine container logs remain at 7 days by default.
 - `make audit-test`: generates successful and failed identity activity, waits

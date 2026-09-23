@@ -1,5 +1,5 @@
 # =============================================================================
-# Observability — Prometheus, Grafana, Loki, Promtail, exporters
+# Observability — Prometheus, Alertmanager, Grafana, Loki, Promtail, exporters
 # =============================================================================
 # Metrics and logs, provisioned end to end. Nothing here needs a click to set
 # up: datasources, dashboards, scrape targets and alert rules are all files in
@@ -8,8 +8,9 @@
 # The pipeline:
 #
 #   cAdvisor ──┐
-#   node-exp ──┼─▶ Prometheus ──┐
-#   Traefik  ──┘                ├─▶ Grafana
+#   node-exp ──┼─▶ Prometheus ──▶ Alertmanager ──▶ alert-webhook (local sink)
+#   Traefik  ──┘       │
+#                      ├─▶ Grafana
 #   containers ─▶ Promtail ─▶ Loki ─┘
 # =============================================================================
 
@@ -63,6 +64,8 @@ services:
       - lab_edge
       - lab_observability
     depends_on:
+      alertmanager:
+        condition: service_started
       cadvisor:
         condition: service_started
     healthcheck:
@@ -79,6 +82,85 @@ services:
       - traefik.http.routers.prometheus.tls=true
       - traefik.http.routers.prometheus.middlewares=lab-default@file,lab-ratelimit@docker
       - traefik.http.services.prometheus.loadbalancer.server.port=9090
+
+
+  # ---------------------------------------------------------------------------
+  # Alertmanager — alert routing, grouping and inhibition
+  #
+  # Prometheus evaluates the rules; Alertmanager decides who hears about them.
+  # Grouping and inhibition live in monitoring/alertmanager/alertmanager.yml.
+  # The default receiver is the in-lab alert-webhook sink so notifications work
+  # with no external account. Optional Slack / email / Discord receivers are
+  # documented in that file and in docs/observability.md.
+  # ---------------------------------------------------------------------------
+  alertmanager:
+    <<: [*defaults, *hardened]
+    image: prom/alertmanager:v0.28.1
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-alertmanager
+    # The image's own unprivileged user (nobody).
+    user: "65534:65534"
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --web.external-url=https://alertmanager.${LAB_DOMAIN:-lab.localhost}
+      - --web.route-prefix=/
+      # Single-instance lab: do not listen for cluster gossip.
+      - --cluster.listen-address=
+      - --log.level=warn
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    networks:
+      - lab_edge
+      - lab_observability
+    depends_on:
+      alert-webhook:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:9093/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${COMPOSE_PROJECT_NAME:-lab}_edge
+      - traefik.http.routers.alertmanager.rule=Host(`alertmanager.${LAB_DOMAIN:-lab.localhost}`)
+      - traefik.http.routers.alertmanager.entrypoints=web,websecure
+      - traefik.http.routers.alertmanager.tls=true
+      - traefik.http.routers.alertmanager.middlewares=lab-default@file,lab-ratelimit@docker
+      - traefik.http.services.alertmanager.loadbalancer.server.port=9093
+
+  # ---------------------------------------------------------------------------
+  # alert-webhook — local notification sink
+  #
+  # Receives Alertmanager webhook POSTs and logs the JSON body to stdout. No
+  # Traefik route on purpose: this is an internal proof that routing works, not
+  # a public endpoint. Tail it with `docker compose logs -f alert-webhook`.
+  # ---------------------------------------------------------------------------
+  alert-webhook:
+    <<: [*defaults, *hardened]
+    image: mendhak/http-https-echo:41
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-alert-webhook
+    environment:
+      TZ: ${LAB_TZ:-UTC}
+      HTTP_PORT: "8080"
+      # Drop the noisy Express access lines; the echoed JSON body is what we want.
+      DISABLE_REQUEST_LOGS: "true"
+    networks:
+      - lab_observability
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://127.0.0.1:8080/',r=>process.exit(r.statusCode&&r.statusCode<500?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   # ---------------------------------------------------------------------------
   # cAdvisor — per-container resource metrics

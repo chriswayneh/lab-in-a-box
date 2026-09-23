@@ -8,7 +8,7 @@
 
 Every container in the lab, grouped by the compose fragment that defines it. Hostnames assume `LAB_DOMAIN=lab.localhost`.
 
-**28 available services** across **6 layers**. **26 start by default**; `qdrant`, `watchtower` require their optional Compose profiles. Services whose name ends in `-init` are one-shot provisioning jobs: they run once, do their work, and exit. A stopped `-init` container is a success, not a fault.
+**30 available services** across **6 layers**. **28 start by default**; `qdrant`, `watchtower` require their optional Compose profiles. Services whose name ends in `-init` are one-shot provisioning jobs: they run once, do their work, and exit. A stopped `-init` container is a success, not a fault.
 
 ## Core
 
@@ -35,11 +35,13 @@ _Who you are, and what you are allowed to know_
 
 ## Observability
 
-_Metrics, logs and dashboards_
+_Metrics, logs, alerts and dashboards_
 
 | Service | Image | URL | Host ports | Networks | Health | Privileges |
 | --- | --- | --- | --- | --- | :---: | --- |
 | `prometheus` | `prom/prometheus:v3.1.0` | `prometheus.lab.localhost` | — | edge, observability | ✅ | uid `65534:65534` |
+| `alertmanager` | `prom/alertmanager:v0.28.1` | `alertmanager.lab.localhost` | — | edge, observability | ✅ | uid `65534:65534` |
+| `alert-webhook` | `mendhak/http-https-echo:41` | — | — | observability | ✅ | — |
 | `grafana` | `grafana/grafana:11.5.0` | `grafana.lab.localhost` | — | edge, observability | ✅ | uid `472:472` |
 | `loki` | `grafana/loki:3.3.2` | — | — | observability | ✅ | uid `10001:10001` |
 | `promtail` | `grafana/promtail:3.3.2` | — | — | observability, socket | ✅ | — |
@@ -99,6 +101,6 @@ _Not yet categorised_
 
 ## Volumes
 
-17 named volumes hold all persistent state: `gitea_data`, `grafana_data`, `keycloak_data`, `loki_data`, `minio_data`, `ollama_models`, `openwebui_data`, `pgadmin_data`, `portainer_data`, `postgres_data`, `prometheus_data`, `promtail_positions`, `qdrant_data`, `redis_data`, `scim_state`, `vault_data`, `vault_logs`.
+18 named volumes hold all persistent state: `alertmanager_data`, `gitea_data`, `grafana_data`, `keycloak_data`, `loki_data`, `minio_data`, `ollama_models`, `openwebui_data`, `pgadmin_data`, `portainer_data`, `postgres_data`, `prometheus_data`, `promtail_positions`, `qdrant_data`, `redis_data`, `scim_state`, `vault_data`, `vault_logs`.
 
 `make down` preserves every one of them. Only `make clean` removes them, and it asks first.

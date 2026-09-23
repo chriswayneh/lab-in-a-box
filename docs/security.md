@@ -297,7 +297,7 @@ Honest list. These are known and accepted for a local development lab.
 | **Portainer holds the socket** | Portainer compromise = host compromise | Remove it, or put authentication and network restriction in front |
 | **cAdvisor is privileged** | Container escape from cAdvisor = host access | Unavoidable for cgroup metrics; treat the host as inside the boundary |
 | **No authentication in front of Prometheus** | Metrics are readable by anyone who can reach the edge | Traefik forward-auth against Keycloak |
-| **No Alertmanager** | Alert rules evaluate but nothing routes them | Add Alertmanager (v2 roadmap) |
+| **Alertmanager has no authentication** | Anyone who can reach the edge can view and silence alerts | Traefik forward-auth against Keycloak (same as Prometheus; v2-7) |
 | **No network policy inside networks** | Any container on `lab_edge` can reach any other on it | Service mesh, or finer-grained networks |
 | **Shipped fallback credentials** | A lab run without `make secrets` uses published passwords | Always run `make secrets` |
 

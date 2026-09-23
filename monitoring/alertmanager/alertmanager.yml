@@ -1,0 +1,121 @@
+# =============================================================================
+# Alertmanager — routing, grouping, inhibition and notification
+# =============================================================================
+# Prometheus evaluates the lab's alert rules and forwards firing alerts here.
+# This file decides how they are grouped, which ones are suppressed when a
+# parent condition is already firing, and where the resulting notifications go.
+#
+# Out of the box every notification lands on the in-lab `alert-webhook` sink
+# (see compose/03-observability.yml). Optional email, Slack and Discord
+# receivers are documented below but deliberately off: enabling any of them
+# requires editing this file (and for Slack/Discord, adding a secret URL).
+# Walkthrough: docs/observability.md#alertmanager
+# =============================================================================
+
+global:
+  # How long Alertmanager waits after an alert stops firing before declaring
+  # it resolved. Five minutes is enough that a brief flap does not send a
+  # resolve immediately after the page.
+  resolve_timeout: 5m
+
+  # Optional SMTP defaults used only when the `email` receiver below is
+  # uncommented. Leave blank until you intentionally enable email delivery.
+  # smtp_smarthost: "smtp.example.com:587"
+  # smtp_from: "alertmanager@lab.localhost"
+  # smtp_auth_username: "alertmanager"
+  # smtp_auth_password: "replace-me"
+  # smtp_require_tls: true
+
+# ---------------------------------------------------------------------------
+# Routing tree
+#
+# group_by [category, severity] keeps related lab alerts together: a host
+# memory event and the container saturation it causes share a category, and
+# criticals do not get buried under infos. Timings are generous because this
+# runs on a laptop where a model pull is normal traffic, not an incident.
+# ---------------------------------------------------------------------------
+route:
+  receiver: local-webhook
+  group_by: [category, severity]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+  routes:
+    # Criticals page a little faster and re-notify more often.
+    - matchers: [severity = critical]
+      receiver: local-webhook
+      group_wait: 15s
+      repeat_interval: 1h
+
+    - matchers: [severity = warning]
+      receiver: local-webhook
+      repeat_interval: 4h
+
+    # Infos are logged once and mostly left alone.
+    - matchers: [severity = info]
+      receiver: local-webhook
+      repeat_interval: 12h
+
+# ---------------------------------------------------------------------------
+# Inhibition
+#
+# When the host itself is out of memory, every container looks unhealthy at
+# once. Suppress the noisy per-container symptoms so the operator sees the
+# real cause — HostMemoryPressure — rather than a cascade of children.
+# ---------------------------------------------------------------------------
+inhibit_rules:
+  - source_matchers:
+      - alertname = HostMemoryPressure
+    target_matchers:
+      - alertname =~ ContainerHighCPU|ContainerHighMemory|ContainerUnhealthy|ContainerRestartLoop
+
+# ---------------------------------------------------------------------------
+# Receivers
+# ---------------------------------------------------------------------------
+receivers:
+  # Default, zero-setup sink. alert-webhook is an in-compose echo server that
+  # logs every POST Alertmanager sends. Tail it with:
+  #   docker compose logs -f alert-webhook
+  - name: local-webhook
+    webhook_configs:
+      - url: http://alert-webhook:8080/
+        send_resolved: true
+
+  # --- Optional: email (off) ------------------------------------------------
+  # Uncomment the block, fill in global smtp_* above, then either change the
+  # root `receiver:` to `email` or add a route that selects it.
+  #
+  # - name: email
+  #   email_configs:
+  #     - to: "oncall@example.com"
+  #       send_resolved: true
+
+  # --- Optional: Slack (off) ------------------------------------------------
+  # Create an Incoming Webhook in Slack, paste the URL below, then route to
+  # the `slack` receiver. Do not commit a real webhook URL.
+  #
+  # - name: slack
+  #   slack_configs:
+  #     - api_url: "https://hooks.slack.com/services/T00/B00/XXXXXXXX"
+  #       channel: "#lab-alerts"
+  #       send_resolved: true
+  #       title: '{{ template "slack.default.title" . }}'
+  #       text: >-
+  #         {{ range .Alerts }}*{{ .Labels.alertname }}* ({{ .Labels.severity }})
+  #         {{ .Annotations.summary }}
+  #         {{ end }}
+
+  # --- Optional: Discord (off) ----------------------------------------------
+  # Discord accepts Slack-compatible webhooks at /slack on the webhook URL.
+  # Same caution as Slack: keep the URL out of git.
+  #
+  # - name: discord
+  #   slack_configs:
+  #     - api_url: "https://discord.com/api/webhooks/ID/TOKEN/slack"
+  #       send_resolved: true
+  #       title: '{{ template "slack.default.title" . }}'
+  #       text: >-
+  #         {{ range .Alerts }}**{{ .Labels.alertname }}** ({{ .Labels.severity }})
+  #         {{ .Annotations.summary }}
+  #         {{ end }}

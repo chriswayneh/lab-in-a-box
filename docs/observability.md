@@ -5,6 +5,7 @@ The metrics and logs pipeline: what collects what, how it is provisioned, and ho
 - [The pipeline](#the-pipeline)
 - [Dashboards](#dashboards)
 - [Alert rules](#alert-rules)
+- [Alertmanager](#alertmanager)
 - [Metrics](#metrics)
 - [Logs](#logs)
 - [Identity audit pipeline](#identity-audit-pipeline)
@@ -32,19 +33,20 @@ The metrics and logs pipeline: what collects what, how it is provisioned, and ho
    │ host system │   │   │    rules     │              │  discovery │
    └─────────────┘   │   └───────┬──────┘              │  + filter  │
    ┌─────────────┐   │           │                     └──────┬─────┘
-   │   Traefik   │───┤           │                            │
-   │  requests   │   │           │                     ┌──────▼─────┐
-   └─────────────┘   │           │                     │    Loki    │
-   ┌─────────────┐   │           │                     │  7d / 30d  │
-   │  Keycloak   │───┤           │                     └──────┬─────┘
+   │   Traefik   │───┤           ▼                            │
+   │  requests   │   │   ┌──────────────┐              ┌──────▼─────┐
+   └─────────────┘   │   │ Alertmanager │              │    Loki    │
+   ┌─────────────┐   │   │ group/inhibit│              │  7d / 30d  │
+   │  Keycloak   │───┤   └───────┬──────┘              └──────┬─────┘
    │  JVM/logins │   │           │                            │
-   └─────────────┘   │           └──────────┬─────────────────┘
-   ┌─────────────┐   │                      │
-   │ Loki, MinIO │───┘              ┌───────▼────────┐
-   └─────────────┘                  │    Grafana     │
-                                    │  4 dashboards  │
-                                    │  provisioned   │
-                                    └────────────────┘
+   └─────────────┘   │           ▼                            │
+   ┌─────────────┐   │   alert-webhook                 ┌──────┘
+   │ Loki, MinIO │───┘   (local sink)                  │
+   └─────────────┘                  ┌──────────────────▼─┐
+                                    │      Grafana       │
+                                    │   4 dashboards     │
+                                    │    provisioned     │
+                                    └────────────────────┘
 ```
 
 Nothing in this diagram requires a click to set up. Datasources, dashboards, scrape configuration and
@@ -122,18 +124,93 @@ or a container restart is normal.
 that, every unlimited container divides by zero and reports `+Inf`, and the alert fires constantly.
 
 Two additional Loki-managed audit rules evaluate brute-force login patterns and
-privileged Vault policy changes. **There is no Alertmanager yet.** All eleven
-rules evaluate and appear in Grafana's alert list, but nothing routes them
-anywhere. Adding Alertmanager is the next v2 roadmap item.
+privileged Vault policy changes. All eleven rules evaluate in Prometheus or Loki,
+appear in Grafana's alert list, and route through Alertmanager (see below).
 
-Validate rule changes before starting anything:
+Every Prometheus and Loki rule carries a `runbook_url` annotation pointing back
+at this document so a firing alert links to the explanation of what to do.
+
+Validate rule and Alertmanager changes before starting anything:
 
 ```bash
-make validate          # includes promtool check rules
+make validate          # includes promtool check rules and amtool check-config
 ```
 
 `promtool` parses every PromQL expression, so a typo is caught at commit time rather than at 3am when the
-rule silently never fires.
+rule silently never fires. `amtool check-config` does the same for the routing
+tree, inhibition rules and receivers.
+
+---
+
+## Alertmanager
+
+Alertmanager receives every firing alert from Prometheus, groups related ones,
+suppresses children when a parent is already firing, and delivers notifications.
+
+| | |
+| --- | --- |
+| UI | <https://alertmanager.lab.localhost> |
+| Config | `monitoring/alertmanager/alertmanager.yml` |
+| Default receiver | `local-webhook` → in-lab `alert-webhook` container |
+
+### Grouping
+
+Alerts are grouped by `category` and `severity` (the labels every lab rule
+already sets). Criticals re-notify after one hour; warnings after four; infos
+after twelve. `group_wait` / `group_interval` are deliberately generous so a
+model download does not look like an incident.
+
+### Inhibition
+
+When `HostMemoryPressure` is firing, Alertmanager suppresses the per-container
+symptoms it usually causes:
+
+- `ContainerHighCPU`
+- `ContainerHighMemory`
+- `ContainerUnhealthy`
+- `ContainerRestartLoop`
+
+The operator sees the cause once rather than a cascade of children.
+
+### Local webhook (works out of the box)
+
+No Slack workspace, SMTP relay or Discord bot is required. Alertmanager POSTs
+to `http://alert-webhook:8080/`, an echo container on `lab_observability` that
+logs the JSON body to stdout:
+
+```bash
+docker compose logs -f alert-webhook
+```
+
+Resolved alerts are included (`send_resolved: true`), so a quiet period after a
+firing burst is visible in the same stream.
+
+### Optional receivers (off by default)
+
+Email, Slack and Discord receivers are stubbed as commented examples in
+`monitoring/alertmanager/alertmanager.yml`. To enable one:
+
+1. Uncomment the receiver block and fill in the real endpoint (SMTP host, Slack
+   incoming-webhook URL, or Discord webhook URL with the `/slack` suffix).
+1. Either change the root `receiver:` to that name, or add a child route that
+   selects it (for example by severity).
+1. Restart Alertmanager: `docker compose up -d alertmanager`.
+
+Do not commit real webhook URLs or SMTP passwords. Keep them in an ignored
+local override or a secret manager.
+
+Discord accepts Slack-compatible payloads at `…/slack` on the webhook URL, which
+is why the Discord example reuses `slack_configs`.
+
+### Validate
+
+```bash
+make validate
+# or directly:
+docker run --rm --entrypoint amtool \
+  -v "$PWD/monitoring/alertmanager:/cfg:ro" \
+  prom/alertmanager:v0.28.1 check-config /cfg/alertmanager.yml
+```
 
 ---
 

@@ -107,12 +107,11 @@ End with what you would change for production:
 - replace Vault dev mode with durable storage, unseal controls and no standing
   root token
 - use a trusted certificate and external secret distribution
-- route and inhibit alerts through roadmap `v2-6`
-- put unauthenticated operational routes behind role-aware forward auth in
-  roadmap `v2-7`
+- put Alertmanager, Prometheus and the Traefik dashboard behind role-aware
+  forward auth in roadmap `v2-7` (routing and inhibition already ship as `v2-6`)
 - move Loki chunks to object storage and define recovery objectives
 
-The strongest portfolio claim is not “I ran 26 containers.” It is: “I designed
+The strongest portfolio claim is not “I ran 28 containers.” It is: “I designed
 an identity-governance control loop, made its trade-offs explicit, and built
 tests that prove the security-relevant outcomes against live systems.”
 

@@ -44,7 +44,7 @@ docker-compose.yml            networks, volumes, secrets, and six includes
 │
 ├── compose/01-core.yml           Traefik, socket proxy, PostgreSQL, Redis, landing page
 ├── compose/02-iam.yml            Keycloak, Vault, + provisioning jobs
-├── compose/03-observability.yml  Prometheus, Grafana, Loki, Promtail, cAdvisor, node-exporter
+├── compose/03-observability.yml  Prometheus, Alertmanager, Grafana, Loki, Promtail, cAdvisor, node-exporter
 ├── compose/04-ai.yml             Ollama, Open WebUI, Qdrant
 ├── compose/05-platform.yml       Gitea, MinIO, + provisioning jobs
 ├── compose/06-tools.yml          Portainer, pgAdmin, Adminer, Watchtower
@@ -84,7 +84,7 @@ Five networks. A service can reach only what it shares one with.
 | --- | :---: | --- |
 | `lab_edge` | no | Traefik plus every service with an HTTP route |
 | `lab_data` | **yes** | PostgreSQL, Redis, and their clients |
-| `lab_observability` | no | Prometheus, Grafana, Loki, Promtail, exporters, scrape targets |
+| `lab_observability` | no | Prometheus, Alertmanager, Grafana, Loki, Promtail, exporters, scrape targets |
 | `lab_ai` | no | Ollama, Open WebUI, Qdrant |
 | `lab_socket` | **yes** | Socket proxy, Traefik, Promtail |
 
@@ -109,7 +109,7 @@ PostgreSQL) and `lab_observability` (to be scraped), and nothing else. Open WebU
         │ lab_data               │ lab_obs   │ lab_ai     │ lab_data
         ▼                        ▼           ▼            ▼
    ┌─────────────────┐   ┌──────────────┐ ┌────────┐ ┌─────────┐
-   │   PostgreSQL    │   │  Prometheus  │ │ Ollama │ │  Redis  │
+   │   PostgreSQL    │   │ Prometheus+AM│ │ Ollama │ │  Redis  │
    │    (isolated)   │   │     Loki     │ └────────┘ │(isolated)│
    └─────────────────┘   └──────────────┘            └─────────┘
 ```

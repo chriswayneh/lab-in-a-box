@@ -21,10 +21,12 @@ global:
 rule_files:
   - /etc/prometheus/rules/*.yml
 
-# Alertmanager is not part of the lab yet — see the v2 roadmap. Rules still
-# evaluate and surface in Grafana's alert list without it.
+# Alertmanager receives every firing alert. Addressed by Compose service name
+# on lab_observability; Traefik only exposes the UI, not this push path.
 alerting:
-  alertmanagers: []
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
 
 scrape_configs:
   # ---------------------------------------------------------------------------
