@@ -4,13 +4,13 @@
 
 **A self-hosted AI, infrastructure and identity lab. One command, no manual configuration.**
 
-Twenty-six containers by default: identity, secrets, observability, object storage, Git hosting and a
+Twenty-nine containers by default: identity, secrets, observability, object storage, Git hosting and a
 local LLM. All provisioned and wired together automatically. Two more services, Qdrant and Watchtower,
-are available through optional Compose profiles.
+are available through optional Compose profiles (thirty-one in the full catalogue).
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Docker Compose](https://img.shields.io/badge/Docker%20Compose-v2.20%2B-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
-[![Services](https://img.shields.io/badge/services-28-38bdf8)](docs/SERVICES.md)
+[![Services](https://img.shields.io/badge/services-31-38bdf8)](docs/SERVICES.md)
 [![Setup](https://img.shields.io/badge/setup-1%20command-34d399)](#quick-start)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-blueviolet.svg)](CONTRIBUTING.md)
 [![CI](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/ci.yml/badge.svg)](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/ci.yml)
@@ -55,7 +55,7 @@ trade-offs that a lab makes against production are stated plainly rather than hi
 
 | | |
 | --- | --- |
-| **Identity** | Keycloak with a seeded realm: 4 users, 4 groups, 6 roles, 5 OIDC clients, brute-force protection and a password policy |
+| **Identity** | Keycloak with a seeded realm: 4 users, 4 groups, 6 roles, 6 OIDC clients, brute-force protection and a password policy |
 | **Identity lifecycle** | Joiner/Mover/Leaver automation across Keycloak, Vault and Gitea. Group-based RBAC, access diffing, session and refresh-token revocation, repository custody transfer, redacted audit records |
 | **RBAC simulator** | Read-only: answers "what can this person reach, and why?" Resolves live Keycloak, Vault and Gitea state, explains every grant's source, surfaces entitlement drift |
 | **Access review** | Campaign-based recertification built on the simulator above: snapshot, approve/revoke per entitlement, remediate through the same JML adapters, retained evidence |
@@ -63,7 +63,7 @@ trade-offs that a lab makes against production are stated plainly rather than hi
 | **Observability** | Prometheus, Alertmanager, Grafana, Loki and Promtail: 4 provisioned dashboards, 11 evaluating rules routed with grouping and inhibition, and parsed Keycloak/Vault audit evidence |
 | **AI** | Ollama with a model pulled automatically, Open WebUI wired to it, optional Qdrant for retrieval |
 | **Platform** | Gitea with Actions enabled, MinIO with buckets, policies, versioning and lifecycle rules |
-| **Edge** | Traefik with automatic service discovery, TLS, rate limiting and security headers |
+| **Edge** | Traefik with automatic service discovery, TLS, rate limiting, security headers, and Keycloak forward-auth (oauth2-proxy) for Prometheus, Alertmanager and the Traefik dashboard |
 | **Operations** | Portainer, pgAdmin, Adminer, backups, health checks and a Makefile that explains itself |
 
 ---
@@ -76,6 +76,7 @@ The lab demonstrates zero-trust principles through explicit identity, least priv
 - **Effective-access review:** the read-only RBAC simulator explains grants from live service state. Access-review campaigns retain decisions and remediation evidence.
 - **Scoped secrets access:** Vault ACL policies separate permissions by role rather than giving every identity administrative access.
 - **Separated service networks:** services join selected Compose networks; network placement and credential handling are documented alongside their limitations.
+- **Forward-auth at the edge:** Prometheus, Alertmanager and the Traefik dashboard require a Keycloak login via oauth2-proxy (`oauth.${LAB_DOMAIN}`); Grafana continues to scrape Prometheus on the internal network.
 
 This remains a local lab, not a complete enterprise zero-trust architecture. Shipped development credentials must be replaced before handling sensitive data. The host, service administrators, privileged monitoring, and components with direct Docker socket access remain trusted. Network separation alone does not authenticate a caller. See the [security model](docs/security.md) for the exact boundaries and deliberate development exceptions.
 
@@ -571,6 +572,7 @@ This is a **development lab**, not a production deployment, and it is explicit a
   their own database, created with `NOCREATEDB NOCREATEROLE NOSUPERUSER`
 - **Least-privilege Vault policies**, including an explicit `deny` on audit-device paths for the
   administrator policy, so an operator cannot erase their own trail
+- **Forward-auth** for Prometheus, Alertmanager and the Traefik dashboard via oauth2-proxy and Traefik ForwardAuth (Keycloak OIDC; on by default)
 - **Rate limiting and security headers** on every routed service
 - **Generated credentials.** 32 characters of CSPRNG output per service
 - **CI security scanning.** Secret scanning over full history, image CVEs and configuration checks
@@ -794,11 +796,14 @@ More, including how to read the init-job logs and what each provisioning script 
 **v2 roadmap work is complete (7/7).** Identity lifecycle automation, RBAC
 simulation, access review campaigns, SCIM provisioning, the identity audit
 pipeline, Alertmanager and forward-auth for Prometheus / Alertmanager / Traefik
-have landed. The `v2.0.0` tag waits on demo/screenshots. See
+have landed. Milestone complete; the remaining ship step is the `v2.0.0`
+release tag after the local demo. See
 [Identity lifecycle](#identity-lifecycle) above, or
 [`docs/identity-governance.md`](docs/identity-governance.md) for the full model.
 For a reviewer-friendly walkthrough, use the [10-minute demo](docs/demo.md).
-v1.0.0 remains the only tagged release.
+Screenshots in this README were captured from the local lab (see
+[`screenshots/README.md`](screenshots/README.md) to refresh before tagging).
+v1.0.0 remains the only tagged release until `v2.0.0` is cut.
 
 Full detail, including ready-to-file issues with acceptance criteria, is in
 [`roadmap/`](roadmap/README.md).

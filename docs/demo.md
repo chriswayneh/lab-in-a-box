@@ -108,10 +108,10 @@ End with what you would change for production:
   root token
 - use a trusted certificate and external secret distribution
 - keep forward-auth enabled for Prometheus, Alertmanager and the Traefik
-  dashboard (ships as `v2-7`; disable only on a fully trusted host)
+  dashboard (on by default since `v2-7`; disable only on a fully trusted host)
 - move Loki chunks to object storage and define recovery objectives
 
-The strongest portfolio claim is not “I ran 28 containers.” It is: “I designed
+The strongest portfolio claim is not “I ran 29 containers.” It is: “I designed
 an identity-governance control loop, made its trade-offs explicit, and built
 tests that prove the security-relevant outcomes against live systems.”
 
