@@ -246,6 +246,42 @@ ensure_oauth2_proxy_client() {
       -s 'config."userinfo.token.claim"=true' >/dev/null
     log "realm-roles-in-token mapper added to oauth2-proxy"
   fi
+
+  # oauth2-proxy v7.15 reads realm roles from realm_access.roles and
+  # requires an email claim even when Keycloak advertises only the openid scope.
+  mapper_id="$(kc get "clients/${uuid}/protocol-mappers/models" -r "$KC_REALM" \
+    -q name=email --fields id --format csv --noquotes 2>/dev/null | head -n1 | tr -d '\r' || true)"
+  if [[ -z "$mapper_id" ]]; then
+    kc create "clients/${uuid}/protocol-mappers/models" -r "$KC_REALM" \
+      -s name=email \
+      -s protocol=openid-connect \
+      -s protocolMapper=oidc-usermodel-property-mapper \
+      -s consentRequired=false \
+      -s 'config."user.attribute"=email' \
+      -s 'config."claim.name"=email' \
+      -s 'config."jsonType.label"=String' \
+      -s 'config."id.token.claim"=true' \
+      -s 'config."access.token.claim"=true' \
+      -s 'config."userinfo.token.claim"=true' >/dev/null
+    log "email mapper added to oauth2-proxy"
+  fi
+
+  mapper_id="$(kc get "clients/${uuid}/protocol-mappers/models" -r "$KC_REALM" \
+    -q name=realm-access-roles-for-oauth2-proxy --fields id --format csv --noquotes 2>/dev/null | head -n1 | tr -d '\r' || true)"
+  if [[ -z "$mapper_id" ]]; then
+    kc create "clients/${uuid}/protocol-mappers/models" -r "$KC_REALM" \
+      -s name=realm-access-roles-for-oauth2-proxy \
+      -s protocol=openid-connect \
+      -s protocolMapper=oidc-usermodel-realm-role-mapper \
+      -s consentRequired=false \
+      -s 'config.multivalued=true' \
+      -s 'config."claim.name"=realm_access.roles' \
+      -s 'config."jsonType.label"=String' \
+      -s 'config."id.token.claim"=false' \
+      -s 'config."access.token.claim"=true' \
+      -s 'config."userinfo.token.claim"=false' >/dev/null
+    log "nested realm-access roles mapper added to oauth2-proxy"
+  fi
 }
 
 # -----------------------------------------------------------------------------
