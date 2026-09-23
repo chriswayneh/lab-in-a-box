@@ -18,7 +18,7 @@ Where this project is going, and how to file the work.
 | Milestone | Theme | Status | Issues |
 | --- | --- | --- | :---: |
 | **v1.0** | Foundation, the working lab | ✅ Shipped | n/a |
-| **v2.0** | Identity governance | ✅ Complete (7/7); release tag pending | 7 |
+| **v2.0** | Identity governance | ✅ Complete (7/7); `v2.0.0` tag remaining | 7 |
 | **v3.0** | Infrastructure as code | Planned | 7 |
 | **v4.0** | AI operations | Planned | 6 |
 | **v5.0** | Homelab operations | Planned | 3 |
@@ -30,9 +30,9 @@ Full detail for every planned issue (description, acceptance criteria, labels) i
 
 ## v1: Foundation (shipped)
 
-Twenty-eight default services, provisioned automatically, starting with one command. Identity, secrets,
+Twenty-nine default services, provisioned automatically, starting with one command. Identity, secrets,
 observability, object storage, Git hosting and a local LLM, behind a single reverse proxy with network
-segmentation and generated credentials. Qdrant and Watchtower bring the catalogue to thirty when
+segmentation and generated credentials. Qdrant and Watchtower bring the catalogue to thirty-one when
 their optional Compose profiles are enabled.
 
 See [`CHANGELOG.md`](../CHANGELOG.md) for the full inventory.
@@ -45,7 +45,7 @@ The theme: **turn the seeded Keycloak realm into a working demonstration of iden
 access governance.** This is the area where most self-hosted labs stop at "we installed an IdP", and it
 is where the genuinely interesting problems are.
 
-**Status: complete (7/7).** Release tag `v2.0.0` is deferred until demo/screenshots land.
+**Status: complete (7/7).** Milestone complete; the remaining ship step is the `v2.0.0` release tag after the local demo/screenshots.
 
 | | Issue | Status |
 | --- | --- | --- |
@@ -57,9 +57,10 @@ is where the genuinely interesting problems are.
 | `v2-6` | Alertmanager: route the alert rules that currently evaluate into nothing | ✅ **Complete**. See [docs/observability.md](../docs/observability.md#alertmanager) |
 | `v2-7` | Forward-auth for unauthenticated services: Prometheus, Alertmanager and the Traefik dashboard behind SSO | ✅ **Complete**. See [docs/observability.md](../docs/observability.md#forward-auth) and [docs/security.md](../docs/security.md#identity-and-access) |
 
-**Why this first.** The lab already models RBAC correctly, with roles granted to groups and users joining
-groups. What it does not yet show is what happens over *time*: someone joins, changes team, leaves.
-That lifecycle is the actual work of identity management, and it is what an IAM interviewer asks about.
+**Why this first.** The lab already modelled RBAC correctly, with roles granted to groups and users joining
+groups. v2 shows what happens over *time*: someone joins, changes team, leaves — plus effective-access
+simulation, access reviews, SCIM, audit evidence, alerting and forward-auth. That lifecycle is the actual
+work of identity management, and it is what an IAM interviewer asks about.
 
 ---
 

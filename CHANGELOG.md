@@ -13,9 +13,21 @@ action from someone with an existing lab**: a `make clean`, a manual migration, 
 
 ## [Unreleased]
 
-Work in progress toward **v2.0, Identity governance**. The milestone is
-**complete** at the roadmap level (`v2-1` through `v2-7`); tagging `v2.0.0`
-waits on demo/screenshots.
+### Added
+
+### Changed
+
+### Fixed
+
+---
+
+## [2.0.0] - 2026-09-23
+
+**Identity governance.** Roadmap items `v2-1` through `v2-7` are complete.
+The remaining ship step is tagging `v2.0.0` after the local demo (screenshots
+already referenced in the README were captured from the local lab; refresh
+them before the release if the UI has drifted — see
+[`screenshots/README.md`](screenshots/README.md)).
 
 ### Added
 
@@ -340,4 +352,5 @@ for a local development lab and wrong for production.
 ---
 
 [Unreleased]: https://github.com/chriswayneh/lab-in-a-box/compare/v1.0.0...HEAD
+[2.0.0]: https://github.com/chriswayneh/lab-in-a-box/compare/v1.0.0...docs/v2-0-ship
 [1.0.0]: https://github.com/chriswayneh/lab-in-a-box/releases/tag/v1.0.0
