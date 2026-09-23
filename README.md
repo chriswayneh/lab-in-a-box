@@ -68,6 +68,17 @@ trade-offs that a lab makes against production are stated plainly rather than hi
 
 ---
 
+## Zero-trust principles and trust boundaries
+
+The lab demonstrates zero-trust principles through explicit identity, least privilege, and reviewable access decisions. A running service or an existing account is not evidence that every entitlement remains appropriate.
+
+- **Identity lifecycle:** group-based access and joiner, mover, and leaver workflows make grants and revocation explicit, including session and refresh-token revocation.
+- **Effective-access review:** the read-only RBAC simulator explains grants from live service state. Access-review campaigns retain decisions and remediation evidence.
+- **Scoped secrets access:** Vault ACL policies separate permissions by role rather than giving every identity administrative access.
+- **Separated service networks:** services join selected Compose networks; network placement and credential handling are documented alongside their limitations.
+
+This remains a local lab, not a complete enterprise zero-trust architecture. Shipped development credentials must be replaced before handling sensitive data. The host, service administrators, privileged monitoring, and components with direct Docker socket access remain trusted. Network separation alone does not authenticate a caller. See the [security model](docs/security.md) for the exact boundaries and deliberate development exceptions.
+
 ## Screenshots
 
 > Screenshots below were captured from the local development lab. They use only the project's
@@ -804,9 +815,13 @@ Two placeholders need replacing after you fork:
 
 ---
 
-## Licence
+## License
 
-[MIT](LICENSE). Use it, fork it, put it in your portfolio, build a product on it.
+Licensed under the MIT License. Use it, fork it, modify it, or build something of your own. See [LICENSE](LICENSE) for the terms.
+
+---
+
+If this project helped you, a ⭐ is appreciated.
 
 ### Built with
 
@@ -826,8 +841,3 @@ Two placeholders need replacing after you fork:
 [Portainer](https://www.portainer.io) ·
 [pgAdmin](https://www.pgadmin.org) ·
 [Adminer](https://www.adminer.org)
-
-<div align="center">
-<br>
-<sub>If this saved you a weekend of wiring containers together, a ⭐ is appreciated.</sub>
-</div>
