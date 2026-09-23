@@ -54,8 +54,8 @@ graph TD
     prometheus --> grafana
     postgres --> keycloak
     keycloak --> keycloak_init
-    keycloak --> oauth2_proxy
     minio --> minio_init
+    keycloak --> oauth2_proxy
     ollama --> ollama_init
     ollama --> open_webui
     postgres --> pgadmin

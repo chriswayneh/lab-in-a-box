@@ -261,7 +261,6 @@ unset keeps the default chain
 `,lab-oauth-errors@docker,lab-forward-auth@docker` appended to the existing
 middleware list.
 
-
 ## Metrics
 
 Scrape targets are in `monitoring/prometheus/prometheus.yml`, addressed by Docker service name.
