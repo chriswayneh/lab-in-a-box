@@ -76,6 +76,11 @@ main() {
   row "User" "$(env_value GRAFANA_ADMIN_USER admin)"
   row "Password" "$(read_secret grafana_admin_password.txt)"
 
+  printf '\n%s%s%s\n' "$C_CYAN" "Forward-auth (Prometheus / Alertmanager / Traefik)" "$C_RESET"
+  printf '  %-14s %s\n' "Enabled" "$(env_value FORWARD_AUTH_ENABLED true)"
+  printf '  %-14s %s\n' "Login via" "https://oauth.${DOMAIN}  (Keycloak demo users)"
+  printf '  %-14s %s\n' "Roles" "platform-admin, developer, security-analyst, auditor"
+
   service "MinIO" "minio"
   row "Root user" "$(env_value MINIO_ROOT_USER labadmin)"
   row "Password" "$(read_secret minio_root_password.txt)"

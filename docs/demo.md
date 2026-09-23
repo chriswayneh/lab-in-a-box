@@ -107,8 +107,8 @@ End with what you would change for production:
 - replace Vault dev mode with durable storage, unseal controls and no standing
   root token
 - use a trusted certificate and external secret distribution
-- put Alertmanager, Prometheus and the Traefik dashboard behind role-aware
-  forward auth in roadmap `v2-7` (routing and inhibition already ship as `v2-6`)
+- keep forward-auth enabled for Prometheus, Alertmanager and the Traefik
+  dashboard (ships as `v2-7`; disable only on a fully trusted host)
 - move Loki chunks to object storage and define recovery objectives
 
 The strongest portfolio claim is not “I ran 28 containers.” It is: “I designed

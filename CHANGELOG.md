@@ -13,10 +13,28 @@ action from someone with an existing lab**: a `make clean`, a manual migration, 
 
 ## [Unreleased]
 
-Work in progress toward **v2.0, Identity governance**. The milestone is not
-complete: `v2-1` through `v2-6` have landed, `v2-7` remains.
+Work in progress toward **v2.0, Identity governance**. The milestone is
+**complete** at the roadmap level (`v2-1` through `v2-7`); tagging `v2.0.0`
+waits on demo/screenshots.
 
 ### Added
+
+#### Forward-auth for observability UIs (roadmap `v2-7`)
+
+- oauth2-proxy (`quay.io/oauth2-proxy/oauth2-proxy:v7.15.4-alpine`) on
+  `lab_edge`, routed at `oauth.${LAB_DOMAIN}`, as Traefik ForwardAuth against
+  Keycloak (OIDC + PKCE).
+- Prometheus, Alertmanager and the Traefik dashboard require a Keycloak login
+  when forward-auth is enabled.
+- Access restricted by realm role: `platform-admin`, `developer`,
+  `security-analyst`, `auditor` (contractors denied).
+- Grafana continues to scrape Prometheus at `http://prometheus:9090` on the
+  internal network — not through Traefik.
+- `FORWARD_AUTH_ENABLED=true` by default; disable with
+  `FORWARD_AUTH_ENABLED=false` and empty `FORWARD_AUTH_MIDDLEWARE=`.
+- Confidential Keycloak client `oauth2-proxy` in the realm export; secret and
+  cookie seed via `.env` / `make secrets`.
+- Known-gaps table and hardening checklist in `docs/security.md` updated.
 
 #### Alertmanager (roadmap `v2-6`)
 

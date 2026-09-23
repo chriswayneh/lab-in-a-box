@@ -110,7 +110,8 @@ services:
       - --api.dashboard=${TRAEFIK_DASHBOARD_ENABLED:-true}
       # `api.insecure` would expose the dashboard on a raw port with no auth.
       # The dashboard is instead routed like any other service, through the
-      # middleware chain, so it inherits the same headers and rate limits.
+      # middleware chain (headers, rate limits, and Keycloak forward-auth when
+      # FORWARD_AUTH_ENABLED — the default).
       - --api.insecure=false
       - --ping=true
       - --ping.entrypoint=ping
@@ -165,7 +166,7 @@ services:
       - traefik.http.routers.traefik.entrypoints=web,websecure
       - traefik.http.routers.traefik.tls=true
       - traefik.http.routers.traefik.service=api@internal
-      - traefik.http.routers.traefik.middlewares=lab-default@file,lab-ratelimit@docker
+      - traefik.http.routers.traefik.middlewares=lab-default@file,lab-ratelimit@docker${FORWARD_AUTH_MIDDLEWARE-,lab-oauth-errors@docker,lab-forward-auth@docker}
 
   # ---------------------------------------------------------------------------
   # PostgreSQL — shared relational store

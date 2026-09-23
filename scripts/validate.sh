@@ -280,6 +280,65 @@ loki_check() {
 }
 
 # -----------------------------------------------------------------------------
+# Forward-auth wiring (roadmap v2-7). Runs without Docker so CI and laptops
+# without a daemon still catch a broken toggle or a missing realm client.
+# -----------------------------------------------------------------------------
+check_forward_auth() {
+  heading "Forward-auth"
+
+  local compose_iam="${LAB_ROOT}/compose/02-iam.yml"
+  local compose_obs="${LAB_ROOT}/compose/03-observability.yml"
+  local compose_core="${LAB_ROOT}/compose/01-core.yml"
+  local realm="${LAB_ROOT}/configs/keycloak/realm-export.json"
+  local env_example="${LAB_ROOT}/.env.example"
+
+  if ! grep -q 'oauth2-proxy:' "$compose_iam"; then
+    fail "compose/02-iam.yml is missing the oauth2-proxy service"
+  else
+    success "oauth2-proxy service declared"
+  fi
+
+  if ! grep -q '"clientId": "oauth2-proxy"' "$realm"; then
+    fail "realm-export.json is missing the oauth2-proxy client"
+  else
+    success "Keycloak oauth2-proxy client present"
+  fi
+
+  local missing=0
+  for f in "$compose_obs" "$compose_core"; do
+    if ! grep -q 'FORWARD_AUTH_MIDDLEWARE' "$f"; then
+      fail "$(basename "$f") routers are missing FORWARD_AUTH_MIDDLEWARE substitution"
+      missing=1
+    fi
+  done
+  if [[ "$missing" -eq 0 ]]; then
+    success "protected routers carry the FORWARD_AUTH_MIDDLEWARE toggle"
+  fi
+
+  if ! grep -q '^FORWARD_AUTH_ENABLED=' "$env_example"; then
+    fail ".env.example is missing FORWARD_AUTH_ENABLED"
+  else
+    success ".env.example documents FORWARD_AUTH_ENABLED"
+  fi
+
+  # Compose's ${VAR-default} treats an *unset* variable as "use default", so
+  # disabling forward-auth requires an explicit empty FORWARD_AUTH_MIDDLEWARE=
+  # in .env alongside FORWARD_AUTH_ENABLED=false.
+  if [[ -f "${LAB_ROOT}/.env" ]]; then
+    local enabled
+    enabled="$(env_value FORWARD_AUTH_ENABLED true)"
+    if [[ "$enabled" == "false" || "$enabled" == "0" ]]; then
+      if grep -qE '^FORWARD_AUTH_MIDDLEWARE=$' "${LAB_ROOT}/.env"; then
+        success "FORWARD_AUTH_ENABLED=false with empty FORWARD_AUTH_MIDDLEWARE"
+      else
+        fail "FORWARD_AUTH_ENABLED=false but FORWARD_AUTH_MIDDLEWARE is unset or non-empty — set FORWARD_AUTH_MIDDLEWARE= (empty) in .env"
+      fi
+    else
+      success "FORWARD_AUTH_ENABLED is on (or default)"
+    fi
+  fi
+}
+
 check_secrets() {
   # Delegated so that the same logic backs `make validate`, the pre-commit hook
   # and CI — three callers, one definition of "is this safe to commit".
@@ -373,6 +432,7 @@ main() {
   # Pulls a container image, so it is opt-out for a fast inner loop.
   if [[ "${SKIP_UPSTREAM:-0}" != "1" ]]; then
     check_with_upstream_tools
+  check_forward_auth
   fi
 
   heading "Result"

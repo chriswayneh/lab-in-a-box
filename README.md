@@ -55,7 +55,7 @@ trade-offs that a lab makes against production are stated plainly rather than hi
 
 | | |
 | --- | --- |
-| **Identity** | Keycloak with a seeded realm: 4 users, 4 groups, 6 roles, 4 OIDC clients, brute-force protection and a password policy |
+| **Identity** | Keycloak with a seeded realm: 4 users, 4 groups, 6 roles, 5 OIDC clients, brute-force protection and a password policy |
 | **Identity lifecycle** | Joiner/Mover/Leaver automation across Keycloak, Vault and Gitea. Group-based RBAC, access diffing, session and refresh-token revocation, repository custody transfer, redacted audit records |
 | **RBAC simulator** | Read-only: answers "what can this person reach, and why?" Resolves live Keycloak, Vault and Gitea state, explains every grant's source, surfaces entitlement drift |
 | **Access review** | Campaign-based recertification built on the simulator above: snapshot, approve/revoke per entitlement, remediate through the same JML adapters, retained evidence |
@@ -207,6 +207,7 @@ graph TB
 
     subgraph iam["Identity & Secrets"]
         Keycloak["<b>Keycloak</b><br/>OIDC · SAML"]
+        OAuth2Proxy["oauth2-proxy<br/>forward-auth"]
         Vault["<b>Vault</b><br/>KV · transit · AppRole"]
     end
 
@@ -240,7 +241,7 @@ graph TB
     end
 
     User -->|"443"| Traefik
-    Traefik --> Landing & Keycloak & Vault & Grafana & OpenWebUI & Gitea & MinIO & Prometheus & Alertmanager
+    Traefik --> Landing & Keycloak & OAuth2Proxy & Vault & Grafana & OpenWebUI & Gitea & MinIO & Prometheus & Alertmanager
 
     Keycloak --> Postgres
     Gitea --> Postgres & Redis
@@ -310,7 +311,7 @@ the stack is one project with one dependency graph, split into fragments you can
 ```text
 docker-compose.yml            networks, volumes, secrets, includes
 ├── compose/01-core.yml           Traefik, socket proxy, PostgreSQL, Redis, landing page
-├── compose/02-iam.yml            Keycloak, Vault, and their provisioning jobs
+├── compose/02-iam.yml            Keycloak, oauth2-proxy, Vault, and their provisioning jobs
 ├── compose/03-observability.yml  Prometheus, Alertmanager, Grafana, Loki, Promtail, cAdvisor, node-exporter
 ├── compose/04-ai.yml             Ollama, Open WebUI, Qdrant
 ├── compose/05-platform.yml       Gitea, MinIO, and their provisioning jobs
@@ -329,10 +330,11 @@ Full generated catalogue, including images, networks and privileges:
 | **Landing page** | <https://lab.localhost> | Index of every service, with live status |
 | **Traefik** | <https://traefik.lab.localhost> | Edge router. Discovers services automatically; terminates TLS |
 | **Keycloak** | <https://keycloak.lab.localhost> | Identity provider. OIDC and SAML, with a seeded demo realm |
+| **oauth2-proxy** | <https://oauth.lab.localhost> | Traefik forward-auth against Keycloak (Prometheus, Alertmanager, Traefik UI) |
 | **Vault** | <https://vault.lab.localhost> | Secrets management, dynamic credentials, encryption as a service |
 | **Grafana** | <https://grafana.lab.localhost> | Dashboards. Datasources and panels provisioned from files |
-| **Prometheus** | <https://prometheus.lab.localhost> | Metrics collection and alert rule evaluation |
-| **Alertmanager** | <https://alertmanager.lab.localhost> | Alert routing, grouping and inhibition |
+| **Prometheus** | <https://prometheus.lab.localhost> | Metrics collection and alert rule evaluation (Keycloak forward-auth) |
+| **Alertmanager** | <https://alertmanager.lab.localhost> | Alert routing, grouping and inhibition (Keycloak forward-auth) |
 | **Open WebUI** | <https://chat.lab.localhost> | Chat interface for the local models |
 | **Ollama** | <https://ollama.lab.localhost> | Local LLM runtime and API |
 | **Gitea** | <https://git.lab.localhost> | Git hosting with issues, pull requests and CI |
@@ -562,7 +564,7 @@ This is a **development lab**, not a production deployment, and it is explicit a
   a container
 - **Docker secrets** for the images with real `_FILE` support. Credentials do not appear in
   `docker inspect`, the process table or shell history
-- **Non-root containers** wherever the image allows: Traefik (`1000`), Prometheus (`65534`), Alertmanager (`65534`),
+- **Non-root containers** wherever the image allows: Traefik (`1000`), oauth2-proxy (`2000`), Prometheus (`65534`), Alertmanager (`65534`),
   Grafana (`472`), Loki (`10001`), Gitea (`1000`), nginx (unprivileged variant)
 - **`no-new-privileges`** on every container; a read-only root filesystem on the landing page
 - **Per-service database roles.** Keycloak and Gitea each get their own PostgreSQL login, scoped to
@@ -587,7 +589,7 @@ This is a **development lab**, not a production deployment, and it is explicit a
 > **Warning**
 > Do not expose this lab to the internet as-is. It is designed for `localhost`. If you need it reachable,
 > read [`docs/security.md`](docs/security.md) first. At minimum you need real certificates, generated
-> credentials, `LAB_FORCE_HTTPS=true`, and authentication in front of Traefik, Prometheus, Alertmanager and Portainer.
+> credentials, `LAB_FORCE_HTTPS=true`, keep forward-auth on (the default), and protect or remove Portainer.
 
 ### Trusted local HTTPS (Windows)
 
@@ -784,14 +786,15 @@ More, including how to read the init-job logs and what each provisioning script 
 | Version | Theme | Highlights |
 | --- | --- | --- |
 | **v1** | Foundation ✅ | The stack you are reading about |
-| **v2** | Identity governance 🚧 | v2-1 JML ✅ · v2-2 RBAC ✅ · v2-3 access reviews ✅ · v2-4 SCIM ✅ · v2-5 audit pipeline ✅ · v2-6 Alertmanager ✅ · forward-auth next |
+| **v2** | Identity governance ✅ | v2-1 JML ✅ · v2-2 RBAC ✅ · v2-3 access reviews ✅ · v2-4 SCIM ✅ · v2-5 audit pipeline ✅ · v2-6 Alertmanager ✅ · v2-7 forward-auth ✅ |
 | **v3** | Infrastructure as code | Terraform and Ansible deployments, a Kubernetes edition, AWS/Azure/GCP targets |
 | **v4** | AI operations | Log analysis, incident response copilot, automatic infrastructure documentation, RAG over your own runbooks |
 | **v5** | Homelab operations | Backup verification, external uptime monitoring and resource presets |
 
-**v2 is in progress.** Identity lifecycle automation, RBAC simulation, access
-review campaigns, SCIM provisioning, the identity audit pipeline and
-Alertmanager have landed and are usable today. See
+**v2 roadmap work is complete (7/7).** Identity lifecycle automation, RBAC
+simulation, access review campaigns, SCIM provisioning, the identity audit
+pipeline, Alertmanager and forward-auth for Prometheus / Alertmanager / Traefik
+have landed. The `v2.0.0` tag waits on demo/screenshots. See
 [Identity lifecycle](#identity-lifecycle) above, or
 [`docs/identity-governance.md`](docs/identity-governance.md) for the full model.
 For a reviewer-friendly walkthrough, use the [10-minute demo](docs/demo.md).

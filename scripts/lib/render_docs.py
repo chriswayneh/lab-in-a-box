@@ -25,7 +25,8 @@ LAYERS: list[tuple[str, str, list[str]]] = [
         "traefik", "socket-proxy", "postgres", "redis", "landing",
     ]),
     ("Identity & Secrets", "Who you are, and what you are allowed to know", [
-        "keycloak", "keycloak-init", "vault", "vault-init",
+        "keycloak", "keycloak-init", "oauth2-proxy", "vault", "vault-init",
+        "scim-provisioner",
     ]),
     ("Observability", "Metrics, logs, alerts and dashboards", [
         "prometheus", "alertmanager", "alert-webhook", "grafana", "loki",

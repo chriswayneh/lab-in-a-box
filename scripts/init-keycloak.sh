@@ -11,9 +11,10 @@
 #
 #   1. Demo user passwords          (from DEMO_USER_PASSWORD)
 #   2. The Grafana OIDC client secret (from KEYCLOAK_GRAFANA_CLIENT_SECRET)
-#   3. The SCIM service-account secret and least-privilege realm roles
-#   4. Redirect URIs and the SCIM audience for a custom LAB_DOMAIN
-#   5. Audit listener settings for both fresh and persistent realms
+#   3. The oauth2-proxy client secret (from KEYCLOAK_OAUTH2_PROXY_CLIENT_SECRET)
+#   4. The SCIM service-account secret and least-privilege realm roles
+#   5. Redirect URIs and the SCIM audience for a custom LAB_DOMAIN
+#   6. Audit listener settings for both fresh and persistent realms
 #
 # Every step is idempotent — running it against an already-provisioned realm
 # converges to the same state rather than failing.
@@ -31,6 +32,7 @@ KC_ADMIN="${KC_ADMIN:-admin}"
 KC_ADMIN_PASSWORD="${KC_ADMIN_PASSWORD:?KC_ADMIN_PASSWORD is required}"
 DEMO_USER_PASSWORD="${DEMO_USER_PASSWORD:?DEMO_USER_PASSWORD is required}"
 GRAFANA_CLIENT_SECRET="${GRAFANA_CLIENT_SECRET:?GRAFANA_CLIENT_SECRET is required}"
+OAUTH2_PROXY_CLIENT_SECRET="${OAUTH2_PROXY_CLIENT_SECRET:?OAUTH2_PROXY_CLIENT_SECRET is required}"
 SCIM_CLIENT_SECRET="${SCIM_CLIENT_SECRET:?SCIM_CLIENT_SECRET is required}"
 LAB_DOMAIN="${LAB_DOMAIN:-lab.localhost}"
 
@@ -193,6 +195,59 @@ retarget_client_domain() {
   log "redirect URIs for '$client_id' now point at ${subdomain}.${LAB_DOMAIN}"
 }
 
+
+# -----------------------------------------------------------------------------
+# Ensure the oauth2-proxy confidential client exists
+#
+# Realm import is IGNORE_EXISTING, so labs that started before v2-7 never get
+# the client from realm-export.json. Create it here so an upgrade does not
+# require wiping the Keycloak database.
+# -----------------------------------------------------------------------------
+ensure_oauth2_proxy_client() {
+  local uuid
+  uuid="$(client_uuid oauth2-proxy)"
+  if [[ -z "$uuid" ]]; then
+    kc create clients -r "$KC_REALM" \
+      -s clientId=oauth2-proxy \
+      -s 'name=OAuth2 Proxy (Traefik forward-auth)' \
+      -s 'description=Confidential client for Traefik forward-auth via oauth2-proxy.' \
+      -s enabled=true \
+      -s protocol=openid-connect \
+      -s publicClient=false \
+      -s standardFlowEnabled=true \
+      -s directAccessGrantsEnabled=false \
+      -s serviceAccountsEnabled=false \
+      -s fullScopeAllowed=true \
+      -s "rootUrl=https://oauth.${LAB_DOMAIN}" \
+      -s "redirectUris=[\"https://oauth.${LAB_DOMAIN}/oauth2/callback\",\"http://oauth.${LAB_DOMAIN}/oauth2/callback\"]" \
+      -s "webOrigins=[\"https://oauth.${LAB_DOMAIN}\",\"http://oauth.${LAB_DOMAIN}\"]" >/dev/null
+    uuid="$(client_uuid oauth2-proxy)"
+    log "client 'oauth2-proxy' created for this existing realm"
+  else
+    log "client 'oauth2-proxy' present"
+  fi
+  [[ -n "$uuid" ]] || { warn "client 'oauth2-proxy' could not be created"; return; }
+
+  # Realm roles must appear in the access token for --allowed-role checks.
+  local mapper_id
+  mapper_id="$(kc get "clients/${uuid}/protocol-mappers/models" -r "$KC_REALM" \
+    -q name=realm-roles-in-token --fields id --format csv --noquotes 2>/dev/null | head -n1 | tr -d '\r' || true)"
+  if [[ -z "$mapper_id" ]]; then
+    kc create "clients/${uuid}/protocol-mappers/models" -r "$KC_REALM" \
+      -s name=realm-roles-in-token \
+      -s protocol=openid-connect \
+      -s protocolMapper=oidc-usermodel-realm-role-mapper \
+      -s consentRequired=false \
+      -s 'config.multivalued=true' \
+      -s 'config."claim.name"=roles' \
+      -s 'config."jsonType.label"=String' \
+      -s 'config."id.token.claim"=true' \
+      -s 'config."access.token.claim"=true' \
+      -s 'config."userinfo.token.claim"=true' >/dev/null
+    log "realm-roles-in-token mapper added to oauth2-proxy"
+  fi
+}
+
 # -----------------------------------------------------------------------------
 # 6. SCIM service account
 #
@@ -269,12 +324,15 @@ main() {
   ensure_scim_group
   set_demo_passwords
   set_client_secret grafana "$GRAFANA_CLIENT_SECRET"
+  ensure_oauth2_proxy_client
+  set_client_secret oauth2-proxy "$OAUTH2_PROXY_CLIENT_SECRET"
   configure_scim_client
 
   if [[ "$LAB_DOMAIN" != "lab.localhost" ]]; then
     log "LAB_DOMAIN is '${LAB_DOMAIN}' — rewriting client redirect URIs"
-    retarget_client_domain grafana   grafana
-    retarget_client_domain openwebui chat
+    retarget_client_domain grafana      grafana
+    retarget_client_domain oauth2-proxy oauth
+    retarget_client_domain openwebui    chat
   fi
 
   log "done. Demo users: ${DEMO_USERS[*]} (all share DEMO_USER_PASSWORD)"

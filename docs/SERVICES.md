@@ -8,7 +8,7 @@
 
 Every container in the lab, grouped by the compose fragment that defines it. Hostnames assume `LAB_DOMAIN=lab.localhost`.
 
-**30 available services** across **6 layers**. **28 start by default**; `qdrant`, `watchtower` require their optional Compose profiles. Services whose name ends in `-init` are one-shot provisioning jobs: they run once, do their work, and exit. A stopped `-init` container is a success, not a fault.
+**31 available services** across **6 layers**. **29 start by default**; `qdrant`, `watchtower` require their optional Compose profiles. Services whose name ends in `-init` are one-shot provisioning jobs: they run once, do their work, and exit. A stopped `-init` container is a success, not a fault.
 
 ## Core
 
@@ -30,8 +30,10 @@ _Who you are, and what you are allowed to know_
 | --- | --- | --- | --- | --- | :---: | --- |
 | `keycloak` | `quay.io/keycloak/keycloak:26.7.1` | `keycloak.lab.localhost` | — | data, edge, observability | ✅ | — |
 | `keycloak-init` | `quay.io/keycloak/keycloak:26.7.1` | — | — | edge | n/a | — |
+| `oauth2-proxy` | `quay.io/oauth2-proxy/oauth2-proxy:v7.15.4-alpine` | `oauth.lab.localhost` | — | edge | ✅ | uid `2000:2000` |
 | `vault` | `hashicorp/vault:1.18` | `vault.lab.localhost` | — | edge, observability | ✅ | cap `IPC_LOCK` |
 | `vault-init` | `hashicorp/vault:1.18` | — | — | edge | n/a | — |
+| `scim-provisioner` | `python:3.12-alpine` | — | — | edge | ✅ | read-only fs |
 
 ## Observability
 
@@ -80,14 +82,6 @@ _Operator conveniences_
 | `pgadmin` | `dpage/pgadmin4:8.14` | `pgadmin.lab.localhost` | — | data, edge | ✅ | — |
 | `adminer` | `adminer:4.8.1` | `adminer.lab.localhost` | — | data, edge | ✅ | — |
 | `watchtower` | `containrrr/watchtower:1.7.1` | — | — | edge | ✅ | **docker socket (rw)** |
-
-## Other
-
-_Not yet categorised_
-
-| Service | Image | URL | Host ports | Networks | Health | Privileges |
-| --- | --- | --- | --- | --- | :---: | --- |
-| `scim-provisioner` | `python:3.12-alpine` | — | — | edge | ✅ | read-only fs |
 
 ## Networks
 
