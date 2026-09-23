@@ -27,8 +27,9 @@ LAYERS: list[tuple[str, str, list[str]]] = [
     ("Identity & Secrets", "Who you are, and what you are allowed to know", [
         "keycloak", "keycloak-init", "vault", "vault-init",
     ]),
-    ("Observability", "Metrics, logs and dashboards", [
-        "prometheus", "grafana", "loki", "promtail", "cadvisor", "node-exporter",
+    ("Observability", "Metrics, logs, alerts and dashboards", [
+        "prometheus", "alertmanager", "alert-webhook", "grafana", "loki",
+        "promtail", "cadvisor", "node-exporter",
     ]),
     ("AI", "Local model serving and chat", [
         "ollama", "ollama-init", "open-webui", "qdrant",

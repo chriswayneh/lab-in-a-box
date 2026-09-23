@@ -28,6 +28,8 @@ groups:
             Prometheus has been unable to scrape {{ $labels.job }} at
             {{ $labels.instance }} for 3 minutes. Check the container with
             `docker compose ps` and `docker compose logs {{ $labels.job }}`.
+          runbook_url: >-
+            https://github.com/chriswayneh/lab-in-a-box/blob/main/docs/observability.md#alert-rules
 
       - alert: ContainerUnhealthy
         # cAdvisor does not export Docker's healthcheck state, so this infers
@@ -49,6 +51,8 @@ groups:
           description: >-
             {{ $labels.container }} is registered with Docker but has produced
             no CPU samples for 5 minutes. It is most likely crash-looping.
+          runbook_url: >-
+            https://github.com/chriswayneh/lab-in-a-box/blob/main/docs/observability.md#alert-rules
 
       - alert: ContainerRestartLoop
         expr: |
@@ -63,6 +67,8 @@ groups:
             {{ $labels.container }} has restarted more than three times in
             fifteen minutes. Read the last exit reason with
             `docker inspect --format '{{ "{{ .State }}" }}' {{ $labels.container }}`.
+          runbook_url: >-
+            https://github.com/chriswayneh/lab-in-a-box/blob/main/docs/observability.md#alert-rules
 
   # ---------------------------------------------------------------------------
   - name: saturation
@@ -82,6 +88,8 @@ groups:
           description: >-
             Sustained for ten minutes. Expected for Ollama during inference or
             a model pull; investigate for anything else.
+          runbook_url: >-
+            https://github.com/chriswayneh/lab-in-a-box/blob/main/docs/observability.md#alert-rules
 
       - alert: ContainerHighMemory
         # Only fires when a memory limit is actually set — dividing by a zero
@@ -101,6 +109,8 @@ groups:
           description: >-
             Working set is above 90% of the configured limit. The next
             allocation spike will get the process OOM-killed.
+          runbook_url: >-
+            https://github.com/chriswayneh/lab-in-a-box/blob/main/docs/observability.md#alert-rules
 
       - alert: HostMemoryPressure
         expr: |
@@ -117,6 +127,8 @@ groups:
             The whole lab is competing for the last 10% of RAM. Stop the AI
             stack with `docker compose stop ollama open-webui` to reclaim the
             largest consumer.
+          runbook_url: >-
+            https://github.com/chriswayneh/lab-in-a-box/blob/main/docs/observability.md#alert-rules
 
       - alert: HostDiskFillingUp
         expr: |
@@ -134,6 +146,8 @@ groups:
             Model weights, container images and Prometheus data are the usual
             culprits. `docker system df` breaks it down; `make clean` reclaims
             the lab's own volumes.
+          runbook_url: >-
+            https://github.com/chriswayneh/lab-in-a-box/blob/main/docs/observability.md#alert-rules
 
   # ---------------------------------------------------------------------------
   - name: edge
@@ -157,6 +171,8 @@ groups:
           description: >-
             Measured at the edge, so this counts failures the service itself
             may not be logging. Correlate with its logs in Grafana's Explore.
+          runbook_url: >-
+            https://github.com/chriswayneh/lab-in-a-box/blob/main/docs/observability.md#alert-rules
 
       - alert: EdgeLatencyHigh
         expr: |
@@ -173,3 +189,5 @@ groups:
           description: >-
             Normal for chat completions from Ollama, which stream slowly by
             design. Worth investigating for any other service.
+          runbook_url: >-
+            https://github.com/chriswayneh/lab-in-a-box/blob/main/docs/observability.md#alert-rules

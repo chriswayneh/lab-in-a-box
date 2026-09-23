@@ -195,6 +195,7 @@ check_with_upstream_tools() {
 
   promtool_check "prometheus.yml" config /cfg/prometheus.yml
   promtool_check "alert rules"    rules  /cfg/rules/lab-alerts.yml
+  amtool_check
   promtail_check
   loki_check
 }
@@ -217,6 +218,24 @@ promtool_check() {
     success "${label} accepted by promtool"
   else
     fail "promtool rejected ${label}"
+    MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "${cmd[@]}" 2>&1 | tail -12 | sed 's/^/    /'
+  fi
+}
+
+
+# Runs `amtool check-config` against the Alertmanager config, using the same
+# pinned image the compose file runs so a clean local validate matches CI.
+amtool_check() {
+  local -a cmd=(
+    docker run --rm --entrypoint amtool
+    -v "${LAB_ROOT}/monitoring/alertmanager:/cfg:ro"
+    prom/alertmanager:v0.28.1 check-config /cfg/alertmanager.yml
+  )
+
+  if MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "${cmd[@]}" >/dev/null 2>&1; then
+    success "alertmanager.yml accepted by amtool"
+  else
+    fail "amtool rejected alertmanager.yml"
     MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "${cmd[@]}" 2>&1 | tail -12 | sed 's/^/    /'
   fi
 }
