@@ -6,6 +6,7 @@ The metrics and logs pipeline: what collects what, how it is provisioned, and ho
 - [Dashboards](#dashboards)
 - [Alert rules](#alert-rules)
 - [Alertmanager](#alertmanager)
+- [Forward-auth](#forward-auth)
 - [Metrics](#metrics)
 - [Logs](#logs)
 - [Identity audit pipeline](#identity-audit-pipeline)
@@ -213,6 +214,52 @@ docker run --rm --entrypoint amtool \
 ```
 
 ---
+
+---
+
+## Forward-auth
+
+Prometheus, Alertmanager and the Traefik dashboard are browser-facing and would
+otherwise be open to anyone who can reach the edge. Traefik's ForwardAuth
+middleware delegates session checks to **oauth2-proxy**, which validates a
+Keycloak OIDC login and requires one of these realm roles:
+
+| Allowed | Denied (examples) |
+| --- | --- |
+| `platform-admin`, `developer`, `security-analyst`, `auditor` | `contractor` (dave), identities with only `ai-user` |
+
+Login and callback live at `https://oauth.${LAB_DOMAIN}`. The cookie is scoped
+to `.${LAB_DOMAIN}` so a single Keycloak login covers all three UIs.
+
+### Grafana datasources are not affected
+
+Grafana talks to Prometheus at `http://prometheus:9090` on `lab_observability`
+(see `monitoring/grafana/provisioning/datasources/datasources.yml`). That path
+never enters Traefik, so dashboards and alert evaluation keep working without a
+browser session on the Prometheus UI. Do **not** point Grafana at
+`https://prometheus.${LAB_DOMAIN}` for scrapes — that would force every panel
+query through forward-auth.
+
+### Toggle
+
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `FORWARD_AUTH_ENABLED` | `true` | Documented on/off flag (match sibling toggles like `GRAFANA_OIDC_ENABLED`) |
+| `FORWARD_AUTH_MIDDLEWARE` | unset → oauth chain | What Compose substitutes into protected routers |
+
+Default ON. To disable on a trusted host:
+
+```bash
+# .env
+FORWARD_AUTH_ENABLED=false
+FORWARD_AUTH_MIDDLEWARE=
+
+```
+
+Then `docker compose up -d` (or `make up`). Leaving `FORWARD_AUTH_MIDDLEWARE`
+unset keeps the default chain
+`,lab-oauth-errors@docker,lab-forward-auth@docker` appended to the existing
+middleware list.
 
 ## Metrics
 

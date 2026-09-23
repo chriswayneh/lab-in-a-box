@@ -18,7 +18,7 @@ Where this project is going, and how to file the work.
 | Milestone | Theme | Status | Issues |
 | --- | --- | --- | :---: |
 | **v1.0** | Foundation, the working lab | ✅ Shipped | n/a |
-| **v2.0** | Identity governance | 🚧 In progress, 6 of 7 done | 7 |
+| **v2.0** | Identity governance | ✅ Complete (7/7); release tag pending | 7 |
 | **v3.0** | Infrastructure as code | Planned | 7 |
 | **v4.0** | AI operations | Planned | 6 |
 | **v5.0** | Homelab operations | Planned | 3 |
@@ -45,7 +45,7 @@ The theme: **turn the seeded Keycloak realm into a working demonstration of iden
 access governance.** This is the area where most self-hosted labs stop at "we installed an IdP", and it
 is where the genuinely interesting problems are.
 
-**Status: in progress.** `v2-1` through `v2-6` are complete; `v2-7` is next. The milestone itself is not done.
+**Status: complete (7/7).** Release tag `v2.0.0` is deferred until demo/screenshots land.
 
 | | Issue | Status |
 | --- | --- | --- |
@@ -55,7 +55,7 @@ is where the genuinely interesting problems are.
 | `v2-4` | SCIM provisioning endpoint: propagate identity changes to downstream services | ✅ **Complete**. See [docs/identity-governance.md](../docs/identity-governance.md#scim-provisioning) |
 | `v2-5` | Audit event pipeline: ship Keycloak and Vault audit events into Loki with a dashboard | ✅ **Complete**. See [docs/observability.md](../docs/observability.md#identity-audit-pipeline) |
 | `v2-6` | Alertmanager: route the alert rules that currently evaluate into nothing | ✅ **Complete**. See [docs/observability.md](../docs/observability.md#alertmanager) |
-| `v2-7` | Forward-auth for unauthenticated services: Prometheus and the Traefik dashboard behind SSO | ⬅ **Next** |
+| `v2-7` | Forward-auth for unauthenticated services: Prometheus, Alertmanager and the Traefik dashboard behind SSO | ✅ **Complete**. See [docs/observability.md](../docs/observability.md#forward-auth) and [docs/security.md](../docs/security.md#identity-and-access) |
 
 **Why this first.** The lab already models RBAC correctly, with roles granted to groups and users joining
 groups. What it does not yet show is what happens over *time*: someone joins, changes team, leaves.

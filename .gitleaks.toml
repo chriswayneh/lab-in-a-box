@@ -1,0 +1,16 @@
+# =============================================================================
+# Gitleaks — project allowlist
+# =============================================================================
+# CI runs gitleaks-action with the default ruleset. A few intentional strings
+# in this repo trip `generic-api-key` (pinned image tags that look like tokens).
+# Allowlist them here rather than weakening the scan globally.
+# =============================================================================
+
+title = "lab-in-a-box"
+
+[allowlist]
+description = "Pinned oauth2-proxy alpine image tags (not credentials)"
+regexes = [
+  '''(?i)oauth2-proxy:v[0-9]+\.[0-9]+\.[0-9]+-alpine''',
+  '''(?i)v[0-9]+\.[0-9]+\.[0-9]+-alpine''',
+]

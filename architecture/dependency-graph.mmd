@@ -11,8 +11,10 @@ graph TD
     subgraph Identity_and_Secrets["Identity & Secrets"]
         keycloak["keycloak"]
         keycloak_init(["keycloak-init"])
+        oauth2_proxy["oauth2-proxy"]
         vault["vault"]
         vault_init(["vault-init"])
+        scim_provisioner["scim-provisioner"]
     end
     subgraph Observability["Observability"]
         prometheus["prometheus"]
@@ -53,6 +55,7 @@ graph TD
     postgres --> keycloak
     keycloak --> keycloak_init
     minio --> minio_init
+    keycloak --> oauth2_proxy
     ollama --> ollama_init
     ollama --> open_webui
     postgres --> pgadmin

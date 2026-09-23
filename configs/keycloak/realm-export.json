@@ -225,6 +225,56 @@
       ]
     },
     {
+      "clientId": "oauth2-proxy",
+      "name": "OAuth2 Proxy (Traefik forward-auth)",
+      "description": "Confidential client for Traefik forward-auth via oauth2-proxy. Protects Prometheus, Alertmanager and the Traefik dashboard.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true,
+      "rootUrl": "https://oauth.lab.localhost",
+      "baseUrl": "/",
+      "redirectUris": ["https://oauth.lab.localhost/oauth2/callback", "http://oauth.lab.localhost/oauth2/callback"],
+      "webOrigins": ["https://oauth.lab.localhost", "http://oauth.lab.localhost"],
+      "attributes": {
+        "post.logout.redirect.uris": "+",
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm-roles-in-token",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "full.path": "false",
+            "claim.name": "groups",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
       "clientId": "openwebui",
       "name": "Open WebUI",
       "description": "Chat interface. Wired for OIDC so the AI stack can share the lab's identity.",

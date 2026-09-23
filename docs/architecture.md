@@ -43,7 +43,7 @@ The trade-off is stated plainly rather than hidden: the fallback passwords are i
 docker-compose.yml            networks, volumes, secrets, and six includes
 │
 ├── compose/01-core.yml           Traefik, socket proxy, PostgreSQL, Redis, landing page
-├── compose/02-iam.yml            Keycloak, Vault, + provisioning jobs
+├── compose/02-iam.yml            Keycloak, oauth2-proxy, Vault, + provisioning jobs
 ├── compose/03-observability.yml  Prometheus, Alertmanager, Grafana, Loki, Promtail, cAdvisor, node-exporter
 ├── compose/04-ai.yml             Ollama, Open WebUI, Qdrant
 ├── compose/05-platform.yml       Gitea, MinIO, + provisioning jobs

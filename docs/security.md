@@ -56,8 +56,8 @@ What this lab defends against, what it does not, and where the line is drawn.
 │                                                                 │
 │  ┌───────────────────────────────────────────────────────────┐  │
 │  │ EDGE                              (lab_edge, reachable)   │  │
-│  │  Traefik · Landing · Keycloak · Vault · Grafana ·         │  │
-│  │  Open WebUI · Gitea · MinIO · Portainer · pgAdmin          │  │
+│  │  Traefik · Landing · Keycloak · oauth2-proxy · Vault ·     │  │
+│  │  Grafana · Open WebUI · Gitea · MinIO · Portainer · pgAdmin│  │
 │  └───────────────────────────────────────────────────────────┘  │
 │                                                                 │
 │  ┌───────────────────────────────────────────────────────────┐  │
@@ -170,7 +170,7 @@ from other machines on your network.
 | Control | Coverage |
 | --- | --- |
 | `no-new-privileges:true` | Every container except cAdvisor (which is privileged by necessity) |
-| Non-root user | Traefik `1000`, Prometheus `65534`, Grafana `472`, Loki `10001`, Gitea `1000`, Redis `redis`, nginx unprivileged variant. Keycloak, Vault and PostgreSQL drop privileges in their own entrypoints |
+| Non-root user | Traefik `1000`, oauth2-proxy `2000`, Prometheus `65534`, Alertmanager `65534`, Grafana `472`, Loki `10001`, Gitea `1000`, Redis `redis`, nginx unprivileged variant. Keycloak, Vault and PostgreSQL drop privileges in their own entrypoints |
 | Read-only root filesystem | Landing page, with tmpfs for nginx scratch state |
 | Capability grants | Exactly one: `IPC_LOCK` on Vault, so it can `mlock()` its memory and keep secret material out of swap |
 | Log rotation | Every container: 10 MB × 3 files. Without it a chatty container fills the disk |
@@ -242,6 +242,15 @@ Grafana can federate to it (`GRAFANA_OIDC_ENABLED=true`), mapping realm roles on
 `platform-admin` lands as Admin, a `developer` as Editor, everyone else as Viewer. Token and userinfo
 calls go container-to-container over HTTP, so SSO does not depend on the self-signed edge certificate.
 
+**Forward-auth for unauthenticated UIs.** oauth2-proxy sits on `lab_edge` and Traefik applies a
+ForwardAuth middleware to Prometheus, Alertmanager and the Traefik dashboard. Login is Keycloak;
+access requires one of the realm roles `platform-admin`, `developer`, `security-analyst` or
+`auditor` (contractors and ai-user-only identities are denied). Default ON
+(`FORWARD_AUTH_ENABLED=true`); set `FORWARD_AUTH_ENABLED=false` and `FORWARD_AUTH_MIDDLEWARE=`
+(empty) to disable. Grafana's Prometheus datasource stays on `http://prometheus:9090` inside
+`lab_observability` and never goes through Traefik — scrapes and dashboard queries keep working
+without a browser session.
+
 ---
 
 ## Secrets management
@@ -296,8 +305,6 @@ Honest list. These are known and accepted for a local development lab.
 | **Tier-2 credentials in environment** | Visible in `docker inspect` | An external secret manager injecting at runtime |
 | **Portainer holds the socket** | Portainer compromise = host compromise | Remove it, or put authentication and network restriction in front |
 | **cAdvisor is privileged** | Container escape from cAdvisor = host access | Unavoidable for cgroup metrics; treat the host as inside the boundary |
-| **No authentication in front of Prometheus** | Metrics are readable by anyone who can reach the edge | Traefik forward-auth against Keycloak |
-| **Alertmanager has no authentication** | Anyone who can reach the edge can view and silence alerts | Traefik forward-auth against Keycloak (same as Prometheus; v2-7) |
 | **No network policy inside networks** | Any container on `lab_edge` can reach any other on it | Service mesh, or finer-grained networks |
 | **Shipped fallback credentials** | A lab run without `make secrets` uses published passwords | Always run `make secrets` |
 
@@ -328,8 +335,9 @@ If you must reach the lab from outside `localhost`, this is the minimum. None of
 1. **Remove or protect the high-privilege services.** Portainer at minimum; consider Adminer and
    pgAdmin too.
 
-1. **Put authentication in front of everything unauthenticated.** Prometheus and the Traefik dashboard
-   both need it, using Traefik forward-auth against Keycloak.
+1. **Keep forward-auth enabled** (`FORWARD_AUTH_ENABLED=true`, the default). Prometheus,
+   Alertmanager and the Traefik dashboard already sit behind Keycloak via oauth2-proxy.
+   Only turn it off on a fully trusted host if you accept open metrics and dashboard UIs.
 
 1. **Stop publishing database ports.** Delete the `ports:` blocks for `postgres` and `redis` in
    `compose/01-core.yml`. Services reach them over `lab_data` regardless.

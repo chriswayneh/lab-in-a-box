@@ -155,6 +155,7 @@ services:
       KC_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin-insecure-dev-only}
       DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-demo-insecure-dev-only}
       GRAFANA_CLIENT_SECRET: ${KEYCLOAK_GRAFANA_CLIENT_SECRET:-grafana-insecure-dev-only}
+      OAUTH2_PROXY_CLIENT_SECRET: ${KEYCLOAK_OAUTH2_PROXY_CLIENT_SECRET:-oauth2-proxy-insecure-dev-only}
       SCIM_CLIENT_SECRET: ${KEYCLOAK_SCIM_CLIENT_SECRET:-scim-insecure-dev-only}
       LAB_DOMAIN: ${LAB_DOMAIN:-lab.localhost}
     volumes:
@@ -164,6 +165,100 @@ services:
     depends_on:
       keycloak:
         condition: service_healthy
+
+
+  # ---------------------------------------------------------------------------
+  # oauth2-proxy — Traefik forward-auth against Keycloak
+  #
+  # Validates browser sessions for Prometheus, Alertmanager and the Traefik
+  # dashboard. Grafana already scrapes Prometheus on the internal network
+  # (http://prometheus:9090) and never goes through this middleware.
+  #
+  # Toggle: FORWARD_AUTH_ENABLED (documented) + FORWARD_AUTH_MIDDLEWARE (what
+  # Compose substitutes into protected routers). Default ON. Set
+  # FORWARD_AUTH_ENABLED=false and FORWARD_AUTH_MIDDLEWARE= (empty) to disable.
+  #
+  # Allowed realm roles: platform-admin, developer, security-analyst, auditor.
+  # Contractors (dave) and ai-user-only identities are denied.
+  # ---------------------------------------------------------------------------
+  oauth2-proxy:
+    <<: [*defaults, *hardened]
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.4-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-oauth2-proxy
+    # Alpine image runs as non-root uid 2000.
+    user: "2000:2000"
+    command:
+      - --http-address=0.0.0.0:4180
+      - --reverse-proxy=true
+      # Auth-only mode: ForwardAuth checks /oauth2/auth; browsers hit /oauth2/*
+      # on the dedicated oauth.${LAB_DOMAIN} router for login and callback.
+      - --upstream=static://202
+      - --provider=keycloak-oidc
+      - --client-id=oauth2-proxy
+      - --client-secret=${KEYCLOAK_OAUTH2_PROXY_CLIENT_SECRET:-oauth2-proxy-insecure-dev-only}
+      # Issuer matches Keycloak's public hostname (token `iss` claim). Discovery
+      # is skipped so token/JWKS calls stay on the internal HTTP address and
+      # never depend on the self-signed edge certificate — same pattern as
+      # Grafana's OIDC token URL.
+      - --oidc-issuer-url=https://keycloak.${LAB_DOMAIN:-lab.localhost}/realms/${KEYCLOAK_REALM:-lab}
+      - --skip-oidc-discovery=true
+      - --login-url=https://keycloak.${LAB_DOMAIN:-lab.localhost}/realms/${KEYCLOAK_REALM:-lab}/protocol/openid-connect/auth
+      - --redeem-url=http://keycloak:8080/realms/${KEYCLOAK_REALM:-lab}/protocol/openid-connect/token
+      - --oidc-jwks-url=http://keycloak:8080/realms/${KEYCLOAK_REALM:-lab}/protocol/openid-connect/certs
+      - --profile-url=http://keycloak:8080/realms/${KEYCLOAK_REALM:-lab}/protocol/openid-connect/userinfo
+      - --redirect-url=https://oauth.${LAB_DOMAIN:-lab.localhost}/oauth2/callback
+      - --scope=openid email profile roles
+      - --code-challenge-method=S256
+      - --email-domain=*
+      - --allowed-role=platform-admin
+      - --allowed-role=developer
+      - --allowed-role=security-analyst
+      - --allowed-role=auditor
+      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET:-oauth2proxyinsecuredevonlyckseed}
+      - --cookie-domain=.${LAB_DOMAIN:-lab.localhost}
+      - --cookie-secure=true
+      - --cookie-samesite=lax
+      - --whitelist-domain=.${LAB_DOMAIN:-lab.localhost}
+      - --whitelist-domain=.${LAB_DOMAIN:-lab.localhost}:*
+      - --set-xauthrequest=true
+      - --skip-provider-button=true
+      - --silence-ping-logging=true
+      # Traefik is the only client that should send X-Forwarded-* here. The lab
+      # edge network is private; 0.0.0.0/0 matches oauth2-proxy's documented
+      # default and avoids brittle Docker bridge CIDR pinning.
+      - --trusted-proxy-ip=0.0.0.0/0
+    networks:
+      - lab_edge
+    depends_on:
+      keycloak:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:4180/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${COMPOSE_PROJECT_NAME:-lab}_edge
+      # Public callback / sign-in host. Not itself behind forward-auth.
+      - traefik.http.routers.oauth2-proxy.rule=Host(`oauth.${LAB_DOMAIN:-lab.localhost}`)
+      - traefik.http.routers.oauth2-proxy.entrypoints=web,websecure
+      - traefik.http.routers.oauth2-proxy.tls=true
+      - traefik.http.routers.oauth2-proxy.middlewares=lab-default@file,lab-ratelimit@docker
+      - traefik.http.services.oauth2-proxy.loadbalancer.server.port=4180
+      # --- ForwardAuth middlewares (referenced by protected routers) ----------
+      # Errors must come *before* ForwardAuth so a 401 from /oauth2/auth is
+      # rewritten into a redirect to the login flow rather than a blank 401.
+      - traefik.http.middlewares.lab-forward-auth.forwardauth.address=http://oauth2-proxy:4180/oauth2/auth
+      - traefik.http.middlewares.lab-forward-auth.forwardauth.trustForwardHeader=true
+      - traefik.http.middlewares.lab-forward-auth.forwardauth.authResponseHeaders=X-Auth-Request-User,X-Auth-Request-Email,X-Auth-Request-Preferred-Username,X-Auth-Request-Groups
+      - traefik.http.middlewares.lab-oauth-errors.errors.status=401-403
+      - traefik.http.middlewares.lab-oauth-errors.errors.service=oauth2-proxy
+      - traefik.http.middlewares.lab-oauth-errors.errors.query=/oauth2/start?rd={url}
+      # Rewrite auth failures to 302 so the browser follows /oauth2/start.
+      - traefik.http.middlewares.lab-oauth-errors.errors.statusrewrites.401=302
+      - traefik.http.middlewares.lab-oauth-errors.errors.statusrewrites.403=302
 
   # ---------------------------------------------------------------------------
   # SCIM downstream reconciler
