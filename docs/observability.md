@@ -192,9 +192,9 @@ Email, Slack and Discord receivers are stubbed as commented examples in
 
 1. Uncomment the receiver block and fill in the real endpoint (SMTP host, Slack
    incoming-webhook URL, or Discord webhook URL with the `/slack` suffix).
-2. Either change the root `receiver:` to that name, or add a child route that
+1. Either change the root `receiver:` to that name, or add a child route that
    selects it (for example by severity).
-3. Restart Alertmanager: `docker compose up -d alertmanager`.
+1. Restart Alertmanager: `docker compose up -d alertmanager`.
 
 Do not commit real webhook URLs or SMTP passwords. Keep them in an ignored
 local override or a secret manager.
