@@ -111,7 +111,7 @@ jobs:
           trivyignores: .trivyignore
 
       - name: Upload to code scanning
-        uses: github/codeql-action/upload-sarif@v4.38.1
+        uses: github/codeql-action/upload-sarif@v4.38.2
         if: always()
         with:
           sarif_file: trivy-config.sarif
