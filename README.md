@@ -2,11 +2,13 @@
 
 # Lab-in-a-Box
 
-**A self-hosted AI, infrastructure and identity lab. One command, no manual configuration.**
+**A self-hosted infrastructure and identity governance lab.**
 
 Twenty-nine containers by default: identity, secrets, observability, object storage, Git hosting and a
 local LLM. All provisioned and wired together automatically. Two more services, Qdrant and Watchtower,
 are available through optional Compose profiles (thirty-one in the full catalogue).
+
+**Current release:** [v2.0.0](https://github.com/chriswayneh/lab-in-a-box/releases/tag/v2.0.0), with identity lifecycle automation, access reviews, and role-based access to monitoring interfaces.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Docker Compose](https://img.shields.io/badge/Docker%20Compose-v2.20%2B-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
@@ -31,11 +33,8 @@ are available through optional Compose profiles (thirty-one in the full catalogu
 
 ## What this is
 
-Most "homelab" repositories are a `docker-compose.yml` and a list of things you still have to do by hand:
-create the database, import the realm, add the datasource, generate a password, connect service A to
-service B.
-
-This one does all of that itself.
+Docker Compose starts the services and their initialization jobs: database setup, realm imports,
+dashboard provisioning, secrets policies, and service integrations.
 
 ```bash
 git clone https://github.com/chriswayneh/lab-in-a-box.git
@@ -48,8 +47,8 @@ policies and roles, dashboards already showing live container metrics, an object
 a Git server with an administrator, and a local language model you can chat with. All of it sits behind
 a single reverse proxy on friendly hostnames, with no entry added to your `hosts` file.
 
-It is built to be read as much as run. Every non-obvious decision is explained where it is made, and the
-trade-offs that a lab makes against production are stated plainly rather than hidden.
+The documentation covers the provisioning flow, identity workflows, and differences between this
+local lab and a production deployment.
 
 ### What you get
 
@@ -154,7 +153,11 @@ make up
 `make up` generates unique credentials before starting and keeps file-backed ones in the git-ignored
 `secrets/local/` directory.
 
-Generate real ones at any time:
+If you already started with the shipped defaults, use the following only to reinitialize a disposable lab with generated credentials:
+
+> **Data loss:** `make clean` deletes all lab volumes, including databases, Git repositories,
+> object storage, dashboards, chat history, and downloaded models. Back up anything you need
+> before proceeding. This is a reset, not an in-place password rotation procedure.
 
 ```bash
 make secrets && make clean && make up
@@ -796,14 +799,13 @@ More, including how to read the init-job logs and what each provisioning script 
 **v2 roadmap work is complete (7/7).** Identity lifecycle automation, RBAC
 simulation, access review campaigns, SCIM provisioning, the identity audit
 pipeline, Alertmanager and forward-auth for Prometheus / Alertmanager / Traefik
-have landed. Milestone complete; the remaining ship step is the `v2.0.0`
-release tag after the local demo. See
+have shipped in [v2.0.0](https://github.com/chriswayneh/lab-in-a-box/releases/tag/v2.0.0).
+See
 [Identity lifecycle](#identity-lifecycle) above, or
 [`docs/identity-governance.md`](docs/identity-governance.md) for the full model.
 For a reviewer-friendly walkthrough, use the [10-minute demo](docs/demo.md).
 Screenshots in this README were captured from the local lab (see
-[`screenshots/README.md`](screenshots/README.md) to refresh before tagging).
-v1.0.0 remains the only tagged release until `v2.0.0` is cut.
+[`screenshots/README.md`](screenshots/README.md) for capture instructions).
 
 Full detail, including ready-to-file issues with acceptance criteria, is in
 [`roadmap/`](roadmap/README.md).

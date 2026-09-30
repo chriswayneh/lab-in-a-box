@@ -19,15 +19,16 @@ action from someone with an existing lab**: a `make clean`, a manual migration, 
 
 ### Fixed
 
+- Corrected stale v2.0.0 release status in the README and roadmap, and made the destructive credential-reset warning explicit.
+
 ---
 
 ## [2.0.0] - 2026-09-23
 
 **Identity governance.** Roadmap items `v2-1` through `v2-7` are complete.
-The remaining ship step is tagging `v2.0.0` after the local demo (screenshots
-already referenced in the README were captured from the local lab; refresh
-them before the release if the UI has drifted — see
-[`screenshots/README.md`](screenshots/README.md)).
+Released as [v2.0.0](https://github.com/chriswayneh/lab-in-a-box/releases/tag/v2.0.0).
+The README screenshots were captured from the local lab; see
+[`screenshots/README.md`](screenshots/README.md) for capture instructions.
 
 ### Added
 
