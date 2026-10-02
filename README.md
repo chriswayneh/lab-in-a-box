@@ -33,7 +33,7 @@ are available through optional Compose profiles (thirty-one in the full catalogu
 
 ## What this is
 
-This is a local lab, not a production system. Passwords published for this lab are dev-only credentials. Read the [security model](docs/security.md) before the service list.
+This is a local lab, not a production system. Passwords published for this lab are dev-only credentials. Published ports 80, 443, and 2222 are bound for this lab only, not as a production exposure. Read the [security model](docs/security.md) before the service list.
 
 Docker Compose starts the services and their initialization jobs: database setup, realm imports,
 dashboard provisioning, secrets policies, and service integrations.
