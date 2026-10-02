@@ -18,7 +18,7 @@ Where this project is going, and how to file the work.
 | Milestone | Theme | Status | Issues |
 | --- | --- | --- | :---: |
 | **v1.0** | Foundation, the working lab | ✅ Shipped | n/a |
-| **v2.0** | Identity governance | ✅ Complete (7/7); `v2.0.0` tag remaining | 7 |
+| **v2.0** | Identity governance | ✅ Shipped in `v2.0.0` (7/7) | 7 |
 | **v3.0** | Infrastructure as code | Planned | 7 |
 | **v4.0** | AI operations | Planned | 6 |
 | **v5.0** | Homelab operations | Planned | 3 |
@@ -45,7 +45,7 @@ The theme: **turn the seeded Keycloak realm into a working demonstration of iden
 access governance.** This is the area where most self-hosted labs stop at "we installed an IdP", and it
 is where the genuinely interesting problems are.
 
-**Status: complete (7/7).** Milestone complete; the remaining ship step is the `v2.0.0` release tag after the local demo/screenshots.
+**Status: shipped (7/7).** Released as [v2.0.0](https://github.com/chriswayneh/lab-in-a-box/releases/tag/v2.0.0) on 2026-09-23.
 
 | | Issue | Status |
 | --- | --- | --- |
