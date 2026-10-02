@@ -33,6 +33,8 @@ are available through optional Compose profiles (thirty-one in the full catalogu
 
 ## What this is
 
+This is a local lab, not a production system. Passwords published for this lab are dev-only credentials. Read the [security model](docs/security.md) before the service list.
+
 Docker Compose starts the services and their initialization jobs: database setup, realm imports,
 dashboard provisioning, secrets policies, and service integrations.
 
@@ -343,7 +345,7 @@ Full generated catalogue, including images, networks and privileges:
 | **Ollama** | <https://ollama.lab.localhost> | Local LLM runtime and API |
 | **Gitea** | <https://git.lab.localhost> | Git hosting with issues, pull requests and CI |
 | **MinIO** | <https://minio.lab.localhost> | Object storage console (S3 API at `s3.lab.localhost`) |
-| **Portainer** | <https://portainer.lab.localhost> | Container management and troubleshooting. `admin` / `portainer-insecure-dev-only` |
+| **Portainer** | <https://portainer.lab.localhost> | Container management and troubleshooting. Dev-only sign-in, not a production credential; see [Credential handling](docs/security.md#credential-handling). |
 | **pgAdmin** | <https://pgadmin.lab.localhost> | PostgreSQL console, pre-connected to all three databases |
 | **Adminer** | <https://adminer.lab.localhost> | Lightweight database client |
 | **Qdrant** | <https://qdrant.lab.localhost> | Vector database. Optional, `COMPOSE_PROFILES=qdrant` |
