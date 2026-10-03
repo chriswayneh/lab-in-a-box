@@ -56,7 +56,7 @@ local lab and a production deployment.
 
 | | |
 | --- | --- |
-| **Identity** | Keycloak with a seeded realm: 4 users, 4 groups, 6 roles, 6 OIDC clients, brute-force protection and a password policy |
+| **Identity** | Keycloak with a seeded realm: 4 users, 5 groups, 6 roles, 6 OIDC clients, brute-force protection and a password policy |
 | **Identity lifecycle** | Joiner/Mover/Leaver automation across Keycloak, Vault and Gitea. Group-based RBAC, access diffing, session and refresh-token revocation, repository custody transfer, redacted audit records |
 | **RBAC simulator** | Read-only: answers "what can this person reach, and why?" Resolves live Keycloak, Vault and Gitea state, explains every grant's source, surfaces entitlement drift |
 | **Access review** | Campaign-based recertification built on the simulator above: snapshot, approve/revoke per entitlement, remediate through the same JML adapters, retained evidence |
