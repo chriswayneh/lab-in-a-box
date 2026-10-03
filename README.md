@@ -574,7 +574,7 @@ This is a **development lab**, not a production deployment, and it is explicit a
   `docker inspect`, the process table or shell history
 - **Non-root containers** wherever the image allows: Traefik (`1000`), oauth2-proxy (`2000`), Prometheus (`65534`), Alertmanager (`65534`),
   Grafana (`472`), Loki (`10001`), Gitea (`1000`), nginx (unprivileged variant)
-- **`no-new-privileges`** on every container; a read-only root filesystem on the landing page
+- **`no-new-privileges`** on every container except cAdvisor, which is privileged and does not set it; a read-only root filesystem on the landing page
 - **Per-service database roles.** Keycloak and Gitea each get their own PostgreSQL login, scoped to
   their own database, created with `NOCREATEDB NOCREATEROLE NOSUPERUSER`
 - **Least-privilege Vault policies**, including an explicit `deny` on audit-device paths for the
