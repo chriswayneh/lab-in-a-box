@@ -354,7 +354,7 @@ Full generated catalogue, including images, networks and privileges:
 
 ### Host ports
 
-The lab binds four ports on your machine, and no more. Everything else is reachable only through Traefik.
+The lab binds five ports on your machine, and no more. Everything else is reachable only through Traefik.
 
 | Port | Service | Bound to | Why |
 | --- | --- | --- | --- |
