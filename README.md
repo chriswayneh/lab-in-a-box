@@ -95,10 +95,10 @@ This remains a local lab, not a complete enterprise zero-trust architecture. Shi
 | ![Landing page](screenshots/landing-page-live.png) | ![Grafana](screenshots/grafana-overview-live.png) |
 | Every active service, with live reachability | The provisioned Lab Overview dashboard |
 
-| Keycloak realm | Open WebUI |
+| Keycloak after sign-in | Open WebUI |
 | :---: | :---: |
-| ![Keycloak](screenshots/keycloak-login-desktop.png) | ![Open WebUI](screenshots/open-webui-live.png) |
-| Keycloak administrator sign-in | Open WebUI's local first-run sign-in |
+| ![Keycloak after sign-in](screenshots/keycloak-admin-desktop.png) | ![Open WebUI](screenshots/open-webui-live.png) |
+| The page after sign-in | Open WebUI's local first-run sign-in |
 
 </div>
 
