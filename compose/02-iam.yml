@@ -101,6 +101,7 @@ services:
       KC_SPI_EVENTS_LISTENER__JBOSS_LOGGING__QUOTES: none
     volumes:
       - ./configs/keycloak/realm-export.json:/opt/keycloak/data/import/lab-realm.json:ro
+      - ./configs/keycloak/themes/lab:/opt/keycloak/themes/lab:ro
       - keycloak_data:/opt/keycloak/data/h2
     networks:
       - lab_edge
