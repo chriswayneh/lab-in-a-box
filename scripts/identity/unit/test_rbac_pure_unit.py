@@ -51,6 +51,18 @@ def test_unrelated_paths_do_not_match(granted, query):
     assert not resource_matches(granted, query)
 
 
+def test_sibling_prefix_is_not_a_child_path():
+    """`apps` must not match a question about `app`.
+
+    Character prefixes are not Vault paths. A holder of `secret/data/apps/*`
+    cannot reach `secret/data/app`, and who-can must not say they can.
+    """
+    assert not resource_matches("secret/data/apps/*", "secret/data/app")
+    assert not resource_matches("secret/data/app", "secret/data/apps/*")
+    assert resource_matches("secret/data/apps/*", "secret/data/apps/demo")
+    assert resource_matches("secret/data/apps/demo", "secret/data/apps/*")
+
+
 def test_empty_query_matches_anything_in_the_service():
     """`vault:` with no path means "any Vault grant", used by who-can."""
     assert resource_matches("anything/at/all", "")
