@@ -2,6 +2,7 @@
   "realm": "lab",
   "displayName": "Lab-in-a-Box",
   "displayNameHtml": "<strong>Lab</strong>-in-a-Box",
+  "loginTheme": "lab",
   "enabled": true,
 
   "sslRequired": "none",

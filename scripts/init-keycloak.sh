@@ -80,6 +80,16 @@ require_realm() {
         for import errors, then recreate the stack with 'make clean && make up'."
 }
 
+ensure_login_theme() {
+  # Import leaves an existing realm alone, so re-apply the theme named in
+  # realm-export.json. The hostname admin sign-in uses the master realm,
+  # which is not part of that export; give it the same theme.
+  kc update "realms/${KC_REALM}" -s loginTheme=lab >/dev/null
+  log "login theme 'lab' set for realm '${KC_REALM}'"
+  kc update realms/master -s loginTheme=lab >/dev/null
+  log "login theme 'lab' set for realm 'master'"
+}
+
 enable_scim_api() {
   kc update "realms/${KC_REALM}" -s scimApiEnabled=true >/dev/null
   log "SCIM API enabled for realm '${KC_REALM}'"
@@ -355,6 +365,7 @@ main() {
 
   authenticate
   require_realm
+  ensure_login_theme
   enable_scim_api
   ensure_audit_events
   ensure_scim_group
