@@ -47,7 +47,7 @@ _Metrics, logs, alerts and dashboards_
 | `grafana` | `grafana/grafana:11.5.0` | `grafana.lab.localhost` | — | edge, observability | ✅ | uid `472:472` |
 | `loki` | `grafana/loki:3.3.2` | — | — | observability | ✅ | uid `10001:10001` |
 | `promtail` | `grafana/promtail:3.3.2` | — | — | observability, socket | ✅ | — |
-| `cadvisor` | `gcr.io/cadvisor/cadvisor:v0.49.1` | — | — | observability | ✅ | **privileged** |
+| `cadvisor` | `ghcr.io/google/cadvisor:v0.60.6` | — | — | observability | ✅ | **privileged** |
 | `node-exporter` | `prom/node-exporter:v1.8.2` | — | — | observability | ✅ | — |
 
 ## AI
