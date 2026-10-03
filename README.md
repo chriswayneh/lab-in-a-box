@@ -580,7 +580,7 @@ This is a **development lab**, not a production deployment, and it is explicit a
 - **Least-privilege Vault policies**, including an explicit `deny` on audit-device paths for the
   administrator policy, so an operator cannot erase their own trail
 - **Forward-auth** for Prometheus, Alertmanager and the Traefik dashboard via oauth2-proxy and Traefik ForwardAuth (Keycloak OIDC; on by default)
-- **Rate limiting and security headers** on every routed service
+- **Security headers** on every routed service. **Rate limiting** is on every Traefik router except the MinIO S3 API (`s3.lab.localhost`), which uses security headers only
 - **Generated credentials.** 32 characters of CSPRNG output per service
 - **CI security scanning.** Secret scanning over full history, image CVEs and configuration checks
 
