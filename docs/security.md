@@ -3,8 +3,8 @@
 What this lab defends against, what it does not, and where the line is drawn.
 
 > **Warning**
-> Lab-in-a-Box is a **development environment designed to run on `localhost`**. It is not hardened for
-> internet exposure, and several deliberate choices would be wrong in production. Those choices are
+> Lab-in-a-Box is a **development lab, not a production system**. It is not hardened for
+> internet exposure. Ports 80, 443, and 2222 bind all interfaces by default; PostgreSQL and Redis stay on localhost. Several deliberate choices would be wrong in production. Those choices are
 > listed below rather than buried.
 
 - [Threat model](#threat-model)
@@ -312,7 +312,7 @@ Honest list. These are known and accepted for a local development lab.
 
 ## Hardening for exposure
 
-If you must reach the lab from outside `localhost`, this is the minimum. None of it is optional.
+Ports 80, 443, and 2222 already listen on all interfaces. If the lab must be used beyond a trusted machine, this is the minimum. None of it is optional.
 
 1. **Generate credentials.**
 
@@ -350,7 +350,7 @@ If you must reach the lab from outside `localhost`, this is the minimum. None of
 1. **Turn on Keycloak's production mode**, with a real hostname and certificate.
 
 If several of these feel like too much work for what you need, that is a meaningful signal that the lab
-should stay on `localhost` and be reached over a VPN or SSH tunnel instead.
+should stay off untrusted networks and be reached over a VPN or SSH tunnel instead.
 
 ---
 

@@ -596,7 +596,7 @@ This is a **development lab**, not a production deployment, and it is explicit a
 | Fallback passwords are **in this repo** | Makes `docker compose up -d` genuinely work with no prior step | `make secrets`, always |
 
 > **Warning**
-> Do not expose this lab to the internet as-is. It is designed for `localhost`. If you need it reachable,
+> Do not expose this lab to the internet as-is. Ports 80, 443, and 2222 already bind all interfaces, not localhost only. If you need it on a network you do not trust,
 > read [`docs/security.md`](docs/security.md) first. At minimum you need real certificates, generated
 > credentials, `LAB_FORCE_HTTPS=true`, keep forward-auth on (the default), and protect or remove Portainer.
 
