@@ -618,7 +618,7 @@ docker compose up -d --force-recreate traefik
 ```
 
 Refresh <https://lab.localhost>. The browser should no longer warn, and the landing page should report
-**12/12 enabled services reachable**. Qdrant is shown separately as an optional disabled service; enable
+**13/13 enabled services reachable**. Qdrant is shown separately as an optional disabled service; enable
 the `qdrant` profile when you want to use it.
 
 This script installs a local development CA only for the current computer, creates a certificate for
