@@ -33,7 +33,7 @@ are available through optional Compose profiles (thirty-one in the full catalogu
 
 ## What this is
 
-This is a local lab, not a production system. Passwords published for this lab are dev-only credentials. Published ports 80, 443, and 2222 are bound for this lab only, not as a production exposure. Read the [security model](docs/security.md) before the service list.
+This is a local lab, not a production system. Passwords published for this lab are dev-only credentials. Published ports 80, 443, and 2222 bind to all interfaces by default and may be reachable from other machines, depending on host firewall and network settings. Read the [security model](docs/security.md) before the service list.
 
 Docker Compose starts the services and their initialization jobs: database setup, realm imports,
 dashboard provisioning, secrets policies, and service integrations.
@@ -144,7 +144,9 @@ docker compose up -d
 ```
 
 This is enough to use the complete local lab. It uses the published development passwords,
-which is appropriate only because the lab is reachable only from this computer.
+which are intended only for a trusted local lab. HTTP, HTTPS, and Gitea SSH bind to all interfaces
+by default; `*.lab.localhost` names do not restrict network access. Keep the lab off untrusted
+networks and read the [security model](docs/security.md) before exposing it beyond this computer.
 
 **Use unique passwords (recommended).** On macOS/Linux, or in Git Bash/WSL on Windows, run:
 
