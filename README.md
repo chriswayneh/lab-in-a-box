@@ -33,7 +33,7 @@ are available through optional Compose profiles (thirty-one in the full catalogu
 
 ## What this is
 
-This is a local lab, not a production system. Passwords published for this lab are dev-only credentials. Published ports 80, 443, and 2222 bind to all interfaces by default and may be reachable from other machines, depending on host firewall and network settings. Read the [security model](docs/security.md) before the service list.
+This is a local lab, not a production system. Passwords published for this lab are dev-only credentials. Published ports 80, 443, and 2222 bind to all interfaces by default and may be reachable from other machines, depending on host firewall and network settings. PostgreSQL and Redis stay on `127.0.0.1` only. Read the [security model](docs/security.md) before the service list.
 
 Docker Compose starts the services and their initialization jobs: database setup, realm imports,
 dashboard provisioning, secrets policies, and service integrations.
@@ -43,6 +43,8 @@ git clone https://github.com/chriswayneh/lab-in-a-box.git
 cd lab-in-a-box
 docker compose up -d
 ```
+
+<https://lab.localhost> is the front door and links to everything else.
 
 A few minutes later you have a running identity provider with a populated realm, a secrets manager with
 policies and roles, dashboards already showing live container metrics, an object store with buckets,
