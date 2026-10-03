@@ -122,6 +122,22 @@ _VAULT_PATH = re.compile(
 )
 
 
+def _path_prefix(prefix: str, path: str) -> bool:
+    """True when `path` is `prefix` or a child of it, not a longer sibling name.
+
+    `secret/data/apps`.startswith(`secret/data/app`) is true, but those are
+    different Vault paths. A boundary is `/` or the end of the string, so a
+    trailing slash left by stripping `*` still means "everything below".
+    """
+    if prefix == "":
+        return True
+    if path == prefix or prefix.endswith("/"):
+        return path.startswith(prefix)
+    if not path.startswith(prefix):
+        return False
+    return path[len(prefix):].startswith("/")
+
+
 def resource_matches(granted: str, query: str) -> bool:
     """
     Does a grant on `granted` cover a question about `query`?
@@ -135,13 +151,14 @@ def resource_matches(granted: str, query: str) -> bool:
     this" — the most dangerous possible wrong answer for an access review.
 
     Vault treats a trailing `*` as "everything below here", so both sides are
-    stripped of it and compared as prefixes each way.
+    stripped of it and compared as path prefixes each way. The comparison stops
+    at a path boundary: `secret/data/apps/*` does not cover `secret/data/app`.
     """
     g = granted.rstrip("*")
     q = query.rstrip("*")
     if not q:
         return True
-    return g.startswith(q) or q.startswith(g)
+    return _path_prefix(g, q) or _path_prefix(q, g)
 
 
 def parse_vault_policy(document: str | None) -> list:
