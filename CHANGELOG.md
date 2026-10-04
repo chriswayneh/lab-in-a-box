@@ -24,6 +24,9 @@ No manual migration or credential reset is required by this patch.
 
 ### Fixed
 
+- Start non-root Grafana with generated owner-only password files by preparing a private
+  copy in its existing data volume; host secret permissions remain unchanged.
+
 - Match Vault child paths without accepting a sibling path with the same prefix.
 - Show named cAdvisor container metrics on the Lab Overview dashboard.
 - Correct stale v2.0.0 release status in the README and roadmap.

@@ -55,7 +55,7 @@ docker-compose.yml            networks, volumes, secrets, and six includes
 The root file uses the Compose Spec [`include:`](https://docs.docker.com/compose/how-tos/multiple-compose-files/include/)
 directive. This is **not** the same as multiple `-f` flags: the fragments merge into a single project with
 one network namespace, one dependency graph and one `up` command. `docker compose ps` shows all
-28 available services (26 by default); `depends_on` works across fragment boundaries.
+32 available services (30 by default); `depends_on` works across fragment boundaries.
 
 Each include sets `project_directory: .` so that a relative path inside a fragment resolves from the
 repository root. Without it, Compose would resolve `./configs/...` relative to `compose/`, and every
@@ -67,7 +67,7 @@ is defined.
 
 ### Why not one file?
 
-A single file containing all 28 services would be around 1,500 lines. That is unreviewable in a pull
+A single file containing all 32 services would be around 1,500 lines. That is unreviewable in a pull
 request and unmergeable when two people touch it at once. The split is by *responsibility*, so a change
 to the AI stack touches one file and conflicts with nothing else.
 
@@ -350,3 +350,18 @@ the read-only proxy rather than adding a second socket mount.
 - [`docs/security.md`](security.md): threat model and trust boundaries
 - [`docs/observability.md`](observability.md): the metrics and logs pipeline
 - [`architecture/dependency-graph.mmd`](../architecture/dependency-graph.mmd): generated startup graph
+
+## Grafana password initialization
+
+Compose file-backed secrets preserve the source file's host ownership and permissions.
+`make secrets` creates private files, so Grafana's UID 472 cannot read a root-owned
+mode-600 source file. The network-disabled `grafana-secrets-init` job copies only its
+admin password into `grafana_data/.secrets/admin_password`, owned by UID 472 with
+mode 0400 under a mode-0700 directory. The non-root Grafana server waits for the
+copy and reads it through `GF_SECURITY_ADMIN_PASSWORD__FILE`. The password stays
+out of process environment variables and the host file stays private.
+
+The copy uses the existing Grafana data volume, already included in lab backups.
+It is refreshed when the init job runs; credential resets still require the
+documented reset procedure rather than assuming a new file changes existing
+database credentials.

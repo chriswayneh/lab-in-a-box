@@ -28,7 +28,7 @@ WARNINGS=0
 
 # Services that are expected to run and exit. A stopped init job is success,
 # not a fault — but a *failed* one means provisioning did not happen.
-INIT_JOBS=(keycloak-init vault-init minio-init gitea-init ollama-init)
+INIT_JOBS=(keycloak-init vault-init minio-init gitea-init ollama-init grafana-secrets-init)
 
 # subdomain:label — the routes the landing page advertises.
 ROUTES=(

@@ -283,6 +283,19 @@ loki_check() {
 # Forward-auth wiring (roadmap v2-7). Runs without Docker so CI and laptops
 # without a daemon still catch a broken toggle or a missing realm client.
 # -----------------------------------------------------------------------------
+check_grafana_secrets() {
+  heading "Grafana private generated secret"
+  if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+    skipped "the Docker daemon is not available"
+    return
+  fi
+  if bash "${LAB_SCRIPT_DIR}/check-grafana-secrets.sh"; then
+    success "Grafana secret ownership regression passed"
+  else
+    fail "Grafana secret ownership regression failed"
+  fi
+}
+
 check_forward_auth() {
   heading "Forward-auth"
 
@@ -432,6 +445,7 @@ main() {
   # Pulls a container image, so it is opt-out for a fast inner loop.
   if [[ "${SKIP_UPSTREAM:-0}" != "1" ]]; then
     check_with_upstream_tools
+    check_grafana_secrets
   check_forward_auth
   fi
 
