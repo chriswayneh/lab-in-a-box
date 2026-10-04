@@ -359,6 +359,6 @@ for a local development lab and wrong for production.
 
 ---
 
-[2.0.1]: https://github.com/chriswayneh/lab-in-a-box/compare/v2.0.0...v2.0.1
+[2.0.1]: https://github.com/chriswayneh/lab-in-a-box/compare/v2.0.0...82bfdff710f1904d0bf08893a586ca2d532cd35e
 [2.0.0]: https://github.com/chriswayneh/lab-in-a-box/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/chriswayneh/lab-in-a-box/releases/tag/v1.0.0
