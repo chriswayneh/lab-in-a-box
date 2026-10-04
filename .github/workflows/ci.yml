@@ -43,6 +43,15 @@ jobs:
         run: bash scripts/check-secrets.sh
 
   # ---------------------------------------------------------------------------
+  grafana-secrets:
+    name: Grafana generated secret
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Non-root Grafana can read a private generated password
+        run: bash scripts/check-grafana-secrets.sh
+
   compose:
     name: Compose project
     runs-on: ubuntu-latest

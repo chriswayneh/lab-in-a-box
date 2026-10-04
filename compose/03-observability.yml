@@ -324,6 +324,25 @@ services:
   # comes up fully populated. Optional Keycloak SSO is wired but off by
   # default; flip GRAFANA_OIDC_ENABLED=true in .env to use it.
   # ---------------------------------------------------------------------------
+  # File-backed Compose secrets do not remap host ownership. A mode-600
+  # generated password is unreadable to Grafana's UID 472 on Linux.
+  # Keep that host file private and create an owner-only copy in the existing
+  # Grafana data volume before the non-root server starts.
+  grafana-secrets-init:
+    <<: [*defaults, *hardened]
+    image: grafana/grafana:11.5.0
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-grafana-secrets-init
+    user: "0:0"
+    restart: "no"
+    read_only: true
+    entrypoint: ["/bin/sh", "/scripts/init-grafana-secrets.sh"]
+    secrets:
+      - grafana_admin_password
+    volumes:
+      - ./scripts/init-grafana-secrets.sh:/scripts/init-grafana-secrets.sh:ro
+      - grafana_data:/var/lib/grafana
+    network_mode: none
+
   grafana:
     <<: [*defaults, *hardened]
     image: grafana/grafana:11.5.0
@@ -336,7 +355,7 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       # Grafana's own file-secret convention: <SETTING>__FILE, with two
       # underscores. The password never enters the container's environment.
-      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /var/lib/grafana/.secrets/admin_password
 
       # --- Server -----------------------------------------------------------
       GF_SERVER_ROOT_URL: https://grafana.${LAB_DOMAIN:-lab.localhost}
@@ -383,8 +402,6 @@ services:
       # Opening Grafana lands on the lab overview instead of an empty home.
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/lab-overview.json
       GF_FEATURE_TOGGLES_ENABLE: "lokiLogsDataplane"
-    secrets:
-      - grafana_admin_password
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
@@ -397,6 +414,8 @@ services:
         condition: service_healthy
       loki:
         condition: service_healthy
+      grafana-secrets-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://127.0.0.1:3000/api/health || exit 1"]
       interval: 30s

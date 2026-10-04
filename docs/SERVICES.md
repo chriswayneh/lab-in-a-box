@@ -8,7 +8,7 @@
 
 Every container in the lab, grouped by the compose fragment that defines it. Hostnames assume `LAB_DOMAIN=lab.localhost`.
 
-**31 available services** across **6 layers**. **29 start by default**; `qdrant`, `watchtower` require their optional Compose profiles. Services whose name ends in `-init` are one-shot provisioning jobs: they run once, do their work, and exit. A stopped `-init` container is a success, not a fault.
+**32 available services** across **6 layers**. **30 start by default**; `qdrant`, `watchtower` require their optional Compose profiles. Services whose name ends in `-init` are one-shot provisioning jobs: they run once, do their work, and exit. A stopped `-init` container is a success, not a fault.
 
 ## Core
 
@@ -69,8 +69,8 @@ _Source control and object storage_
 | --- | --- | --- | --- | --- | :---: | --- |
 | `gitea` | `gitea/gitea:1.23` | `git.lab.localhost` | `2222→22` | data, edge | ✅ | — |
 | `gitea-init` | `gitea/gitea:1.23` | — | — | data | n/a | uid `1000:1000` |
-| `minio` | `minio/minio:latest` | `minio.lab.localhost`, `s3.lab.localhost` | — | edge, observability | ✅ | — |
-| `minio-init` | `minio/mc:latest` | — | — | edge | n/a | — |
+| `minio` | `lab-in-a-box/minio:2025-10-15-source1` | `minio.lab.localhost`, `s3.lab.localhost` | — | edge, observability | ✅ | — |
+| `minio-init` | `lab-in-a-box/mc:2025-08-13-source1` | — | — | edge | n/a | — |
 
 ## Tools
 
@@ -82,6 +82,14 @@ _Operator conveniences_
 | `pgadmin` | `dpage/pgadmin4:8.14` | `pgadmin.lab.localhost` | — | data, edge | ✅ | — |
 | `adminer` | `adminer:4.8.1` | `adminer.lab.localhost` | — | data, edge | ✅ | — |
 | `watchtower` | `containrrr/watchtower:1.7.1` | — | — | edge | ✅ | **docker socket (rw)** |
+
+## Other
+
+_Not yet categorised_
+
+| Service | Image | URL | Host ports | Networks | Health | Privileges |
+| --- | --- | --- | --- | --- | :---: | --- |
+| `grafana-secrets-init` | `grafana/grafana:11.5.0` | — | — | — | n/a | uid `0:0`, read-only fs |
 
 ## Networks
 

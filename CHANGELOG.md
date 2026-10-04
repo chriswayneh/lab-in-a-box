@@ -11,15 +11,27 @@ action from someone with an existing lab**: a `make clean`, a manual migration, 
 
 ---
 
-## [Unreleased]
+## [2.0.1] - 2026-10-04
 
-### Added
+No manual migration or credential reset is required by this patch.
 
 ### Changed
 
+- Build MinIO locally from verified official source with pinned Go/Alpine images after upstream image withdrawal. The server includes the October 2025 session-policy security fix; existing object storage volumes and provisioning are preserved.
+
+- Refresh the Keycloak login background and add the named after-login admin screenshot.
+- Put the lab front door beside the start command and correct the documented service,
+  group, port, network exposure, rate-limiting and container-hardening claims.
+- Make the destructive credential-reset warning and development-only credentials explicit.
+
 ### Fixed
 
-- Corrected stale v2.0.0 release status in the README and roadmap, and made the destructive credential-reset warning explicit.
+- Start non-root Grafana with generated owner-only password files by preparing a private
+  copy in its existing data volume; host secret permissions remain unchanged.
+
+- Match Vault child paths without accepting a sibling path with the same prefix.
+- Show named cAdvisor container metrics on the Lab Overview dashboard.
+- Correct stale v2.0.0 release status in the README and roadmap.
 
 ---
 
@@ -352,6 +364,6 @@ for a local development lab and wrong for production.
 
 ---
 
-[Unreleased]: https://github.com/chriswayneh/lab-in-a-box/compare/v1.0.0...HEAD
-[2.0.0]: https://github.com/chriswayneh/lab-in-a-box/compare/v1.0.0...docs/v2-0-ship
+[2.0.1]: https://github.com/chriswayneh/lab-in-a-box/compare/v2.0.0...82bfdff710f1904d0bf08893a586ca2d532cd35e
+[2.0.0]: https://github.com/chriswayneh/lab-in-a-box/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/chriswayneh/lab-in-a-box/releases/tag/v1.0.0

@@ -172,10 +172,12 @@ services:
   # ---------------------------------------------------------------------------
   minio:
     <<: [*defaults, *hardened]
-    # MinIO publishes date-stamped release tags rather than semantic versions,
-    # so there is no stable minor tag to track. Renovate or Dependabot will
-    # propose a digest pin; see docs/security.md on supply chain.
-    image: minio/minio:latest
+    # Community images were withdrawn. Build verified official source locally.
+    image: lab-in-a-box/minio:2025-10-15-source1
+    pull_policy: build
+    build:
+      context: ./images/minio
+      target: server
     container_name: ${COMPOSE_PROJECT_NAME:-lab}-minio
     command: server /data --console-address ":9001"
     environment:
@@ -199,7 +201,7 @@ services:
       - lab_edge
       - lab_observability
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/minio/health/live"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9000/minio/health/live"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -231,7 +233,11 @@ services:
   # ---------------------------------------------------------------------------
   minio-init:
     <<: *init-job
-    image: minio/mc:latest
+    image: lab-in-a-box/mc:2025-08-13-source1
+    pull_policy: build
+    build:
+      context: ./images/minio
+      target: client
     container_name: ${COMPOSE_PROJECT_NAME:-lab}-minio-init
     entrypoint: ["/bin/sh", "/scripts/init-minio.sh"]
     environment:

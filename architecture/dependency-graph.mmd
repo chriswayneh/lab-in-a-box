@@ -50,6 +50,7 @@ graph TD
     postgres --> gitea
     redis --> gitea
     gitea --> gitea_init
+    grafana_secrets_init --> grafana
     loki --> grafana
     prometheus --> grafana
     postgres --> keycloak
@@ -70,4 +71,4 @@ graph TD
     vault --> vault_init
 
     classDef initJob fill:#1e293b,stroke:#64748b,stroke-width:1px,color:#cbd5e1;
-    class gitea_init,keycloak_init,minio_init,ollama_init,vault_init initJob;
+    class gitea_init,grafana_secrets_init,keycloak_init,minio_init,ollama_init,vault_init initJob;

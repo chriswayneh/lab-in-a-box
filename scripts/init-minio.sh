@@ -5,7 +5,7 @@
 # Creates the buckets the lab expects, applies a sane default policy, and adds
 # a least-privilege service account for application use.
 #
-# Runs in the minio/mc image. The root password is read from the same Docker
+# Runs in the locally built, pinned official MinIO client image. The root password is read from the same Docker
 # secret MinIO itself uses, so the credential exists in exactly one place.
 #
 # Idempotent: `mc mb` on an existing bucket is treated as success, not failure.
