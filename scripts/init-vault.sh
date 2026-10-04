@@ -22,7 +22,7 @@ export VAULT_ADDR
 export VAULT_TOKEN
 
 POLICY_DIR="/policies"
-DEMO_USER_PASSWORD="${DEMO_USER_PASSWORD:-demo-insecure-dev-only}"
+DEMO_USER_PASSWORD="${DEMO_USER_PASSWORD:-LabDemoPass1!}"
 
 log()  { printf '[vault-init] %s\n' "$*"; }
 warn() { printf '[vault-init] WARNING: %s\n' "$*" >&2; }

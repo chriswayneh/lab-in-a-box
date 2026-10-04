@@ -445,3 +445,10 @@ Public community MinIO images have been withdrawn. The lab builds verified offic
 a first build needs internet access and extra time. Run docker compose build minio minio-init
 to view the failing stage. An archive checksum mismatch stops the build: do not disable the
 check or substitute a cached old server. See [MinIO builds](minio-builds.md).
+
+## Development quick start on v2.0.1
+
+The v2.0.1 shared development password did not satisfy the realm password policy, so
+keycloak-init failed when no .env was present. v2.0.2 corrects the shared fallback.
+On v2.0.1, run bash scripts/generate-secrets.sh before docker compose up -d to use
+compliant private credentials. Existing explicitly configured credentials are unchanged.

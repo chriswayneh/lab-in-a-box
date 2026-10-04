@@ -66,7 +66,7 @@ main() {
   row "Password" "$(env_value KEYCLOAK_ADMIN_PASSWORD admin-insecure-dev-only)"
   printf '  %-14s %s\n' "Realm" "$(env_value KEYCLOAK_REALM lab)"
   printf '  %-14s %s\n' "Demo users" "alice, bob, carol, dave"
-  row "Demo password" "$(env_value DEMO_USER_PASSWORD demo-insecure-dev-only)"
+  row "Demo password" "$(env_value DEMO_USER_PASSWORD LabDemoPass1!)"
 
   service "Vault" "vault"
   row "Root token" "$(env_value VAULT_DEV_ROOT_TOKEN vault-root-insecure-dev-only)"

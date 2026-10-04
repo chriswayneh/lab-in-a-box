@@ -36,7 +36,7 @@ SUBJECT = "jmltest"
 TOKEN_SUBJECT = "jmltoken"
 
 ENGINE = "/engine/jml.py"
-PASSWORD = os.environ.get("DEMO_USER_PASSWORD", "demo-insecure-dev-only")
+PASSWORD = os.environ.get("DEMO_USER_PASSWORD", "LabDemoPass1!")
 KEYCLOAK_URL = os.environ.get("KEYCLOAK_URL", "http://keycloak:8080")
 REALM = os.environ.get("KEYCLOAK_REALM", "lab")
 

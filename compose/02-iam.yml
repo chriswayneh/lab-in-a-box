@@ -154,7 +154,7 @@ services:
       KC_REALM: ${KEYCLOAK_REALM:-lab}
       KC_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KC_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin-insecure-dev-only}
-      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-demo-insecure-dev-only}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-LabDemoPass1!}
       GRAFANA_CLIENT_SECRET: ${KEYCLOAK_GRAFANA_CLIENT_SECRET:-grafana-insecure-dev-only}
       OAUTH2_PROXY_CLIENT_SECRET: ${KEYCLOAK_OAUTH2_PROXY_CLIENT_SECRET:-oauth2-proxy-insecure-dev-only}
       SCIM_CLIENT_SECRET: ${KEYCLOAK_SCIM_CLIENT_SECRET:-scim-insecure-dev-only}
@@ -288,7 +288,7 @@ services:
       GRAFANA_URL: http://grafana:3000
       GRAFANA_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GRAFANA_ADMIN_PASSWORD_FILE: /run/secrets/grafana_admin_password
-      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-demo-insecure-dev-only}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-LabDemoPass1!}
       SCIM_SYNC_INTERVAL: ${SCIM_SYNC_INTERVAL:-15}
       PYTHONDONTWRITEBYTECODE: "1"
     secrets:
@@ -381,7 +381,7 @@ services:
       TZ: ${LAB_TZ:-UTC}
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN:-vault-root-insecure-dev-only}
-      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-demo-insecure-dev-only}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-LabDemoPass1!}
       POSTGRES_USER: ${POSTGRES_USER:-lab}
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-labadmin}
     volumes:
