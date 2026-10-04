@@ -69,8 +69,8 @@ _Source control and object storage_
 | --- | --- | --- | --- | --- | :---: | --- |
 | `gitea` | `gitea/gitea:1.23` | `git.lab.localhost` | `2222→22` | data, edge | ✅ | — |
 | `gitea-init` | `gitea/gitea:1.23` | — | — | data | n/a | uid `1000:1000` |
-| `minio` | `minio/minio:latest` | `minio.lab.localhost`, `s3.lab.localhost` | — | edge, observability | ✅ | — |
-| `minio-init` | `minio/mc:latest` | — | — | edge | n/a | — |
+| `minio` | `lab-in-a-box/minio:2025-10-15-source1` | `minio.lab.localhost`, `s3.lab.localhost` | — | edge, observability | ✅ | — |
+| `minio-init` | `lab-in-a-box/mc:2025-08-13-source1` | — | — | edge | n/a | — |
 
 ## Tools
 

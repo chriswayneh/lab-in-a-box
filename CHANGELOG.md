@@ -17,6 +17,8 @@ No manual migration or credential reset is required by this patch.
 
 ### Changed
 
+- Build MinIO locally from verified official source with pinned Go/Alpine images after upstream image withdrawal. The server includes the October 2025 session-policy security fix; existing object storage volumes and provisioning are preserved.
+
 - Refresh the Keycloak login background and add the named after-login admin screenshot.
 - Put the lab front door beside the start command and correct the documented service,
   group, port, network exposure, rate-limiting and container-hardening claims.

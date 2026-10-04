@@ -1,0 +1,10 @@
+*
+!Dockerfile
+!inputs.json
+!NOTICE.md
+!server/
+!server/go.mod
+!server/go.sum
+!client/
+!client/go.mod
+!client/go.sum

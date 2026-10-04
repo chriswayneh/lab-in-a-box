@@ -4,15 +4,15 @@
 
 **A self-hosted infrastructure and identity governance lab.**
 
-Twenty-nine containers by default: identity, secrets, observability, object storage, Git hosting and a
+Thirty containers by default: identity, secrets, observability, object storage, Git hosting and a
 local LLM. All provisioned and wired together automatically. Two more services, Qdrant and Watchtower,
-are available through optional Compose profiles (thirty-one in the full catalogue).
+are available through optional Compose profiles (thirty-two in the full catalogue).
 
 **Release version:** v2.0.1 ([release history](https://github.com/chriswayneh/lab-in-a-box/releases)), with identity lifecycle automation, access reviews, and role-based access to monitoring interfaces.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Docker Compose](https://img.shields.io/badge/Docker%20Compose-v2.20%2B-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
-[![Services](https://img.shields.io/badge/services-31-38bdf8)](docs/SERVICES.md)
+[![Services](https://img.shields.io/badge/services-32-38bdf8)](docs/SERVICES.md)
 [![Setup](https://img.shields.io/badge/setup-1%20command-34d399)](#quick-start)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-blueviolet.svg)](CONTRIBUTING.md)
 [![CI](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/ci.yml/badge.svg)](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/ci.yml)
@@ -35,7 +35,7 @@ are available through optional Compose profiles (thirty-one in the full catalogu
 
 This is a local lab, not a production system. Passwords published for this lab are dev-only credentials. Published ports 80, 443, and 2222 bind to all interfaces by default and may be reachable from other machines, depending on host firewall and network settings. PostgreSQL and Redis stay on `127.0.0.1` only. Read the [security model](docs/security.md) before the service list.
 
-Docker Compose starts the services and their initialization jobs: database setup, realm imports,
+Docker Compose builds MinIO from pinned official source, then starts the services and their initialization jobs: database setup, realm imports,
 dashboard provisioning, secrets policies, and service integrations.
 
 ```bash
@@ -46,7 +46,7 @@ docker compose up -d
 
 <https://lab.localhost> is the front door and links to everything else.
 
-A few minutes later you have a running identity provider with a populated realm, a secrets manager with
+After the first build and service startup, you have a running identity provider with a populated realm, a secrets manager with
 policies and roles, dashboards already showing live container metrics, an object store with buckets,
 a Git server with an administrator, and a local language model you can chat with. All of it sits behind
 a single reverse proxy on friendly hostnames, with no entry added to your `hosts` file.
@@ -144,6 +144,8 @@ git clone https://github.com/chriswayneh/lab-in-a-box.git
 cd lab-in-a-box
 docker compose up -d
 ```
+
+The first run builds MinIO from checksum-verified official source because upstream community images are unavailable. Build dependencies are pinned; no host Go installation or registry login is needed. Allow extra build time and internet access on first run. Later runs reuse build layers. See [MinIO builds](docs/minio-builds.md).
 
 This is enough to use the complete local lab. It uses the published development passwords,
 which are intended only for a trusted local lab. HTTP, HTTPS, and Gitea SSH bind to all interfaces
@@ -410,7 +412,7 @@ the whole point of RBAC, and it is what the Joiner/Mover/Leaver demo on the [roa
 | `make secrets` | Generate random credentials | `bash scripts/generate-secrets.sh` |
 | `make backup` | Snapshot databases and volumes | `bash scripts/backup.sh` |
 | `make restore` | Restore a backup, newest by default | `bash scripts/restore.sh` |
-| `make update` | Pull newer images and recreate what changed | `docker compose pull && docker compose up -d` |
+| `make update` | Pull newer images and recreate what changed | `docker compose pull --ignore-buildable && docker compose build minio minio-init && docker compose up -d` |
 | `make validate` | Everything CI checks, locally | `bash scripts/validate.sh` |
 | `make python-check` | Lint, type check and unit test the engine (no lab needed) | `bash scripts/check-python.sh` |
 | `make docs` | Regenerate the catalogue and dependency graph | `bash scripts/generate-docs.sh` |

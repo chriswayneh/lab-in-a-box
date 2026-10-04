@@ -438,3 +438,10 @@ paste `.env`.
 
 The [bug report template](https://github.com/chriswayneh/lab-in-a-box/issues/new?template=bug_report.yml) asks
 for exactly these.
+
+## MinIO build failures
+
+Public community MinIO images have been withdrawn. The lab builds verified official source;
+a first build needs internet access and extra time. Run docker compose build minio minio-init
+to view the failing stage. An archive checksum mismatch stops the build: do not disable the
+check or substitute a cached old server. See [MinIO builds](minio-builds.md).

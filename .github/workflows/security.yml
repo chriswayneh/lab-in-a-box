@@ -59,7 +59,7 @@ jobs:
           | python3 -c '
           import json, sys
           cfg = json.load(sys.stdin)
-          images = sorted({s["image"] for s in cfg["services"].values() if s.get("image")})
+          images = sorted({s["image"] for s in cfg["services"].values() if s.get("image") and not s.get("build")})
           print("\n".join(images))
           ' > images.txt
           echo "Scanning:"; cat images.txt
@@ -88,6 +88,27 @@ jobs:
         # does not build, so a critical CVE is a signal to bump a tag, not a
         # reason to block an unrelated documentation fix.
         continue-on-error: true
+
+  # Built images are our responsibility: build and scan actual contents.
+  minio-build:
+    name: MinIO source build and security
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build pinned official sources
+        run: |
+          docker compose build minio-init
+          docker compose build minio
+      - name: Verify source, provisioning and persistence
+        run: bash scripts/check-minio-build.sh
+      - name: Scan the actual local images
+        run: |
+          for image in lab-in-a-box/minio:2025-10-15-source1 lab-in-a-box/mc:2025-08-13-source1; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+              aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa \
+              image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --no-progress "$image"
+          done
 
   # ---------------------------------------------------------------------------
   config:

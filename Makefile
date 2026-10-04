@@ -362,14 +362,16 @@ restore: ## Restore a backup (BACKUP=<timestamp>, default: newest)
 # Maintenance
 # =============================================================================
 
-pull: ## Download the latest images without applying them
+pull: ## Pull upstream images and build pinned MinIO without applying them
 	@printf '$(BOLD)Pulling images$(RESET)\n'
-	@$(COMPOSE) pull --ignore-pull-failures
+	@$(COMPOSE) pull --ignore-buildable
+	@$(COMPOSE) build minio minio-init
 	@printf '$(GREEN)✓$(RESET) Images downloaded. Apply them with $(CYAN)make update$(RESET).\n'
 
 update: ## Pull the latest images and recreate changed containers
 	@printf '$(BOLD)Updating the lab$(RESET)\n'
-	@$(COMPOSE) pull --ignore-pull-failures
+	@$(COMPOSE) pull --ignore-buildable
+	@$(COMPOSE) build minio minio-init
 	@$(COMPOSE) up -d --remove-orphans
 	@printf '$(GREEN)✓$(RESET) Updated.\n'
 	@printf '  $(DIM)Only containers whose image changed were recreated.$(RESET)\n'

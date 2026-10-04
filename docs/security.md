@@ -358,3 +358,10 @@ should stay off untrusted networks and be reached over a VPN or SSH tunnel inste
 
 Please report privately rather than opening a public issue. See
 [`SECURITY.md`](../SECURITY.md).
+
+### Locally built MinIO
+
+MinIO source builds use checksum-verified official archives and pinned official Go/Alpine
+images. Their dependency manifests include targeted security fixes; CI builds and scans
+the actual images with a blocking HIGH/CRITICAL check. Corresponding sources and licenses
+are retained in the images. See [MinIO builds](minio-builds.md).
