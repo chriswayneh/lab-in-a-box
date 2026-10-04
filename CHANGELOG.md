@@ -13,8 +13,7 @@ action from someone with an existing lab**: a `make clean`, a manual migration, 
 
 ## [2.0.1] - 2026-10-04
 
-Release candidate; tag and publication pending. No manual migration or credential
-reset is required by this patch.
+No manual migration or credential reset is required by this patch.
 
 ### Changed
 
