@@ -8,6 +8,8 @@ Twenty-nine containers by default: identity, secrets, observability, object stor
 local LLM. All provisioned and wired together automatically. Two more services, Qdrant and Watchtower,
 are available through optional Compose profiles (thirty-one in the full catalogue).
 
+**Release candidate:** v2.0.1 includes the Vault sibling-path and named-container metric fixes plus the documentation and screenshot refresh. Tag and publication are pending; see [CHANGELOG.md](CHANGELOG.md).
+
 **Current release:** [v2.0.0](https://github.com/chriswayneh/lab-in-a-box/releases/tag/v2.0.0), with identity lifecycle automation, access reviews, and role-based access to monitoring interfaces.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
