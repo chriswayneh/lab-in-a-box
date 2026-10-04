@@ -58,6 +58,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Identity engine configuration defaults and overrides
+        run: bash scripts/check-engine-config.sh
+
       - name: Resolve the compose project
         run: docker compose -f docker-compose.yml config --quiet
 

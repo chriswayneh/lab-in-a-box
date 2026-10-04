@@ -19,6 +19,9 @@ action from someone with an existing lab**: a `make clean`, a manual migration, 
   when no .env is present. Keep Keycloak, Vault, identity lifecycle tools and credential
   output consistent; explicitly configured passwords remain unchanged.
 
+- Identity engine launchers now work without an .env file and resolve authentication
+  through Compose, including quoted values and explicit environment overrides.
+
 ## [2.0.1] - 2026-10-04
 
 No manual migration or credential reset is required by this patch.

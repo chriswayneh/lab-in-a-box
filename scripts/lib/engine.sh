@@ -71,7 +71,8 @@ engine_preflight() {
 #
 # Extra `docker run` flags may be supplied through LAB_ENGINE_DOCKER_ARGS.
 # -----------------------------------------------------------------------------
-run_engine() {
+run_engine() (
+  set -euo pipefail
   local module="$1"; shift
 
   local network host_root
@@ -80,12 +81,43 @@ run_engine() {
 
   mkdir -p "${LAB_ROOT}/artifacts/identity" "${LAB_ROOT}/artifacts/access-review"
 
-  # The Vault root token is exported rather than written as --env NAME=VALUE.
-  # A value on the command line lands in argv, which any process on the host can
-  # read out of the process table; `--env NAME` copies it from this shell's
-  # environment instead.
-  VAULT_TOKEN="$(env_value VAULT_DEV_ROOT_TOKEN 'vault-insecure-dev-only')"
-  export VAULT_TOKEN
+  # Resolve authentication through Compose, preserving defaults, dotenv
+  # interpolation and shell overrides without exposing values in argv.
+  local auth_file setting value
+  local -a env_file_args=()
+  auth_file="$(umask 077; mktemp)"
+  trap 'rm -f "$auth_file"' EXIT
+  if ! compose config --format json | docker run --rm --interactive \
+    --network none --read-only --cap-drop ALL \
+    --security-opt no-new-privileges "$LAB_ENGINE_IMAGE" python3 -c '
+import json, sys
+services = json.load(sys.stdin)["services"]
+fields = {
+    "KEYCLOAK_ADMIN": ("keycloak-init", "KC_ADMIN"),
+    "KEYCLOAK_ADMIN_PASSWORD": ("keycloak-init", "KC_ADMIN_PASSWORD"),
+    "KEYCLOAK_REALM": ("keycloak-init", "KC_REALM"),
+    "DEMO_USER_PASSWORD": ("keycloak-init", "DEMO_USER_PASSWORD"),
+    "GITEA_ADMIN_USER": ("gitea-init", "GITEA_ADMIN_USER"),
+    "GITEA_ADMIN_PASSWORD": ("gitea-init", "GITEA_ADMIN_PASSWORD"),
+    "VAULT_TOKEN": ("vault-init", "VAULT_TOKEN"),
+    "KEYCLOAK_DB_PASSWORD": ("keycloak", "KC_DB_PASSWORD"),
+}
+for name, (service, key) in fields.items():
+    value = services[service]["environment"][key]
+    if not isinstance(value, str) or "\0" in value:
+        raise SystemExit("Invalid Compose authentication setting: " + name)
+    sys.stdout.buffer.write((name + "\0" + value + "\0").encode())
+' >"$auth_file"; then
+    die "cannot resolve identity engine authentication from Compose"
+  fi
+  while IFS= read -r -d '' setting && IFS= read -r -d '' value; do
+    printf -v "$setting" '%s' "$value"
+    export "${setting?}"
+  done <"$auth_file"
+  rm -f "$auth_file"
+  if [[ -f "${LAB_ROOT}/.env" ]]; then
+    env_file_args=(--env-file "$(engine_host_path "${LAB_ROOT}/.env")")
+  fi
 
   # The MSYS path-conversion switches are applied to THIS command only, never
   # exported. Exporting them leaks into every later call in the same shell —
@@ -97,7 +129,10 @@ run_engine() {
   MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' \
   docker run --rm --interactive \
     --network "$network" \
-    --env-file "$(engine_host_path "${LAB_ROOT}/.env")" \
+    "${env_file_args[@]}" \
+    --env KEYCLOAK_ADMIN --env KEYCLOAK_ADMIN_PASSWORD --env KEYCLOAK_REALM \
+    --env DEMO_USER_PASSWORD --env GITEA_ADMIN_USER --env GITEA_ADMIN_PASSWORD \
+    --env KEYCLOAK_DB_PASSWORD \
     --env VAULT_TOKEN \
     --env "KEYCLOAK_URL=http://keycloak:8080" \
     --env "VAULT_ADDR=http://vault:8200" \
@@ -113,4 +148,4 @@ run_engine() {
     --workdir /engine \
     "$LAB_ENGINE_IMAGE" \
     python3 "/engine/${module}" "$@"
-}
+)
