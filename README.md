@@ -8,7 +8,7 @@ Thirty containers by default: identity, secrets, observability, object storage, 
 local LLM. All provisioned and wired together automatically. Two more services, Qdrant and Watchtower,
 are available through optional Compose profiles (thirty-two in the full catalogue).
 
-**Release version:** v2.0.1 ([release history](https://github.com/chriswayneh/lab-in-a-box/releases)), with identity lifecycle automation, access reviews, and role-based access to monitoring interfaces.
+**Release version:** v2.0.2 ([release history](https://github.com/chriswayneh/lab-in-a-box/releases)), with identity lifecycle automation, access reviews, and role-based access to monitoring interfaces.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Docker Compose](https://img.shields.io/badge/Docker%20Compose-v2.20%2B-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)

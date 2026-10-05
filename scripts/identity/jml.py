@@ -243,7 +243,7 @@ def initial_password() -> str:
     already give the seeded users, so a provisioned identity behaves exactly like
     alice or bob. `make creds` prints it. It is never written to an artifact.
     """
-    return env("DEMO_USER_PASSWORD", "demo-insecure-dev-only")
+    return env("DEMO_USER_PASSWORD", "LabDemoPass1!")
 
 
 def guard_protected(username: str, operation: str) -> None:

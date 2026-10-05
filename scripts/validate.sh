@@ -296,6 +296,19 @@ check_grafana_secrets() {
   fi
 }
 
+check_engine_config() {
+  heading "Identity engine configuration"
+  if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+    skipped "the Docker daemon is not available"
+    return
+  fi
+  if bash "${LAB_SCRIPT_DIR}/check-engine-config.sh"; then
+    success "identity engine configuration regressions passed"
+  else
+    fail "identity engine configuration regressions failed"
+  fi
+}
+
 check_forward_auth() {
   heading "Forward-auth"
 
@@ -446,6 +459,7 @@ main() {
   if [[ "${SKIP_UPSTREAM:-0}" != "1" ]]; then
     check_with_upstream_tools
     check_grafana_secrets
+    check_engine_config
   check_forward_auth
   fi
 
