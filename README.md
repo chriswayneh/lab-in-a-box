@@ -99,10 +99,10 @@ This remains a local lab, not a complete enterprise zero-trust architecture. Shi
 | ![Landing page](screenshots/landing-page-live.png) | ![Grafana](screenshots/grafana-overview-live.png) |
 | Every active service, with live reachability | The provisioned Lab Overview dashboard |
 
-| Keycloak after sign-in | Open WebUI |
+| Keycloak after sign-in | Traefik routers |
 | :---: | :---: |
-| ![Keycloak after sign-in](screenshots/keycloak-admin-desktop.png) | ![Open WebUI](screenshots/open-webui-live.png) |
-| The page after sign-in | Open WebUI's local first-run sign-in |
+| ![Keycloak after sign-in](screenshots/keycloak-admin-desktop.png) | ![Traefik HTTP routers for the lab services, each with a green status](screenshots/traefik-dashboard.png) |
+| The page after sign-in | Lab services routed through Traefik, each with a green status |
 
 </div>
 
