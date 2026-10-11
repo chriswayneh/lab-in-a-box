@@ -33,6 +33,10 @@ are available through optional Compose profiles (thirty-two in the full catalogu
 
 ## What this is
 
+**In plain words:** Lab-in-a-Box runs a small pretend company on one computer. It has a sign-in server (Keycloak) with seeded users and groups, a password vault (Vault), a Git server (Gitea), and dashboards (Grafana). Its lifecycle automation then adds, moves, and removes those users across all three systems. Other tools show what each person can reach and why, and run access reviews that keep evidence. It is for learning and demonstrating identity and access management (IAM), not for running real accounts.
+
+**What it shows:** joiner, mover, and leaver automation; group-based access control; access reviews; secrets management; and monitoring, all wired together with Docker Compose.
+
 This is a local lab, not a production system. Passwords published for this lab are dev-only credentials. Published ports 80, 443, and 2222 bind to all interfaces by default and may be reachable from other machines, depending on host firewall and network settings. PostgreSQL and Redis stay on `127.0.0.1` only. Read the [security model](docs/security.md) before the service list.
 
 Docker Compose builds MinIO from pinned official source, then starts the services and their initialization jobs: database setup, realm imports,
