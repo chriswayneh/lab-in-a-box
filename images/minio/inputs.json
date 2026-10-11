@@ -1,6 +1,6 @@
 {
   "pins": {
-    "golang:1.27.1-alpine3.24": "sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414",
+    "golang:1.27.2-alpine3.24": "sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d",
     "alpine:3.24": "sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6",
     "aquasec/trivy:0.75.0": "sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa"
   },
@@ -22,12 +22,12 @@
   },
   "security_manifests": {
     "server": {
-      "go.mod": "d88dff92d1a4e7f20b4564b21110bc0a8b09e965de8113adf4c58bb19a6db2b1",
-      "go.sum": "45bf044bdf790824e5f3bb801dab956efa4b9748b55e5e7bf78182c9392dc002"
+      "go.mod": "ab3ca44c82dd17ec9615cc9c4a1a1e80f8bb2ed45628b1a1d3ccf0f9f41d2909",
+      "go.sum": "9609435f484714e0eb1bb077b11649e4a4fe5317cb32dcf0c7f7958ae9f40740"
     },
     "client": {
-      "go.mod": "88ba5270ad5fd1290e3742bc6f4bc7e69457d2e38b0023baa8c78a94b2a5d9fe",
-      "go.sum": "e137c33cccb53b55583bbf1b9956e4fb846b3516a5cbcc700ddc680cf799a8fc"
+      "go.mod": "b882bb9f83c283816f7e3d146d8d3bd36d70ae08eedc0df919d770e52be7187d",
+      "go.sum": "51f4346410d8fb64441c55b5c6a9f44a86896539f612505fd4a2480d6b07f312"
     }
   }
 }
