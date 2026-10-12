@@ -15,7 +15,7 @@ they produce, and the README stays about the project.
 | `keycloak-admin-desktop.png` | Keycloak administrator console after sign-in | The master realm welcome page. The project README shows this file, not the sign-in page. |
 | `keycloak-login-desktop.png` | Keycloak administrator sign-in | The sign-in page. The project README does not use this file. |
 | `open-webui-live.png` | <https://chat.lab.localhost> | The local first-run sign-in page. The project README does not use this file. |
-| `traefik-dashboard.png` | <https://traefik.lab.localhost> | The HTTP Routers view, showing the discovered services with a green status. The project README shows this file. |
+| `traefik-dashboard.png` | <https://traefik.lab.localhost> | The HTTP Routers view, showing the discovered services with a green status. The project README shows this file. Current capture: Oct 12, 2026, after demo-user sign-in. |
 | `vault-policies.png` | Vault → Policies | The four ACL policies (capture after authenticating with a local development token) |
 | `first-boot.gif` | Terminal | `make up` through to `make health` reporting healthy (optional recording, not shown in the README) |
 

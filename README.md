@@ -102,7 +102,7 @@ This remains a local lab, not a complete enterprise zero-trust architecture. Shi
 | Keycloak after sign-in | Traefik routers |
 | :---: | :---: |
 | ![Keycloak after sign-in](screenshots/keycloak-admin-desktop.png) | ![Traefik HTTP routers for the lab services, each with a green status](screenshots/traefik-dashboard.png) |
-| The page after sign-in | Lab services routed through Traefik, each with a green status |
+| The page after sign-in | Signed-in Traefik HTTP routers page, each lab service green (captured Oct 12, 2026) |
 
 </div>
 
