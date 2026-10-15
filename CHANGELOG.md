@@ -21,6 +21,10 @@ action from someone with an existing lab**: a `make clean`, a manual migration, 
 
 - Identity engine fails safe: Keycloak users are listed with pagination (was capped at 500, so the SCIM worker could deprovision users beyond the first page); a failed post-change verification now marks the run failed instead of SUCCESS; Vault policy changes (movers) revoke existing tokens; access-review remediation is only VERIFIED after an authoritative read of the service; Gitea reactivation also clears `prohibit_login`.
 
+### Known issues
+
+- `campaign_cli.py decide` (`cmd_decide`) loads a campaign, records the decision and saves it without a lock. Two reviewers deciding on the same campaign at the same moment can overwrite each other's decision (last save wins). Run decisions one at a time until this is locked.
+
 ## [2.0.2] - 2026-10-04
 
 ### Fixed
