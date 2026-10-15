@@ -797,6 +797,18 @@ def _remediate_one(item: ReviewItem, sim: "rbac.Simulator", kc, vault, gitea) ->
         item.remediation_detail = f"could not verify after remediation: {exc}"
         return
 
+    unknown = next(
+        (g for g in fresh.grants if g.service == item.service and g.decision == rbac.UNKNOWN),
+        None,
+    )
+    if unknown is not None:
+        # An unreachable service reports UNKNOWN, which allowed() filters out.
+        # Absence from allowed() is only proof of removal after an
+        # authoritative read of that service.
+        item.remediation_status = REM_FAILED
+        item.remediation_detail = f"could not verify after remediation: {unknown.source}"
+        return
+
     still_present = next((g for g in fresh.allowed() if g.key() == item.key()), None)
     if still_present is None:
         item.remediation_status = REM_VERIFIED
