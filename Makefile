@@ -120,6 +120,7 @@ up: ## Start the lab (generates credentials on first run)
 		bash scripts/generate-secrets.sh; \
 		printf '\n'; \
 	fi
+	@bash scripts/check-secret-files.sh
 	@$(MAKE) _https-mode
 	@printf '$(BOLD)Starting the lab$(RESET)\n'
 	@$(COMPOSE) up -d --remove-orphans
@@ -370,6 +371,7 @@ pull: ## Pull upstream images and build pinned MinIO without applying them
 
 update: ## Pull the latest images and recreate changed containers
 	@printf '$(BOLD)Updating the lab$(RESET)\n'
+	@bash scripts/check-secret-files.sh
 	@$(COMPOSE) pull --ignore-buildable
 	@$(COMPOSE) build minio minio-init
 	@$(COMPOSE) up -d --remove-orphans

@@ -44,10 +44,13 @@ services:
     command:
       - -H
       - unix:///var/run/docker.sock
-      # Bcrypt hash for the documented local-only password
-      # `portainer-insecure-dev-only`. Dollar signs are doubled so Compose
-      # passes the hash through literally rather than treating it as a variable.
-      - --admin-password=$$2y$$05$$/0fTkGja8Teoucm8JRu.GeylevRgVt7rCBYt9ALE5y/GkTTH8GhNq
+      # The admin password comes from a Docker secret that `make secrets`
+      # generates per install, so no shared, documented credential guards the
+      # Docker socket. Portainer reads it only on first initialisation of
+      # portainer_data; rotate an existing install from the Portainer UI.
+      - --admin-password-file=/run/secrets/portainer_admin_password
+    secrets:
+      - portainer_admin_password
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_data:/data

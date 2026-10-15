@@ -36,6 +36,7 @@ SECRET_FILES=(
   "postgres_password.txt:PostgreSQL superuser"
   "minio_root_password.txt:MinIO root user"
   "grafana_admin_password.txt:Grafana administrator"
+  "portainer_admin_password.txt:Portainer administrator (equivalent to host root)"
 )
 
 # -----------------------------------------------------------------------------

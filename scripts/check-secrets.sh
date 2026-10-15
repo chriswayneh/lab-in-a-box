@@ -82,6 +82,23 @@ check_env_not_tracked() {
 }
 
 # -----------------------------------------------------------------------------
+# 3. No inline credentials in Compose files (e.g. a Portainer --admin-password
+#    hash). Credentials must come from secret files or .env.
+# -----------------------------------------------------------------------------
+check_no_inline_compose_credentials() {
+  local hits
+  # Matches --admin-password=<v>, --admin-password <v>, and the YAML list form
+  # where the value is the next argument; --admin-password-file is fine.
+  hits="$(grep -nE -- '--admin-password([= "'"'"']|$)' "${LAB_ROOT}"/docker-compose.yml \
+            "${LAB_ROOT}"/compose/*.yml 2>/dev/null || true)"
+  if [[ -n "$hits" ]]; then
+    error "inline credential in a Compose file (use a secret file instead):"
+    printf '    %s\n' "$hits" >&2
+    (( PROBLEMS++ )) || true
+  fi
+}
+
+# -----------------------------------------------------------------------------
 main() {
   # Not a git repository — nothing to protect.
   git -C "$LAB_ROOT" rev-parse --git-dir >/dev/null 2>&1 || exit 0
@@ -90,6 +107,7 @@ main() {
 
   check_secret_files
   check_env_not_tracked
+  check_no_inline_compose_credentials
 
   if (( PROBLEMS == 0 )); then
     (( STAGED_ONLY )) || success "no real credentials are committed"
