@@ -16,6 +16,7 @@ action from someone with an existing lab**: a `make clean`, a manual migration, 
 ### Security
 
 - Build MinIO with Go 1.27.2 (was 1.27.1) and golang.org/x/net v0.60.0 (was v0.58.0), with the x/sync, x/sys, x/term, x/text, x/crypto, x/mod and x/tools updates that requires. Fixes CVE-2026-78667, CVE-2026-78669 and CVE-2026-97031 reported by the image scan. No action needed for existing labs; the next `make up` or `docker compose up -d` rebuilds MinIO.
+- Bump MinIO server dependencies github.com/nats-io/nats-server/v2 to v2.11.15 (was v2.11.1, with the nats.go, jwt, nkeys, highwayhash and go-tpm updates it requires), github.com/rabbitmq/amqp091-go to v1.14.0 (was v1.13.0) and go.mongodb.org/mongo-driver to v1.17.7 (was v1.17.6). Supersedes Dependabot PRs #50, #51 and #52. No action needed for existing labs.
 
 ## [2.0.2] - 2026-10-04
 
