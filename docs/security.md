@@ -89,9 +89,9 @@ attached to `lab_data`.
 
 | Tier | Mechanism | Used for | Why |
 | --- | --- | --- | --- |
-| **1** | Docker secret file | PostgreSQL, MinIO, Grafana | Images support `_FILE` natively. The value never enters the environment |
+| **1** | Docker secret file | PostgreSQL, MinIO, Grafana, Portainer admin | Images support `_FILE` natively. The value never enters the environment |
 | **2** | Environment variable from `.env` | Keycloak, Gitea, Redis, pgAdmin, Vault | Images have no `_FILE` support. Wrapping them in an entrypoint that reads a file and re-exports it would give up the benefit entirely |
-| **3** | Generated in-place | Open WebUI, Portainer admin | Created by the user on first visit; the lab never holds them |
+| **3** | Generated in-place | Open WebUI | Created by the user on first visit; the lab never holds them |
 
 Tier 1 uses each image's documented convention, which is not uniform:
 
@@ -203,7 +203,7 @@ else. Promtail uses the same proxy for log collection.
 **Portainer and Watchtower do get it**, read/write. Portainer's purpose is creating, destroying and
 exec-ing into containers; Watchtower's is recreating them. Neither can work through a read-only proxy.
 
-Treat the Portainer administrator password as equivalent to root on the host. If that is unacceptable
+Treat the Portainer administrator password as equivalent to root on the host. `make secrets` generates it per install into `secrets/local/portainer_admin_password.txt` (`make creds` shows it); a bare clone uses the tracked development placeholder. Portainer reads it only when `portainer_data` is first initialised, so an existing lab keeps its old password until you change it in the Portainer UI or recreate the volume. If that is unacceptable
 for your use, remove the service:
 
 ```bash

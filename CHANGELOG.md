@@ -15,6 +15,7 @@ action from someone with an existing lab**: a `make clean`, a manual migration, 
 
 ### Security
 
+- Portainer's admin password is no longer a hardcoded, publicly documented bcrypt hash. It is read from the `portainer_admin_password` Docker secret, which `make secrets` generates per install. **Action for existing labs:** Portainer only applies it on first start of `portainer_data`; change the admin password in the Portainer UI (or remove the volume) to stop using the old shared password. `check-secrets.sh` now rejects inline `--admin-password=` values in Compose files.
 - Build MinIO with Go 1.27.2 (was 1.27.1) and golang.org/x/net v0.60.0 (was v0.58.0), with the x/sync, x/sys, x/term, x/text, x/crypto, x/mod and x/tools updates that requires. Fixes CVE-2026-78667, CVE-2026-78669 and CVE-2026-97031 reported by the image scan. No action needed for existing labs; the next `make up` or `docker compose up -d` rebuilds MinIO.
 
 ## [2.0.2] - 2026-10-04
