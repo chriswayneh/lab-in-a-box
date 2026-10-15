@@ -12,6 +12,12 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 ENV_FILE="${LAB_ROOT}/.env"
 [[ -f "$ENV_FILE" ]] || exit 0
 dir="$(sed -n 's/^LAB_SECRETS_DIR=//p' "$ENV_FILE" | tail -1)"
+# Accept the forms Compose accepts: a trailing " # comment", surrounding
+# whitespace, and one pair of surrounding single or double quotes.
+dir="$(printf '%s' "$dir" | sed -E 's/[[:space:]]+#.*$//; s/^[[:space:]]+//; s/[[:space:]]+$//')"
+if [[ "$dir" =~ ^\"(.*)\"$ || "$dir" =~ ^\'(.*)\'$ ]]; then
+  dir="${BASH_REMATCH[1]}"
+fi
 [[ -n "$dir" ]] || exit 0
 [[ "$dir" = /* ]] || dir="${LAB_ROOT}/${dir#./}"
 

@@ -71,3 +71,6 @@ __pycache__/
 .ruff_cache/
 *.log
 .tmp/
+
+# Stray Python wheels from local tooling.
+*.whl
