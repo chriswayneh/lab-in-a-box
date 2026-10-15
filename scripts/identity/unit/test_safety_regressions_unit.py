@@ -27,8 +27,10 @@ def test_all_users_pages_past_first_page(monkeypatch):
     calls = []
 
     def fake_call(self, method, path, **kwargs):
-        first = int(re.search(r"first=(\d+)", path).group(1))
-        size = int(re.search(r"max=(\d+)", path).group(1))
+        first_match = re.search(r"first=(\d+)", path)
+        size_match = re.search(r"max=(\d+)", path)
+        assert first_match and size_match
+        first, size = int(first_match.group(1)), int(size_match.group(1))
         calls.append(first)
         return realm[first:first + size]
 
