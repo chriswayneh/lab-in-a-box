@@ -140,3 +140,5 @@ secrets:
     file: ${LAB_SECRETS_DIR:-./secrets}/minio_root_password.txt
   grafana_admin_password:
     file: ${LAB_SECRETS_DIR:-./secrets}/grafana_admin_password.txt
+  portainer_admin_password:
+    file: ${LAB_SECRETS_DIR:-./secrets}/portainer_admin_password.txt

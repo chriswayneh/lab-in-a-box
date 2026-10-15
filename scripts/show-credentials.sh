@@ -107,7 +107,7 @@ main() {
 
   service "Portainer" "portainer"
   row "User" "admin"
-  row "Password" "portainer-insecure-dev-only"
+  row "Password" "$(read_secret portainer_admin_password.txt)"
 
   printf '\n%s%s%s\n' "$C_CYAN" "Open WebUI" "$C_RESET"
   printf '  %s\n' "Create an administrator on first visit: https://chat.${DOMAIN}"
