@@ -39,3 +39,32 @@ def test_all_users_pages_past_first_page(monkeypatch):
     users = kc.all_users(brief=True)
     assert len(users) == 450
     assert len(calls) == 3
+
+
+def test_vault_mover_revokes_existing_tokens(monkeypatch):
+    from vault import Vault
+
+    calls = []
+    v = Vault.__new__(Vault)
+    monkeypatch.setattr(Vault, "ensure_policy", lambda self, name, result: None)
+    monkeypatch.setattr(Vault, "user_policies", lambda self, username: ["lab-admin"])
+    monkeypatch.setattr(Vault, "_call", lambda self, method, path, **kw: calls.append((method, path)))
+    v.reconcile_user("alice", "lab-readonly", "pw", ServiceResult("Vault"))
+    assert ("PUT", "/sys/leases/revoke-prefix/auth/userpass/login/alice") in calls
+
+
+def test_gitea_reactivation_clears_prohibit_login(monkeypatch):
+    from gitea import Gitea
+
+    bodies = []
+    g = Gitea.__new__(Gitea)
+    monkeypatch.setattr(
+        Gitea, "find_user", lambda self, u: {"login": u, "active": True, "prohibit_login": True}
+    )
+
+    def fake_call(self, method, path, json_body=None, **kw):
+        bodies.append((method, json_body))
+
+    monkeypatch.setattr(Gitea, "_call", fake_call)
+    g.reconcile_user("bob", "pw", "Bob", ServiceResult("Gitea"))
+    assert any(m == "PATCH" and b and b.get("prohibit_login") is False for m, b in bodies)

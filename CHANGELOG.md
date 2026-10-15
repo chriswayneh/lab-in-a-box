@@ -17,6 +17,10 @@ action from someone with an existing lab**: a `make clean`, a manual migration, 
 
 - Build MinIO with Go 1.27.2 (was 1.27.1) and golang.org/x/net v0.60.0 (was v0.58.0), with the x/sync, x/sys, x/term, x/text, x/crypto, x/mod and x/tools updates that requires. Fixes CVE-2026-78667, CVE-2026-78669 and CVE-2026-97031 reported by the image scan. No action needed for existing labs; the next `make up` or `docker compose up -d` rebuilds MinIO.
 
+### Fixed
+
+- Identity engine fails safe: Keycloak users are listed with pagination (was capped at 500, so the SCIM worker could deprovision users beyond the first page); a failed post-change verification now marks the run failed instead of SUCCESS; Vault policy changes (movers) revoke existing tokens; access-review remediation is only VERIFIED after an authoritative read of the service; Gitea reactivation also clears `prohibit_login`.
+
 ## [2.0.2] - 2026-10-04
 
 ### Fixed
