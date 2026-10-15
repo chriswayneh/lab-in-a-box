@@ -87,7 +87,9 @@ check_env_not_tracked() {
 # -----------------------------------------------------------------------------
 check_no_inline_compose_credentials() {
   local hits
-  hits="$(grep -nE -- '--admin-password=' "${LAB_ROOT}"/docker-compose.yml \
+  # Matches --admin-password=<v>, --admin-password <v>, and the YAML list form
+  # where the value is the next argument; --admin-password-file is fine.
+  hits="$(grep -nE -- '--admin-password([= "'"'"']|$)' "${LAB_ROOT}"/docker-compose.yml \
             "${LAB_ROOT}"/compose/*.yml 2>/dev/null || true)"
   if [[ -n "$hits" ]]; then
     error "inline credential in a Compose file (use a secret file instead):"
