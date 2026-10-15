@@ -121,6 +121,21 @@ class Vault:
             UPDATED,
             f"policies replaced: {', '.join(current) or '(none)'} -> {policy}",
         )
+        self.revoke_user_tokens(username, result)
+
+    def revoke_user_tokens(self, username: str, result: ServiceResult) -> None:
+        """Revoke every token issued by a userpass login for this identity.
+
+        Token policies are copied into a token when it is issued, so changing
+        the user's policies does not touch tokens already in circulation. A
+        downgrade is only real once those tokens are gone.
+        """
+        try:
+            self._call("PUT", f"/sys/leases/revoke-prefix/auth/userpass/login/{username}")
+            result.record(UPDATED, "revoked outstanding Vault tokens for this identity")
+        except HttpError as exc:
+            if exc.status not in (400, 404):
+                raise
 
     def set_policies(self, username: str, policies: list, result: ServiceResult) -> None:
         """
@@ -160,12 +175,7 @@ class Vault:
         # Policies bind at token issue time, so a token minted before this call
         # still carries the old set until it expires. Revoking now is what makes
         # the removal take effect for access already in someone's hands.
-        try:
-            self._call("PUT", f"/sys/leases/revoke-prefix/auth/userpass/login/{username}")
-            result.record(UPDATED, "revoked outstanding Vault tokens for this identity")
-        except HttpError as exc:
-            if exc.status not in (400, 404):
-                raise
+        self.revoke_user_tokens(username, result)
 
     # -- leaver --------------------------------------------------------------
 

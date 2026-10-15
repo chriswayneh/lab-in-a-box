@@ -186,7 +186,11 @@ class ServiceResult:
 
     @property
     def failed(self) -> bool:
-        return self.error is not None or any(c.status == FAILED for c in self.changes)
+        return (
+            self.error is not None
+            or any(c.status == FAILED for c in self.changes)
+            or any(not v["ok"] for v in self.verifications)
+        )
 
     @property
     def touched(self) -> bool:

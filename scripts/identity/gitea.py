@@ -162,8 +162,14 @@ class Gitea:
             result.record(CREATED, f"account {username!r} created")
             return user
 
-        if not user.get("active", True):
-            self._call("PATCH", f"/admin/users/{username}", json_body={"active": True, "login_name": username})
+        if not user.get("active", True) or user.get("prohibit_login"):
+            # Offboarding sets both flags; clearing only `active` leaves the
+            # account unable to sign in.
+            self._call(
+                "PATCH",
+                f"/admin/users/{username}",
+                json_body={"active": True, "login_name": username, "prohibit_login": False},
+            )
             result.record(UPDATED, f"account {username!r} reactivated")
             return self.find_user(username)
 

@@ -195,7 +195,21 @@ class Keycloak:
     def all_users(self, brief: bool = False) -> list:
         """Every realm user with enough detail for downstream reconciliation."""
         flag = "true" if brief else "false"
-        return self._call("GET", f"/users?briefRepresentation={flag}&max=500") or []
+        # Page through the whole realm. A single capped page silently drops
+        # users, and callers (the SCIM worker) treat a missing user as deleted.
+        page_size = 200
+        users: list = []
+        first = 0
+        while True:
+            page = self._call(
+                "GET", f"/users?briefRepresentation={flag}&first={first}&max={page_size}"
+            )
+            if not isinstance(page, list):
+                raise Unavailable("Keycloak returned an unexpected user listing")
+            users.extend(page)
+            if len(page) < page_size:
+                return users
+            first += page_size
 
     def active_session_count(self, user_id: str) -> int:
         sessions = self._call("GET", f"/users/{user_id}/sessions") or []
