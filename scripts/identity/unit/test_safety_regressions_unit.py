@@ -168,3 +168,12 @@ def test_revoke_user_tokens_not_found_is_swallowed(monkeypatch):
     result = ServiceResult("Vault")
     v.revoke_user_tokens("alice", result)
     assert not result.failed
+
+
+def test_remediation_unknown_grant_for_other_service_still_verifies():
+    report = rbac.Report(user="alice", exists=True)
+    report.add(rbac.Grant(service="Gitea", resource="(service)", decision=rbac.UNKNOWN,
+                          source="Gitea unreachable"))
+    item = _vault_policy_item()
+    campaign._remediate_one(item, cast(Any, _FakeSim(report)), None, _FakeVault(), None)
+    assert item.remediation_status == campaign.REM_VERIFIED
