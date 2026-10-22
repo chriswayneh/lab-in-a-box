@@ -28,6 +28,10 @@ action from someone with an existing lab**: a `make clean`, a manual migration, 
 
 - `campaign_cli.py decide` (`cmd_decide`) loads a campaign, records the decision and saves it without a lock. Two reviewers deciding on the same campaign at the same moment can overwrite each other's decision (last save wins). Run decisions one at a time until this is locked.
 
+### Fixed (backups)
+
+- Backups no longer tar the live `postgres_data` volume (the `pg_dumpall` dump is the PostgreSQL backup, as the README already says). `pg_dumpall` and restore `psql` now authenticate with the Postgres secret, and a failed dump or restore fails loudly (exit 1) instead of being hidden or reported as complete. Restores of older backups skip `postgres_data.tar.gz`.
+
 ## [2.0.2] - 2026-10-04
 
 ### Fixed
