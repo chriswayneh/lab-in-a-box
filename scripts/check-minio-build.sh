@@ -33,7 +33,7 @@ done
 test "$(docker image inspect "$server_image" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = 9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a
 test "$(docker image inspect "$client_image" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = 7394ce0dd2a80935aded936b09fa12cbb3cb8096
 docker run --rm --network none "$server_image" --version | grep -F 'RELEASE.2025-10-15T17-29-55Z'
-docker run --rm --network none "$client_image" --version | grep -F 'go1.27.2'
+docker run --rm --network none "$client_image" --version | grep -F 'go1.27.3'
 docker run --rm --network none --entrypoint sh "$server_image" -ec 'echo "45521908307306e925c98d629e1c17d78c8b72b6ee242b1bfb1409f7d8ee5841  /usr/share/minio/server-source.tar.gz" | sha256sum -c -'
 docker run --rm --network none --entrypoint sh "$client_image" -ec 'echo "95cd293c7119f16921a6dc515a1fb74a2227f19fd994b9c8b770a154e802ac44  /usr/share/minio/client-source.tar.gz" | sha256sum -c -'
 docker network create "$network" >/dev/null
