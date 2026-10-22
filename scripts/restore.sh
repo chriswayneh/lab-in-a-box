@@ -96,7 +96,7 @@ strip_bootstrap_role() {
 # -----------------------------------------------------------------------------
 restore_postgres() {
   local dump="${BACKUP_DIR}/postgres.sql.gz"
-  [[ -f "$dump" ]] || { log "  ${C_DIM}no postgres.sql.gz in this backup${C_RESET}"; return 0; }
+  [[ -f "$dump" ]] || { error "no postgres.sql.gz in this backup"; return 1; }
 
   info "starting PostgreSQL to receive the dump"
   if ! compose up -d postgres >/dev/null 2>&1; then
@@ -141,6 +141,15 @@ restore_postgres() {
 main() {
   resolve_backup
   list_contents
+
+  # Refuse before anything is stopped or overwritten. A backup without a SQL
+  # dump (for example an old one that only has a postgres_data file copy)
+  # would restore every other service and leave PostgreSQL behind.
+  if [[ ! -s "${BACKUP_DIR}/postgres.sql.gz" ]]; then
+    error "backup ${BACKUP_NAME} has no PostgreSQL dump (postgres.sql.gz) — refusing to restore"
+    log "  ${C_DIM}Nothing was changed. Pick a backup made by 'make backup' that includes postgres.sql.gz.${C_RESET}"
+    exit 1
+  fi
 
   log ""
   warn "This will STOP the lab and OVERWRITE current data."

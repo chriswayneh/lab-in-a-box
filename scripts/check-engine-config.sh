@@ -89,4 +89,4 @@ check_case "shell overrides .env"
 export KEYCLOAK_ADMIN_PASSWORD=''
 export GITEA_ADMIN_PASSWORD=''
 export VAULT_DEV_ROOT_TOKEN=''
-check_case "empty shell overrides use Compose defaults"
+check_case "empty shell overrides reach every consumer unchanged (no admin fallback)"

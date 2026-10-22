@@ -199,6 +199,53 @@ test_only_bootstrap_role_lines_are_stripped() {
   cleanup_fixture
 }
 
+test_missing_dump_fails_before_changes() {
+  local t=${FUNCNAME[0]}; new_fixture
+  mkdir -p "$FIX/repo/backups/b1"; echo data > "$FIX/repo/backups/b1/redis_data.tar.gz"
+  run_restore b1; local rc=$?
+  if (( rc == 0 )); then bad "$t" "exit 0 with no postgres.sql.gz"
+  elif grep -qE ' down| run | psql ' "$FIX/calls"; then bad "$t" "the lab was stopped or data touched before refusing"
+  else ok "$t"; fi
+  cleanup_fixture
+}
+
+test_legacy_archive_only_backup_fails() {
+  local t=${FUNCNAME[0]}; new_fixture
+  mkdir -p "$FIX/repo/backups/b1"; echo data > "$FIX/repo/backups/b1/postgres_data.tar.gz"
+  run_restore b1; local rc=$?
+  if (( rc == 0 )); then bad "$t" "exit 0 for a postgres_data-only backup"
+  elif grep -q "restore complete" "$FIX/out"; then bad "$t" "success was reported"
+  elif grep -qE ' down| run ' "$FIX/calls"; then bad "$t" "volumes were touched before refusing"
+  else ok "$t"; fi
+  cleanup_fixture
+}
+
+test_lookalike_error_is_not_filtered() {
+  # A real error whose text mentions the bootstrap messages must still fail.
+  local t=${FUNCNAME[0]}
+  start_real_pg || { skip "$t" "PostgreSQL server binaries not available"; stop_real_pg; return; }
+  new_fixture
+  make_backup b1 $'SELECT * FROM "current user cannot be dropped";\nCREATE TABLE sentinel2(x int);'
+  FAKE_REAL_PG=1 run_restore b1; local rc=$?
+  local sentinel; sentinel="$(psql -X -tAq -U lab -d postgres -c "select to_regclass('sentinel2') is not null")"
+  if (( rc == 0 )); then bad "$t" "a look-alike SQL error was ignored"
+  elif [[ "$sentinel" == t ]]; then bad "$t" "statement after the error ran"
+  else ok "$t"; fi
+  cleanup_fixture; stop_real_pg
+}
+
+test_sql_errors_do_not_leak_data() {
+  local t=${FUNCNAME[0]}
+  start_real_pg || { skip "$t" "PostgreSQL server binaries not available"; stop_real_pg; return; }
+  new_fixture
+  make_backup b1 $'CREATE TABLE leak(x int);\nINSERT INTO leak VALUES (\'Sensitive-Canary-9876\');'
+  FAKE_REAL_PG=1 run_restore b1; local rc=$?
+  if (( rc == 0 )); then bad "$t" "invalid data restored without error"
+  elif grep -q "Sensitive-Canary-9876" "$FIX/out"; then bad "$t" "restored data appeared in the output"
+  else ok "$t"; fi
+  cleanup_fixture; stop_real_pg
+}
+
 # -- real PostgreSQL cases (optional) ------------------------------------------
 pg_bin() {
   local d
@@ -269,7 +316,11 @@ test_corrupt_gzip_fails_restore
 test_postgres_start_failure_is_reported
 test_successful_restore_reports_success
 test_only_bootstrap_role_lines_are_stripped
+test_missing_dump_fails_before_changes
+test_legacy_archive_only_backup_fails
 test_real_sql_error_stops_before_later_statement
+test_lookalike_error_is_not_filtered
+test_sql_errors_do_not_leak_data
 test_generated_dump_round_trip
 
 printf '\n%d passed, %d failed, %d skipped\n' "$PASSES" "$FAILS" "$SKIPS"
