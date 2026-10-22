@@ -121,6 +121,7 @@ up: ## Start the lab (generates credentials on first run)
 		printf '\n'; \
 	fi
 	@bash scripts/check-secret-files.sh
+	@bash scripts/check-admin-credentials.sh
 	@$(MAKE) _https-mode
 	@printf '$(BOLD)Starting the lab$(RESET)\n'
 	@$(COMPOSE) up -d --remove-orphans

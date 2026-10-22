@@ -140,19 +140,25 @@ need `sudo` for every command.
 
 ### Run it
 
-**Windows / easiest path.** Open PowerShell and paste these three lines. Docker Desktop must be
-running first.
+**Windows / easiest path.** Open PowerShell and paste these four lines. Docker Desktop must be
+running first, and Git for Windows provides the `bash` command used in step three.
 
 ```powershell
 git clone https://github.com/chriswayneh/lab-in-a-box.git
 cd lab-in-a-box
+bash scripts/generate-secrets.sh
 docker compose up -d
 ```
 
+Step three creates your own `.env` file with fresh random passwords. You only run it once; running it
+again keeps your existing passwords. Skip it and Keycloak and Vault will not start properly, because
+their admin password and root token have no built-in default any more.
+
 The first run builds MinIO from checksum-verified official source because upstream community images are unavailable. Build dependencies are pinned; no host Go installation or registry login is needed. Allow extra build time and internet access on first run. Later runs reuse build layers. See [MinIO builds](docs/minio-builds.md).
 
-This is enough to use the complete local lab. It uses the published development passwords,
-which are intended only for a trusted local lab. HTTP, HTTPS, and Gitea SSH bind to all interfaces
+This is enough to use the complete local lab. The Keycloak admin password and Vault root token are
+unique to your machine; a few other services still use published development passwords, which are
+intended only for a trusted local lab. HTTP, HTTPS, and Gitea SSH bind to all interfaces
 by default; `*.lab.localhost` names do not restrict network access. Keep the lab off untrusted
 networks and read the [security model](docs/security.md) before exposing it beyond this computer.
 
@@ -162,8 +168,14 @@ networks and read the [security model](docs/security.md) before exposing it beyo
 make up
 ```
 
-`make up` generates unique credentials before starting and keeps file-backed ones in the git-ignored
-`secrets/local/` directory.
+`make up` generates unique credentials on the first run, checks that the Keycloak and Vault admin
+credentials are set, then starts the lab. File-backed credentials live in the git-ignored
+`secrets/local/` directory. See them any time with `make creds`.
+
+> **Got "KEYCLOAK_ADMIN_PASSWORD is missing or empty"?** Your `.env` predates this check or was copied by
+> hand. On a fresh lab, run `make secrets`. On a lab you already use, put the passwords it is actually
+> running with into `.env`: changing the Keycloak value in `.env` alone does not change the password
+> inside Keycloak.
 
 If you already started with the shipped defaults, use the following only to reinitialize a disposable lab with generated credentials:
 
@@ -534,11 +546,14 @@ security implications and limitations.
 
 ## Configuration
 
-Everything lives in one file. Copy the annotated template and edit nothing else:
+Everything lives in one file, `.env`. Generate it from the annotated template:
 
 ```bash
-cp .env.example .env    # or: make secrets
+make secrets            # or: bash scripts/generate-secrets.sh
 ```
+
+It keeps an existing `.env` as it is. If you copy `.env.example` by hand instead, replace every
+`CHANGEME_*` value before starting; `make up` refuses to start Keycloak and Vault with a placeholder.
 
 Highlights:
 
@@ -601,7 +616,7 @@ This is a **development lab**, not a production deployment, and it is explicit a
 | **Self-signed TLS** | HTTPS works with zero setup | A real certificate. See below |
 | **Portainer holds the Docker socket** | You cannot debug a lab you cannot exec into | Restricted access, or drop it |
 | **cAdvisor is privileged** | It genuinely needs cgroup access to produce container metrics | Same, but treat the host as inside the trust boundary |
-| Fallback passwords are **in this repo** | Makes `docker compose up -d` genuinely work with no prior step | `make secrets`, always |
+| Some fallback passwords are **in this repo** | Keeps most services starting with no prior step. Keycloak admin and the Vault root token have none and must be generated | `make secrets`, always |
 
 > **Warning**
 > Do not expose this lab to the internet as-is. Ports 80, 443, and 2222 already bind all interfaces, not localhost only. If you need it on a network you do not trust,

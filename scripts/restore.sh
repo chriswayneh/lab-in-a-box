@@ -87,12 +87,22 @@ restore_volume() {
 }
 
 # -----------------------------------------------------------------------------
+# Drop only the two statements pg_dumpall writes for the restoring superuser.
+strip_bootstrap_role() {
+  local role="$1"
+  sed -E "/^(DROP ROLE IF EXISTS|CREATE ROLE) \"?${role}\"?;\$/d"
+}
+
+# -----------------------------------------------------------------------------
 restore_postgres() {
   local dump="${BACKUP_DIR}/postgres.sql.gz"
   [[ -f "$dump" ]] || { log "  ${C_DIM}no postgres.sql.gz in this backup${C_RESET}"; return 0; }
 
   info "starting PostgreSQL to receive the dump"
-  compose up -d postgres >/dev/null 2>&1
+  if ! compose up -d postgres >/dev/null 2>&1; then
+    error "could not start PostgreSQL for the restore"
+    return 1
+  fi
 
   # Wait for readiness rather than sleeping a fixed interval, which is either
   # too short on a cold start or wasteful on a warm one.
@@ -106,12 +116,24 @@ restore_postgres() {
 
   info "loading the dump"
   # The dump was written with --clean --if-exists, so it drops and recreates
-  # each object itself. ON_ERROR_STOP is off: a dump legitimately contains
-  # statements that fail harmlessly, such as dropping a role that is not there.
-  if gunzip -c "$dump" | compose exec -T postgres psql -U "$user" -d postgres >/dev/null 2>&1; then
+  # each object itself. psql runs with ON_ERROR_STOP, so the first SQL error
+  # stops the restore and fails it, and pipefail (set above) also fails it on
+  # a corrupt archive.
+  #
+  # pg_dumpall always emits `DROP ROLE IF EXISTS <us>;` and `CREATE ROLE <us>;`
+  # for the superuser running the restore. Postgres refuses both (it cannot
+  # drop or recreate the role it is connected as), so exactly those two lines
+  # are removed before loading. The superuser's ALTER ROLE, and every other
+  # statement, still runs under ON_ERROR_STOP. SQL output stays suppressed
+  # because a dump contains credential-bearing statements.
+  if gunzip -c "$dump" \
+       | strip_bootstrap_role "$user" \
+       | compose exec -T postgres psql -X -q -v ON_ERROR_STOP=1 -U "$user" -d postgres \
+           >/dev/null 2>&1; then
     success "PostgreSQL restored"
   else
-    warn "psql reported errors during the restore — inspect the databases before trusting them"
+    error "PostgreSQL restore failed — the databases may be only partly restored"
+    return 1
   fi
 }
 
@@ -148,7 +170,7 @@ main() {
   if (( failures == 0 )); then
     success "restore complete from ${BACKUP_NAME}"
   else
-    warn "restore finished with ${failures} problem(s)"
+    error "restore FAILED with ${failures} problem(s) — do not trust the restored data until you have checked it"
   fi
 
   log ""

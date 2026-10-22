@@ -407,6 +407,20 @@ check_makefile_user_guard() {
   success "jml targets ignore an inherited USER and require an explicit one"
 }
 
+check_failure_paths() {
+  heading "Credential and backup/restore failure paths"
+  if bash "${LAB_SCRIPT_DIR}/test-admin-credentials.sh" >/tmp/lab-cred-tests 2>&1; then
+    success "admin credential checks"
+  else
+    fail "admin credential checks failed"; sed 's/^/    /' /tmp/lab-cred-tests | grep FAIL
+  fi
+  if bash "${LAB_SCRIPT_DIR}/test-backup-restore.sh" >/tmp/lab-br-tests 2>&1; then
+    success "backup/restore failure paths $(tail -n1 /tmp/lab-br-tests)"
+  else
+    fail "backup/restore failure-path tests failed"; sed 's/^/    /' /tmp/lab-br-tests | grep FAIL
+  fi
+}
+
 check_markdown() {
   # Delegated to the same script CI runs, so a clean `make validate` genuinely
   # means a clean Markdown job rather than "clean on whichever linter version
@@ -452,6 +466,7 @@ main() {
   check_yaml
   check_json
   check_shell
+  check_failure_paths
   check_markdown
   check_python
 

@@ -63,13 +63,13 @@ main() {
 
   service "Keycloak" "keycloak"
   row "Admin user" "$(env_value KEYCLOAK_ADMIN admin)"
-  row "Password" "$(env_value KEYCLOAK_ADMIN_PASSWORD admin-insecure-dev-only)"
+  row "Password" "$(env_value KEYCLOAK_ADMIN_PASSWORD "NOT CONFIGURED — run make secrets")"
   printf '  %-14s %s\n' "Realm" "$(env_value KEYCLOAK_REALM lab)"
   printf '  %-14s %s\n' "Demo users" "alice, bob, carol, dave"
   row "Demo password" "$(env_value DEMO_USER_PASSWORD LabDemoPass1!)"
 
   service "Vault" "vault"
-  row "Root token" "$(env_value VAULT_DEV_ROOT_TOKEN vault-root-insecure-dev-only)"
+  row "Root token" "$(env_value VAULT_DEV_ROOT_TOKEN "NOT CONFIGURED — run make secrets")"
   printf '  %-14s %s\n' "userpass" "alice / bob / carol (same demo password)"
 
   service "Grafana" "grafana"

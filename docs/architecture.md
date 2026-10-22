@@ -35,6 +35,10 @@ random values before Compose runs, with file-backed values kept in `secrets/loca
 The trade-off is stated plainly rather than hidden: the fallback passwords are in the repository, and
 `make creds` prints them in red until they are replaced.
 
+One deliberate exception narrows the constraint: the Keycloak admin password and the Vault root token
+have no fallback, because they unlock everything else. The first run needs one step before Compose,
+`make up` (which runs `make secrets` automatically) or `bash scripts/generate-secrets.sh`.
+
 ---
 
 ## Compose structure

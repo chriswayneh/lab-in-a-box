@@ -13,8 +13,9 @@
 #                           reading a credential from a file
 #
 # `.env` and `secrets/local/` are git-ignored. The tracked `secrets/*.txt`
-# files remain untouched as the clearly-labelled defaults used by a bare
-# `docker compose up -d` with no `.env` file.
+# files remain untouched as clearly-labelled placeholders. The Keycloak admin
+# password and the Vault root token have no built-in default at all: they
+# must come from .env, which this script generates.
 #
 # Why this is a separate step rather than something the stack does itself:
 # Compose resolves secrets and environment variables when it *parses* the
@@ -164,6 +165,7 @@ main() {
   ensure_local_secrets_dir
   generate_secret_files
   verify
+  bash "${LAB_ROOT}/scripts/check-admin-credentials.sh"
 
   log ""
   success "credentials ready"

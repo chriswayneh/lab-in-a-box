@@ -13,6 +13,16 @@ action from someone with an existing lab**: a `make clean`, a manual migration, 
 
 ## [Unreleased]
 
+### Changed
+
+- **Action needed only if you start the lab without `.env`:** the Keycloak admin password and the Vault root token no longer have a built-in development default. `make up` generates them on first run; with plain `docker compose up -d`, run `bash scripts/generate-secrets.sh` once first. A new check, `scripts/check-admin-credentials.sh`, runs before `make up` and after `make secrets` and refuses missing, empty, placeholder or old default values without printing them. Existing labs with a generated `.env` need no action.
+
+### Fixed
+
+- `make backup` no longer deletes older backups when any part of the current backup failed.
+- `make restore` now stops at the first SQL error (`ON_ERROR_STOP`), fails on a corrupt dump or when PostgreSQL cannot start, and exits non-zero with a clear failure message instead of a warning.
+- New failure-path tests: `scripts/test-backup-restore.sh` and `scripts/test-admin-credentials.sh`, also run by `make validate`.
+
 ### Security
 
 - Portainer's admin password is no longer a hardcoded, publicly documented bcrypt hash. It is read from the `portainer_admin_password` Docker secret, which `make secrets` generates per install. **Action for existing labs:** Portainer only applies it on first start of `portainer_data`; change the admin password in the Portainer UI (or remove the volume) to stop using the old shared password. **Run `make secrets` once** on an existing lab to create `secrets/local/portainer_admin_password.txt` (existing credentials are kept); `make up` and `make update` stop with that instruction if the file is missing. `check-secrets.sh` now rejects inline `--admin-password` values in Compose files in every form (`=value`, a space, or the value as the next list argument), with fixture tests in CI.

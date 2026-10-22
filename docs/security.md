@@ -125,6 +125,13 @@ surfaces much later as a confusing provisioning failure rather than an obvious r
 The repository contains fallback credentials (`changeme-postgres-insecure-dev-only` and similar) in
 the tracked `secrets/*.txt` files and as `${VAR:-default}` expressions in the compose files.
 
+**Exception: the Keycloak admin password and the Vault root token have no fallback.** They control
+every identity and every secret in the lab, so they must come from `.env`, which `make secrets`
+generates. `scripts/check-admin-credentials.sh` runs before `make up` and after `make secrets`, and
+refuses a missing or empty value, a `CHANGEME_` placeholder, or an old `insecure-dev-only` default.
+A bare `docker compose up -d` without `.env` still parses, but Keycloak and Vault come up with no
+usable admin credential instead of a published one.
+
 This is a conscious trade. The project's central promise is that `docker compose up -d` works with no
 prior step; Compose resolves secret file paths at parse time, so a missing file is a hard error before
 any container starts. Shipping placeholders is what makes the promise true.
