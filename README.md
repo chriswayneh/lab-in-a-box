@@ -2,6 +2,10 @@
 
 # Lab-in-a-Box
 
+[![CI](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/language-Python-blue.svg)](#built-with)
+
 **A self-hosted infrastructure and identity governance lab.**
 
 Thirty containers by default: identity, secrets, observability, object storage, Git hosting and a
@@ -10,99 +14,7 @@ are available through optional Compose profiles (thirty-two in the full catalogu
 
 **Release version:** v2.0.2 ([release history](https://github.com/chriswayneh/lab-in-a-box/releases)), with identity lifecycle automation, access reviews, and role-based access to monitoring interfaces.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Docker Compose](https://img.shields.io/badge/Docker%20Compose-v2.20%2B-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
-[![Services](https://img.shields.io/badge/services-32-38bdf8)](docs/SERVICES.md)
-[![Setup](https://img.shields.io/badge/setup-1%20command-34d399)](#quick-start)
-[![PRs welcome](https://img.shields.io/badge/PRs-welcome-blueviolet.svg)](CONTRIBUTING.md)
-[![CI](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/ci.yml/badge.svg)](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/ci.yml)
-[![Security](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/security.yml/badge.svg)](https://github.com/chriswayneh/lab-in-a-box/actions/workflows/security.yml)
-
-[Quick start](#quick-start) ·
-[Architecture](#architecture) ·
-[Services](#services) ·
-[Security](#security) ·
-[AI](#ai) ·
-[Demo](docs/demo.md) ·
-[Roadmap](#roadmap) ·
 [Contributing](CONTRIBUTING.md)
-
-</div>
-
----
-
-## What this is
-
-**In plain words:** Lab-in-a-Box runs a small pretend company on one computer. It has a sign-in server (Keycloak) with seeded users and groups, a password vault (Vault), a Git server (Gitea), and dashboards (Grafana). Its lifecycle automation then adds, moves, and removes those users across all three systems. Other tools show what each person can reach and why, and run access reviews that keep evidence. It is for learning and demonstrating identity and access management (IAM), not for running real accounts.
-
-**What it shows:** joiner, mover, and leaver automation; group-based access control; access reviews; secrets management; and monitoring, all wired together with Docker Compose.
-
-This is a local lab, not a production system. Passwords published for this lab are dev-only credentials. Published ports 80, 443, and 2222 bind to all interfaces by default and may be reachable from other machines, depending on host firewall and network settings. PostgreSQL and Redis stay on `127.0.0.1` only. Read the [security model](docs/security.md) before the service list.
-
-Docker Compose builds MinIO from pinned official source, then starts the services and their initialization jobs: database setup, realm imports,
-dashboard provisioning, secrets policies, and service integrations.
-
-```bash
-git clone https://github.com/chriswayneh/lab-in-a-box.git
-cd lab-in-a-box
-docker compose up -d
-```
-
-<https://lab.localhost> is the front door and links to everything else.
-
-After the first build and service startup, you have a running identity provider with a populated realm, a secrets manager with
-policies and roles, dashboards already showing live container metrics, an object store with buckets,
-a Git server with an administrator, and a local language model you can chat with. All of it sits behind
-a single reverse proxy on friendly hostnames, with no entry added to your `hosts` file.
-
-The documentation covers the provisioning flow, identity workflows, and differences between this
-local lab and a production deployment.
-
-### What you get
-
-| | |
-| --- | --- |
-| **Identity** | Keycloak with a seeded realm: 4 users, 5 groups, 6 roles, 6 OIDC clients, brute-force protection and a password policy |
-| **Identity lifecycle** | Joiner/Mover/Leaver automation across Keycloak, Vault and Gitea. Group-based RBAC, access diffing, session and refresh-token revocation, repository custody transfer, redacted audit records |
-| **RBAC simulator** | Read-only: answers "what can this person reach, and why?" Resolves live Keycloak, Vault and Gitea state, explains every grant's source, surfaces entitlement drift |
-| **Access review** | Campaign-based recertification built on the simulator above: snapshot, approve/revoke per entitlement, remediate through the same JML adapters, retained evidence |
-| **Secrets** | Vault with KV v2, transit encryption, AppRole for machines, userpass for humans, and least-privilege ACL policies |
-| **Observability** | Prometheus, Alertmanager, Grafana, Loki and Promtail: 4 provisioned dashboards, 11 evaluating rules routed with grouping and inhibition, and parsed Keycloak/Vault audit evidence |
-| **AI** | Ollama with a model pulled automatically, Open WebUI wired to it, optional Qdrant for retrieval |
-| **Platform** | Gitea with Actions enabled, MinIO with buckets, policies, versioning and lifecycle rules |
-| **Edge** | Traefik with automatic service discovery, TLS, rate limiting, security headers, and Keycloak forward-auth (oauth2-proxy) for Prometheus, Alertmanager and the Traefik dashboard |
-| **Operations** | Portainer, pgAdmin, Adminer, backups, health checks and a Makefile that explains itself |
-
----
-
-## Zero-trust principles and trust boundaries
-
-The lab demonstrates zero-trust principles through explicit identity, least privilege, and reviewable access decisions. A running service or an existing account is not evidence that every entitlement remains appropriate.
-
-- **Identity lifecycle:** group-based access and joiner, mover, and leaver workflows make grants and revocation explicit, including session and refresh-token revocation.
-- **Effective-access review:** the read-only RBAC simulator explains grants from live service state. Access-review campaigns retain decisions and remediation evidence.
-- **Scoped secrets access:** Vault ACL policies separate permissions by role rather than giving every identity administrative access.
-- **Separated service networks:** services join selected Compose networks; network placement and credential handling are documented alongside their limitations.
-- **Forward-auth at the edge:** Prometheus, Alertmanager and the Traefik dashboard require a Keycloak login via oauth2-proxy (`oauth.${LAB_DOMAIN}`); Grafana continues to scrape Prometheus on the internal network.
-
-This remains a local lab, not a complete enterprise zero-trust architecture. Shipped development credentials must be replaced before handling sensitive data. The host, service administrators, privileged monitoring, and components with direct Docker socket access remain trusted. Network separation alone does not authenticate a caller. See the [security model](docs/security.md) for the exact boundaries and deliberate development exceptions.
-
-## Screenshots
-
-> Screenshots below were captured from the local development lab. They use only the project's
-> local service names and demo interfaces.
-
-<div align="center">
-
-| Landing page | Grafana overview |
-| :---: | :---: |
-| ![Landing page](screenshots/landing-page-live.png) | ![Grafana](screenshots/grafana-overview-live.png) |
-| Every active service, with live reachability | The provisioned Lab Overview dashboard |
-
-| Keycloak after sign-in | Traefik routers |
-| :---: | :---: |
-| ![Keycloak after sign-in](screenshots/keycloak-admin-desktop.png) | ![Traefik HTTP routers for the lab services, each with a green status](screenshots/traefik-dashboard.png) |
-| The page after sign-in | Signed-in Traefik HTTP routers page, each lab service green (captured Oct 12, 2026) |
 
 </div>
 
@@ -210,6 +122,438 @@ under [RFC 6761](https://www.rfc-editor.org/rfc/rfc6761#section-6.3). No `hosts`
 
 ---
 
+## Features
+
+### What this is
+**In plain words:** Lab-in-a-Box runs a small pretend company on one computer. It has a sign-in server (Keycloak) with seeded users and groups, a password vault (Vault), a Git server (Gitea), and dashboards (Grafana). Its lifecycle automation then adds, moves, and removes those users across all three systems. Other tools show what each person can reach and why, and run access reviews that keep evidence. It is for learning and demonstrating identity and access management (IAM), not for running real accounts.
+
+**What it shows:** joiner, mover, and leaver automation; group-based access control; access reviews; secrets management; and monitoring, all wired together with Docker Compose.
+
+This is a local lab, not a production system. Passwords published for this lab are dev-only credentials. Published ports 80, 443, and 2222 bind to all interfaces by default and may be reachable from other machines, depending on host firewall and network settings. PostgreSQL and Redis stay on `127.0.0.1` only. Read the [security model](docs/security.md) before the service list.
+
+Docker Compose builds MinIO from pinned official source, then starts the services and their initialization jobs: database setup, realm imports,
+dashboard provisioning, secrets policies, and service integrations.
+
+```bash
+git clone https://github.com/chriswayneh/lab-in-a-box.git
+cd lab-in-a-box
+docker compose up -d
+```
+
+<https://lab.localhost> is the front door and links to everything else.
+
+After the first build and service startup, you have a running identity provider with a populated realm, a secrets manager with
+policies and roles, dashboards already showing live container metrics, an object store with buckets,
+a Git server with an administrator, and a local language model you can chat with. All of it sits behind
+a single reverse proxy on friendly hostnames, with no entry added to your `hosts` file.
+
+The documentation covers the provisioning flow, identity workflows, and differences between this
+local lab and a production deployment.
+
+#### What you get
+
+| | |
+| --- | --- |
+| **Identity** | Keycloak with a seeded realm: 4 users, 5 groups, 6 roles, 6 OIDC clients, brute-force protection and a password policy |
+| **Identity lifecycle** | Joiner/Mover/Leaver automation across Keycloak, Vault and Gitea. Group-based RBAC, access diffing, session and refresh-token revocation, repository custody transfer, redacted audit records |
+| **RBAC simulator** | Read-only: answers "what can this person reach, and why?" Resolves live Keycloak, Vault and Gitea state, explains every grant's source, surfaces entitlement drift |
+| **Access review** | Campaign-based recertification built on the simulator above: snapshot, approve/revoke per entitlement, remediate through the same JML adapters, retained evidence |
+| **Secrets** | Vault with KV v2, transit encryption, AppRole for machines, userpass for humans, and least-privilege ACL policies |
+| **Observability** | Prometheus, Alertmanager, Grafana, Loki and Promtail: 4 provisioned dashboards, 11 evaluating rules routed with grouping and inhibition, and parsed Keycloak/Vault audit evidence |
+| **AI** | Ollama with a model pulled automatically, Open WebUI wired to it, optional Qdrant for retrieval |
+| **Platform** | Gitea with Actions enabled, MinIO with buckets, policies, versioning and lifecycle rules |
+| **Edge** | Traefik with automatic service discovery, TLS, rate limiting, security headers, and Keycloak forward-auth (oauth2-proxy) for Prometheus, Alertmanager and the Traefik dashboard |
+| **Operations** | Portainer, pgAdmin, Adminer, backups, health checks and a Makefile that explains itself |
+
+---
+
+### Services
+Full generated catalogue, including images, networks and privileges:
+**[`docs/SERVICES.md`](docs/SERVICES.md)** (`make docs` regenerates it from the compose project).
+
+| Service | URL | What it is |
+| --- | --- | --- |
+| **Landing page** | <https://lab.localhost> | Index of every service, with live status |
+| **Traefik** | <https://traefik.lab.localhost> | Edge router. Discovers services automatically; terminates TLS |
+| **Keycloak** | <https://keycloak.lab.localhost> | Identity provider. OIDC and SAML, with a seeded demo realm |
+| **oauth2-proxy** | <https://oauth.lab.localhost> | Traefik forward-auth against Keycloak (Prometheus, Alertmanager, Traefik UI) |
+| **Vault** | <https://vault.lab.localhost> | Secrets management, dynamic credentials, encryption as a service |
+| **Grafana** | <https://grafana.lab.localhost> | Dashboards. Datasources and panels provisioned from files |
+| **Prometheus** | <https://prometheus.lab.localhost> | Metrics collection and alert rule evaluation (Keycloak forward-auth) |
+| **Alertmanager** | <https://alertmanager.lab.localhost> | Alert routing, grouping and inhibition (Keycloak forward-auth) |
+| **Open WebUI** | <https://chat.lab.localhost> | Chat interface for the local models |
+| **Ollama** | <https://ollama.lab.localhost> | Local LLM runtime and API |
+| **Gitea** | <https://git.lab.localhost> | Git hosting with issues, pull requests and CI |
+| **MinIO** | <https://minio.lab.localhost> | Object storage console (S3 API at `s3.lab.localhost`) |
+| **Portainer** | <https://portainer.lab.localhost> | Container management and troubleshooting. User `admin`; the password is generated by `make secrets` (shown by `make creds`); see [Credential handling](docs/security.md#credential-handling). |
+| **pgAdmin** | <https://pgadmin.lab.localhost> | PostgreSQL console, pre-connected to all three databases |
+| **Adminer** | <https://adminer.lab.localhost> | Lightweight database client |
+| **Qdrant** | <https://qdrant.lab.localhost> | Vector database. Optional, `COMPOSE_PROFILES=qdrant` |
+
+#### Host ports
+
+The lab binds five ports on your machine, and no more. Everything else is reachable only through Traefik.
+
+| Port | Service | Bound to | Why |
+| --- | --- | --- | --- |
+| `80` | Traefik | all interfaces | HTTP |
+| `443` | Traefik | all interfaces | HTTPS |
+| `5432` | PostgreSQL | `127.0.0.1` only | Local tools: `psql`, DataGrip, migrations |
+| `6379` | Redis | `127.0.0.1` only | Local tools: `redis-cli` |
+| `2222` | Gitea SSH | all interfaces | `git clone ssh://`. Cannot be routed by an HTTP proxy |
+
+Change any of them in `.env` (`LAB_HTTP_PORT`, `LAB_HTTPS_PORT`, `POSTGRES_PORT`, `REDIS_PORT`,
+`GITEA_SSH_PORT`) if something already has them.
+
+#### Credentials
+
+```bash
+make creds
+```
+
+Reads the live values out of `.env` and the selected Docker-secret directory, and flags in red anything
+still using a shipped default. Nothing is duplicated into documentation that could drift.
+
+The Keycloak realm is seeded with four demo users that share one password, modelling an access-control
+scenario rather than four identical accounts:
+
+| User | Group | Roles | Represents |
+| --- | --- | --- | --- |
+| `alice` | Platform Engineering | `platform-admin`, `developer`, `ai-user` | Runs the infrastructure |
+| `bob` | Application Engineering | `developer`, `ai-user` | Builds on it |
+| `carol` | Security | `security-analyst`, `auditor`, `ai-user` | Reviews it |
+| `dave` | Contractors | `contractor` | External, deliberately minimal access |
+
+Roles are granted to *groups*, and users join groups. Nobody holds a role directly. That indirection is
+the whole point of RBAC, and it is what the Joiner/Mover/Leaver demo on the [roadmap](#roadmap) automates.
+
+---
+
+## Usage
+
+### Screenshots
+> Screenshots below were captured from the local development lab. They use only the project's
+> local service names and demo interfaces.
+
+<div align="center">
+
+| Landing page | Grafana overview |
+| :---: | :---: |
+| ![Landing page](screenshots/landing-page-live.png) | ![Grafana](screenshots/grafana-overview-live.png) |
+| Every active service, with live reachability | The provisioned Lab Overview dashboard |
+
+| Keycloak after sign-in | Traefik routers |
+| :---: | :---: |
+| ![Keycloak after sign-in](screenshots/keycloak-admin-desktop.png) | ![Traefik HTTP routers for the lab services, each with a green status](screenshots/traefik-dashboard.png) |
+| The page after sign-in | Signed-in Traefik HTTP routers page, each lab service green (captured Oct 12, 2026) |
+
+</div>
+
+---
+
+### Commands
+`make` on its own prints all of them.
+
+| Command | Does | Without `make` |
+| --- | --- | --- |
+| `make up` | Start the lab, generating credentials on first run | `docker compose up -d` |
+| `make down` | Stop everything, **keep all data** | `docker compose down` |
+| `make restart` | Restart all, or one `SERVICE=` | `docker compose restart` |
+| `make clean` | Delete every volume, asks first | `docker compose down -v` |
+| `make logs` | Follow logs, all or one `SERVICE=` | `docker compose logs -f` |
+| `make ps` | Container status | `docker compose ps` |
+| `make health` | Containers, provisioning jobs and HTTP routes | `bash scripts/health-check.sh` |
+| `make creds` | Print every URL and credential | `bash scripts/show-credentials.sh` |
+| `make secrets` | Generate random credentials | `bash scripts/generate-secrets.sh` |
+| `make backup` | Snapshot databases and volumes | `bash scripts/backup.sh` |
+| `make restore` | Restore a backup, newest by default | `bash scripts/restore.sh` |
+| `make update` | Pull newer images and recreate what changed | `docker compose pull --ignore-buildable && docker compose build minio minio-init && docker compose up -d` |
+| `make validate` | Everything CI checks, locally | `bash scripts/validate.sh` |
+| `make python-check` | Lint, type check and unit test the engine (no lab needed) | `bash scripts/check-python.sh` |
+| `make docs` | Regenerate the catalogue and dependency graph | `bash scripts/generate-docs.sh` |
+| `make shell SERVICE=x` | Shell inside a container | `docker compose exec x sh` |
+| `make https-on` / `off` | Toggle the HTTP→HTTPS redirect | n/a |
+| `make jml-join` | Provision an identity everywhere | `bash scripts/jml.sh join …` |
+| `make jml-move` | Change role profile, with an access diff | `bash scripts/jml.sh move …` |
+| `make jml-leave` | Offboard and revoke access everywhere | `bash scripts/jml.sh leave …` |
+| `make jml-show` | Print effective access across services | `bash scripts/jml.sh show …` |
+| `make jml-test` | Run the identity test suites | `bash scripts/test-identity.sh` |
+| `make rbac-show` | Effective access for one identity, with reasons | `bash scripts/rbac.sh show …` |
+| `make rbac-diff` | What one identity can reach that another cannot | `bash scripts/rbac.sh diff …` |
+| `make rbac-who-can` | Every identity that can reach a resource | `bash scripts/rbac.sh who-can …` |
+| `make access-review-create` | Open a campaign and snapshot access | `bash scripts/access-review.sh create …` |
+| `make access-review-decide` | Approve or revoke one reviewed entitlement | `bash scripts/access-review.sh decide …` |
+| `make access-review-remediate` | Act on revoke decisions (the only mutating campaign command) | `bash scripts/access-review.sh remediate …` |
+| `make access-review-complete` | Close a campaign | `bash scripts/access-review.sh complete …` |
+| `make scim-token` | Print a short-lived SCIM bearer token | `bash scripts/scim.sh token` |
+| `make scim-status` | Show provisioning state and pending retries | `docker compose exec … scim_worker.py status` |
+| `make scim-test` | Test SCIM CRUD and downstream propagation | `bash scripts/test-identity.sh scim` |
+| `make scim-conformance` | Run the published SCIM compliance suite | `bash scripts/scim-conformance.sh` |
+
+**Variables:** `GPU=1` (NVIDIA passthrough for Ollama), `PROFILES=qdrant,watchtower`,
+`SERVICE=<name>`, `BACKUP=<timestamp>`, `FORCE=1`, `USER=`/`ROLE=`/`FROM=`/`TO=` for the `jml-*` targets.
+
+---
+
+### Identity lifecycle
+The realm models RBAC. These commands cover what happens to it over time:
+onboarding, role changes and offboarding.
+
+```bash
+make jml-join  USER=erin ROLE=developer     # provision across Keycloak, Vault, Gitea
+make jml-move  USER=erin FROM=developer TO=security   # with a before/after access diff
+make jml-leave USER=erin                    # revoke everywhere, including live sessions
+```
+
+Four role profiles ([`identity/profiles.json`](identity/profiles.json)) map onto the
+groups the realm already has. Authorization stays group-based. The engine never
+grants a role directly to a user.
+
+| Flow | What it does |
+| --- | --- |
+| **Joiner** | Creates the Keycloak user and group membership, a Vault `userpass` identity bound to one policy, and a Gitea account and team. Idempotent: a second run reports `UNCHANGED` and never resets a password |
+| **Mover** | Removes obsolete access *before* adding new access, so entitlements cannot accumulate, then prints a diff resolved from live API reads |
+| **Leaver** | Disables (never deletes) both accounts, revokes sessions and refresh tokens, deletes the Vault identity and revokes its outstanding leases, and transfers owned repositories to a custody account instead of orphaning them |
+
+Every run writes a redacted JSON record to `artifacts/identity/<user>/`.
+
+#### RBAC simulator: what can this person reach?
+
+```bash
+make rbac-show    USER=erin                              # effective access, with reasons
+make rbac-diff    USER=alice OTHER=bob                   # what one has that the other does not
+make rbac-who-can PERMISSION=vault:secret/data/security/*  # reverse lookup
+```
+
+Read-only. It resolves live state instead of restating configuration. Vault
+policy documents are fetched and parsed into the paths they actually grant,
+Grafana's role is computed from the deployment's own `role_attribute_path`, and
+every grant says whether it is direct, group-inherited or derived.
+
+It also compares actual access against what the role profile expects and reports
+the difference as drift: an extra Gitea team, an unexpected Vault policy, an
+entitlement that survived an offboarding. Services with no identity integration
+are labelled as such, not reported as "no access".
+
+Revocation behaviour is documented precisely. Refresh tokens are invalidated
+immediately, and the access token is rejected by anything that consults Keycloak.
+A resource server validating a JWT purely offline would still accept it until
+`exp`, bounded to 300 seconds by the realm's `accessTokenLifespan`.
+
+#### Access review campaigns
+
+```bash
+make access-review-create   NAME=quarterly-q3 SCOPE=all       # snapshot, built on the simulator above
+make access-review-decide   CAMPAIGN=<id> USER=erin ENTITLEMENT="Gitea:team security" DECISION=revoke
+make access-review-remediate CAMPAIGN=<id>                    # only command that changes live access
+make access-review-complete CAMPAIGN=<id>
+```
+
+Governance, not just a report. A campaign snapshots entitlements once, at
+creation, so later access changes never silently rewrite what was reviewed.
+Every item starts `UNDECIDED`, an explicit value, not an absence of one, and a
+campaign refuses to close with items still undecided unless the operator
+deliberately forces it. `REVOKE` is a decision, not a mutation: nothing about
+Keycloak, Vault or Gitea changes until `access-review-remediate` runs, and that
+command reuses the exact same adapter methods the JML commands use, then
+verifies each removal against a fresh read rather than trusting its own report
+of success. Seeded demo identities can be reviewed but never mutated.
+
+#### SCIM provisioning
+
+Keycloak exposes an authenticated SCIM 2.0 endpoint for external identity
+clients. Add an identity to `/SCIM Managed` plus one role-profile group to
+propagate its account and access into Gitea and Grafana. The ownership group
+keeps SCIM automation separate from JML and access-review remediation.
+
+```bash
+make scim-token       # short-lived bearer token
+make scim-status      # reconciliation state and retries
+make scim-test        # live endpoint and downstream checks
+```
+
+`make jml-test` runs 430 checks across five suites against the live lab. Live
+authorization, remediation and SCIM propagation assertions use the real
+services; controlled adapter failures prove partial failures remain visible
+without reporting false success.
+
+**→ [docs/identity-governance.md](docs/identity-governance.md)** for the full model,
+security implications and limitations.
+
+---
+
+### Configuration
+Everything lives in one file. Copy the annotated template and edit nothing else:
+
+```bash
+cp .env.example .env    # or: make secrets
+```
+
+Highlights:
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `LAB_DOMAIN` | `lab.localhost` | Every service is published at `<name>.$LAB_DOMAIN`. Point it at a real domain for a remote deployment. Keycloak's redirect URIs are rewritten to match automatically |
+| `LAB_HTTP_PORT` / `LAB_HTTPS_PORT` | `80` / `443` | Change if something already owns them |
+| `LAB_FORCE_HTTPS` | `false` | Off so the first run is not a wall of certificate warnings |
+| `COMPOSE_PROFILES` | *(empty)* | `qdrant`, `watchtower` |
+| `OLLAMA_DEFAULT_MODELS` | `llama3.2:1b` | Comma-separated. Small by default (~1.3 GB) so the lab is usable in minutes |
+| `PROMETHEUS_RETENTION_TIME` | `15d` | Also bounded by size, which matters more on a laptop |
+| `LOKI_RETENTION_PERIOD` | `168h` | |
+| `GRAFANA_OIDC_ENABLED` | `false` | Set `true` to sign in to Grafana through Keycloak |
+
+#### GPU
+
+```bash
+make up GPU=1
+```
+
+Requires an NVIDIA GPU and the
+[Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
+Layers [`compose/overrides/gpu.yml`](compose/overrides/gpu.yml), which also raises the model keep-alive,
+with a GPU, keeping a model resident is cheap and reloading is the expensive part.
+
+---
+
+### Observability
+Grafana comes up already populated. There is no datasource to add and no dashboard to import.
+
+| Dashboard | Shows |
+| --- | --- |
+| **Lab Overview** | CPU, memory, network and disk per container; restart counts; host resources; recent errors |
+| **Lab Logs** | Log volume by service, error and warning rates, and a filterable log explorer |
+| **Lab Edge** | Request rate, latency percentiles and status codes per routed service, plus identity events |
+| **Identity Audit Trail** | Authentication failures, Keycloak admin changes, Vault secret access and the correlated evidence stream |
+
+Nine Prometheus rules cover availability, saturation and the edge. Two Loki
+rules detect repeated login failures and privileged Vault policy changes. Every
+rule carries a description and a `runbook_url`. Alertmanager groups by category
+and severity, inhibits container noise when the host is out of memory, and
+delivers to an in-lab webhook sink by default.
+
+Logs are collected through the Docker API rather than by tailing host paths, which is why log collection
+works identically on Linux, macOS and Windows. Details, plus how to enable Vault metrics and move Loki's
+chunks into MinIO, are in [`docs/observability.md`](docs/observability.md).
+
+---
+
+### AI
+Open WebUI is wired to Ollama on first boot, and a model is downloaded automatically. The default is
+small by default (`llama3.2:1b`, about 1.3 GB) so the lab is usable within minutes rather than after a
+20 GB download.
+
+Bigger models are one variable away:
+
+```bash
+# .env
+OLLAMA_DEFAULT_MODELS=llama3.1:8b,mistral:7b,gemma2:9b
+```
+
+Then `docker compose up -d ollama-init`.
+
+#### Prompts worth trying
+
+The point of running an LLM *next to* your infrastructure is that you can paste the infrastructure into it.
+
+```text
+Explain what this Docker Compose stack does, service by service, and identify
+which containers hold the most privilege.
+```
+
+```text
+Here are the last 200 lines of my Keycloak container logs. Summarise what
+happened, and tell me whether any of it indicates a real problem.
+```
+
+```text
+Review these Traefik middleware definitions. What attacks do they mitigate,
+and what do they not cover?
+```
+
+```text
+Given this Vault policy, what could a holder of this token actually do that
+the author probably did not intend?
+```
+
+A larger set covering infrastructure documentation, incident triage and security review, with notes on
+where small models fall down, is in [`docs/ai-prompts.md`](docs/ai-prompts.md).
+
+---
+
+### Backups
+```bash
+make backup                          # → backups/20260803-141500/
+make restore                         # restore the newest
+make restore BACKUP=20260803-141500  # or a specific one
+```
+
+PostgreSQL is captured with `pg_dumpall`, not by copying its files. Copying a running database's data
+directory produces a backup that restores into a corrupt cluster. Everything else is a tar of the named
+volume, taken read-only, while the lab keeps running.
+
+Model weights, Prometheus data and Loki chunks are excluded on purpose: large, and either re-downloadable
+or stale on restore. The manifest in each backup says what was captured and what was not.
+
+**Credentials are not included.** Back up `.env` and `secrets/local/` separately, somewhere appropriate
+for secret material.
+
+---
+
+### Troubleshooting
+`make health` first. It checks containers, provisioning jobs and HTTP routes separately, so it usually
+tells you which of the three is wrong.
+
+<details>
+<summary><strong>A service shows 502 in the browser</strong></summary>
+
+It is still starting. Keycloak runs database migrations on first boot and Open WebUI downloads an
+embedding model; both take a minute or two. `make health` distinguishes "starting" from "unhealthy".
+
+</details>
+
+<details>
+<summary><strong>Port 80 or 443 is already in use</strong></summary>
+
+```bash
+# .env
+LAB_HTTP_PORT=8080
+LAB_HTTPS_PORT=8443
+```
+
+Then `make restart`. The landing page derives every link from the address you visit it on, so the
+generated URLs follow automatically.
+
+</details>
+
+<details>
+<summary><strong><code>*.lab.localhost</code> does not resolve</strong></summary>
+
+Rare, but some corporate DNS setups intercept it. Add entries to your `hosts` file, or set `LAB_DOMAIN`
+to something you control.
+
+</details>
+
+<details>
+<summary><strong>A credential does not work</strong></summary>
+
+Almost always: `.env` was regenerated after the service already stored the old password in its volume.
+`make clean && make up` fixes it. `make creds` shows what the lab currently believes.
+
+</details>
+
+<details>
+<summary><strong>Everything is slow</strong></summary>
+
+Check Docker's memory allocation. 8 GB is the floor, and Ollama plus Keycloak will use most of it.
+Stopping the AI stack (`docker compose stop ollama open-webui`) frees the largest consumer.
+
+</details>
+
+More, including how to read the init-job logs and what each provisioning script actually does, in
+[`docs/troubleshooting.md`](docs/troubleshooting.md).
+
+---
+
 ## Architecture
 
 ```mermaid
@@ -288,10 +632,10 @@ what it shares a network with.
 | Network | Isolated | What lives there |
 | --- | :---: | --- |
 | `lab_edge` | | Traefik and everything with an HTTP route |
-| `lab_data` | 🔒 | PostgreSQL, Redis and their clients. No internet access, in or out |
+| `lab_data` | Yes | PostgreSQL, Redis and their clients. No internet access, in or out |
 | `lab_observability` | | Scrape targets, log shippers and their backends |
 | `lab_ai` | | Model serving (needs egress to download model weights) |
-| `lab_socket` | 🔒 | The read-only Docker API proxy |
+| `lab_socket` | Yes | The read-only Docker API proxy |
 
 The AI network has no route to the identity database. Docker network segmentation enforces that
 boundary.
@@ -336,237 +680,60 @@ docker-compose.yml            networks, volumes, secrets, includes
 
 ---
 
-## Services
+## Built with
 
-Full generated catalogue, including images, networks and privileges:
-**[`docs/SERVICES.md`](docs/SERVICES.md)** (`make docs` regenerates it from the compose project).
+**Languages** (GitHub language stats, checked 2026-10-21): Python 64.5%, Shell 28.3%, Makefile 3.5%, HCL 1.3%, JavaScript 1.2%, Dockerfile 0.5%, PowerShell 0.3%
 
-| Service | URL | What it is |
+**AI tools:**
+
+- Grok Bot (confirmed by Chris, 2026-10-21)
+- Cursor cloud agents (confirmed by Chris, 2026-10-21)
+- Claude (Claude Opus 5, commit co-author trailers)
+
+Commits made with AI help carry a `Co-authored-by` trailer from now on. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Roadmap
+
+See [roadmap/README.md](roadmap/README.md) for planned phases and [CHANGELOG.md](CHANGELOG.md) for released versions.
+
+| Version | Theme | Highlights |
 | --- | --- | --- |
-| **Landing page** | <https://lab.localhost> | Index of every service, with live status |
-| **Traefik** | <https://traefik.lab.localhost> | Edge router. Discovers services automatically; terminates TLS |
-| **Keycloak** | <https://keycloak.lab.localhost> | Identity provider. OIDC and SAML, with a seeded demo realm |
-| **oauth2-proxy** | <https://oauth.lab.localhost> | Traefik forward-auth against Keycloak (Prometheus, Alertmanager, Traefik UI) |
-| **Vault** | <https://vault.lab.localhost> | Secrets management, dynamic credentials, encryption as a service |
-| **Grafana** | <https://grafana.lab.localhost> | Dashboards. Datasources and panels provisioned from files |
-| **Prometheus** | <https://prometheus.lab.localhost> | Metrics collection and alert rule evaluation (Keycloak forward-auth) |
-| **Alertmanager** | <https://alertmanager.lab.localhost> | Alert routing, grouping and inhibition (Keycloak forward-auth) |
-| **Open WebUI** | <https://chat.lab.localhost> | Chat interface for the local models |
-| **Ollama** | <https://ollama.lab.localhost> | Local LLM runtime and API |
-| **Gitea** | <https://git.lab.localhost> | Git hosting with issues, pull requests and CI |
-| **MinIO** | <https://minio.lab.localhost> | Object storage console (S3 API at `s3.lab.localhost`) |
-| **Portainer** | <https://portainer.lab.localhost> | Container management and troubleshooting. User `admin`; the password is generated by `make secrets` (shown by `make creds`); see [Credential handling](docs/security.md#credential-handling). |
-| **pgAdmin** | <https://pgadmin.lab.localhost> | PostgreSQL console, pre-connected to all three databases |
-| **Adminer** | <https://adminer.lab.localhost> | Lightweight database client |
-| **Qdrant** | <https://qdrant.lab.localhost> | Vector database. Optional, `COMPOSE_PROFILES=qdrant` |
+| **v1** | Foundation (done) | The stack you are reading about |
+| **v2** | Identity governance (done) | v2-1 JML (done) · v2-2 RBAC (done) · v2-3 access reviews (done) · v2-4 SCIM (done) · v2-5 audit pipeline (done) · v2-6 Alertmanager (done) · v2-7 forward-auth (done) |
+| **v3** | Infrastructure as code | Terraform and Ansible deployments, a Kubernetes edition, AWS/Azure/GCP targets |
+| **v4** | AI operations | Log analysis, incident response copilot, automatic infrastructure documentation, RAG over your own runbooks |
+| **v5** | Homelab operations | Backup verification, external uptime monitoring and resource presets |
 
-### Host ports
+**v2 roadmap work is complete (7/7).** Identity lifecycle automation, RBAC
+simulation, access review campaigns, SCIM provisioning, the identity audit
+pipeline, Alertmanager and forward-auth for Prometheus / Alertmanager / Traefik
+have shipped in [v2.0.0](https://github.com/chriswayneh/lab-in-a-box/releases/tag/v2.0.0).
+See
+[Identity lifecycle](#identity-lifecycle) above, or
+[`docs/identity-governance.md`](docs/identity-governance.md) for the full model.
+For a reviewer-friendly walkthrough, use the [10-minute demo](docs/demo.md).
+Screenshots in this README were captured from the local lab (see
+[`screenshots/README.md`](screenshots/README.md) for capture instructions).
 
-The lab binds five ports on your machine, and no more. Everything else is reachable only through Traefik.
-
-| Port | Service | Bound to | Why |
-| --- | --- | --- | --- |
-| `80` | Traefik | all interfaces | HTTP |
-| `443` | Traefik | all interfaces | HTTPS |
-| `5432` | PostgreSQL | `127.0.0.1` only | Local tools: `psql`, DataGrip, migrations |
-| `6379` | Redis | `127.0.0.1` only | Local tools: `redis-cli` |
-| `2222` | Gitea SSH | all interfaces | `git clone ssh://`. Cannot be routed by an HTTP proxy |
-
-Change any of them in `.env` (`LAB_HTTP_PORT`, `LAB_HTTPS_PORT`, `POSTGRES_PORT`, `REDIS_PORT`,
-`GITEA_SSH_PORT`) if something already has them.
-
-### Credentials
-
-```bash
-make creds
-```
-
-Reads the live values out of `.env` and the selected Docker-secret directory, and flags in red anything
-still using a shipped default. Nothing is duplicated into documentation that could drift.
-
-The Keycloak realm is seeded with four demo users that share one password, modelling an access-control
-scenario rather than four identical accounts:
-
-| User | Group | Roles | Represents |
-| --- | --- | --- | --- |
-| `alice` | Platform Engineering | `platform-admin`, `developer`, `ai-user` | Runs the infrastructure |
-| `bob` | Application Engineering | `developer`, `ai-user` | Builds on it |
-| `carol` | Security | `security-analyst`, `auditor`, `ai-user` | Reviews it |
-| `dave` | Contractors | `contractor` | External, deliberately minimal access |
-
-Roles are granted to *groups*, and users join groups. Nobody holds a role directly. That indirection is
-the whole point of RBAC, and it is what the Joiner/Mover/Leaver demo on the [roadmap](#roadmap) automates.
-
----
-
-## Commands
-
-`make` on its own prints all of them.
-
-| Command | Does | Without `make` |
-| --- | --- | --- |
-| `make up` | Start the lab, generating credentials on first run | `docker compose up -d` |
-| `make down` | Stop everything, **keep all data** | `docker compose down` |
-| `make restart` | Restart all, or one `SERVICE=` | `docker compose restart` |
-| `make clean` | Delete every volume, asks first | `docker compose down -v` |
-| `make logs` | Follow logs, all or one `SERVICE=` | `docker compose logs -f` |
-| `make ps` | Container status | `docker compose ps` |
-| `make health` | Containers, provisioning jobs and HTTP routes | `bash scripts/health-check.sh` |
-| `make creds` | Print every URL and credential | `bash scripts/show-credentials.sh` |
-| `make secrets` | Generate random credentials | `bash scripts/generate-secrets.sh` |
-| `make backup` | Snapshot databases and volumes | `bash scripts/backup.sh` |
-| `make restore` | Restore a backup, newest by default | `bash scripts/restore.sh` |
-| `make update` | Pull newer images and recreate what changed | `docker compose pull --ignore-buildable && docker compose build minio minio-init && docker compose up -d` |
-| `make validate` | Everything CI checks, locally | `bash scripts/validate.sh` |
-| `make python-check` | Lint, type check and unit test the engine (no lab needed) | `bash scripts/check-python.sh` |
-| `make docs` | Regenerate the catalogue and dependency graph | `bash scripts/generate-docs.sh` |
-| `make shell SERVICE=x` | Shell inside a container | `docker compose exec x sh` |
-| `make https-on` / `off` | Toggle the HTTP→HTTPS redirect | n/a |
-| `make jml-join` | Provision an identity everywhere | `bash scripts/jml.sh join …` |
-| `make jml-move` | Change role profile, with an access diff | `bash scripts/jml.sh move …` |
-| `make jml-leave` | Offboard and revoke access everywhere | `bash scripts/jml.sh leave …` |
-| `make jml-show` | Print effective access across services | `bash scripts/jml.sh show …` |
-| `make jml-test` | Run the identity test suites | `bash scripts/test-identity.sh` |
-| `make rbac-show` | Effective access for one identity, with reasons | `bash scripts/rbac.sh show …` |
-| `make rbac-diff` | What one identity can reach that another cannot | `bash scripts/rbac.sh diff …` |
-| `make rbac-who-can` | Every identity that can reach a resource | `bash scripts/rbac.sh who-can …` |
-| `make access-review-create` | Open a campaign and snapshot access | `bash scripts/access-review.sh create …` |
-| `make access-review-decide` | Approve or revoke one reviewed entitlement | `bash scripts/access-review.sh decide …` |
-| `make access-review-remediate` | Act on revoke decisions (the only mutating campaign command) | `bash scripts/access-review.sh remediate …` |
-| `make access-review-complete` | Close a campaign | `bash scripts/access-review.sh complete …` |
-| `make scim-token` | Print a short-lived SCIM bearer token | `bash scripts/scim.sh token` |
-| `make scim-status` | Show provisioning state and pending retries | `docker compose exec … scim_worker.py status` |
-| `make scim-test` | Test SCIM CRUD and downstream propagation | `bash scripts/test-identity.sh scim` |
-| `make scim-conformance` | Run the published SCIM compliance suite | `bash scripts/scim-conformance.sh` |
-
-**Variables:** `GPU=1` (NVIDIA passthrough for Ollama), `PROFILES=qdrant,watchtower`,
-`SERVICE=<name>`, `BACKUP=<timestamp>`, `FORCE=1`, `USER=`/`ROLE=`/`FROM=`/`TO=` for the `jml-*` targets.
-
----
-
-## Identity lifecycle
-
-The realm models RBAC. These commands cover what happens to it over time:
-onboarding, role changes and offboarding.
-
-```bash
-make jml-join  USER=erin ROLE=developer     # provision across Keycloak, Vault, Gitea
-make jml-move  USER=erin FROM=developer TO=security   # with a before/after access diff
-make jml-leave USER=erin                    # revoke everywhere, including live sessions
-```
-
-Four role profiles ([`identity/profiles.json`](identity/profiles.json)) map onto the
-groups the realm already has. Authorization stays group-based. The engine never
-grants a role directly to a user.
-
-| Flow | What it does |
-| --- | --- |
-| **Joiner** | Creates the Keycloak user and group membership, a Vault `userpass` identity bound to one policy, and a Gitea account and team. Idempotent: a second run reports `UNCHANGED` and never resets a password |
-| **Mover** | Removes obsolete access *before* adding new access, so entitlements cannot accumulate, then prints a diff resolved from live API reads |
-| **Leaver** | Disables (never deletes) both accounts, revokes sessions and refresh tokens, deletes the Vault identity and revokes its outstanding leases, and transfers owned repositories to a custody account instead of orphaning them |
-
-Every run writes a redacted JSON record to `artifacts/identity/<user>/`.
-
-### RBAC simulator: what can this person reach?
-
-```bash
-make rbac-show    USER=erin                              # effective access, with reasons
-make rbac-diff    USER=alice OTHER=bob                   # what one has that the other does not
-make rbac-who-can PERMISSION=vault:secret/data/security/*  # reverse lookup
-```
-
-Read-only. It resolves live state instead of restating configuration. Vault
-policy documents are fetched and parsed into the paths they actually grant,
-Grafana's role is computed from the deployment's own `role_attribute_path`, and
-every grant says whether it is direct, group-inherited or derived.
-
-It also compares actual access against what the role profile expects and reports
-the difference as drift: an extra Gitea team, an unexpected Vault policy, an
-entitlement that survived an offboarding. Services with no identity integration
-are labelled as such, not reported as "no access".
-
-Revocation behaviour is documented precisely. Refresh tokens are invalidated
-immediately, and the access token is rejected by anything that consults Keycloak.
-A resource server validating a JWT purely offline would still accept it until
-`exp`, bounded to 300 seconds by the realm's `accessTokenLifespan`.
-
-### Access review campaigns
-
-```bash
-make access-review-create   NAME=quarterly-q3 SCOPE=all       # snapshot, built on the simulator above
-make access-review-decide   CAMPAIGN=<id> USER=erin ENTITLEMENT="Gitea:team security" DECISION=revoke
-make access-review-remediate CAMPAIGN=<id>                    # only command that changes live access
-make access-review-complete CAMPAIGN=<id>
-```
-
-Governance, not just a report. A campaign snapshots entitlements once, at
-creation, so later access changes never silently rewrite what was reviewed.
-Every item starts `UNDECIDED`, an explicit value, not an absence of one, and a
-campaign refuses to close with items still undecided unless the operator
-deliberately forces it. `REVOKE` is a decision, not a mutation: nothing about
-Keycloak, Vault or Gitea changes until `access-review-remediate` runs, and that
-command reuses the exact same adapter methods the JML commands use, then
-verifies each removal against a fresh read rather than trusting its own report
-of success. Seeded demo identities can be reviewed but never mutated.
-
-### SCIM provisioning
-
-Keycloak exposes an authenticated SCIM 2.0 endpoint for external identity
-clients. Add an identity to `/SCIM Managed` plus one role-profile group to
-propagate its account and access into Gitea and Grafana. The ownership group
-keeps SCIM automation separate from JML and access-review remediation.
-
-```bash
-make scim-token       # short-lived bearer token
-make scim-status      # reconciliation state and retries
-make scim-test        # live endpoint and downstream checks
-```
-
-`make jml-test` runs 430 checks across five suites against the live lab. Live
-authorization, remediation and SCIM propagation assertions use the real
-services; controlled adapter failures prove partial failures remain visible
-without reporting false success.
-
-**→ [docs/identity-governance.md](docs/identity-governance.md)** for the full model,
-security implications and limitations.
-
----
-
-## Configuration
-
-Everything lives in one file. Copy the annotated template and edit nothing else:
-
-```bash
-cp .env.example .env    # or: make secrets
-```
-
-Highlights:
-
-| Variable | Default | Notes |
-| --- | --- | --- |
-| `LAB_DOMAIN` | `lab.localhost` | Every service is published at `<name>.$LAB_DOMAIN`. Point it at a real domain for a remote deployment. Keycloak's redirect URIs are rewritten to match automatically |
-| `LAB_HTTP_PORT` / `LAB_HTTPS_PORT` | `80` / `443` | Change if something already owns them |
-| `LAB_FORCE_HTTPS` | `false` | Off so the first run is not a wall of certificate warnings |
-| `COMPOSE_PROFILES` | *(empty)* | `qdrant`, `watchtower` |
-| `OLLAMA_DEFAULT_MODELS` | `llama3.2:1b` | Comma-separated. Small by default (~1.3 GB) so the lab is usable in minutes |
-| `PROMETHEUS_RETENTION_TIME` | `15d` | Also bounded by size, which matters more on a laptop |
-| `LOKI_RETENTION_PERIOD` | `168h` | |
-| `GRAFANA_OIDC_ENABLED` | `false` | Set `true` to sign in to Grafana through Keycloak |
-
-### GPU
-
-```bash
-make up GPU=1
-```
-
-Requires an NVIDIA GPU and the
-[Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
-Layers [`compose/overrides/gpu.yml`](compose/overrides/gpu.yml), which also raises the model keep-alive,
-with a GPU, keeping a model resident is cheap and reloading is the expensive part.
+Full detail, including ready-to-file issues with acceptance criteria, is in
+[`roadmap/`](roadmap/README.md).
 
 ---
 
 ## Security
+
+See [SECURITY.md](SECURITY.md) for supported versions and how to report a vulnerability privately.
+
+### Zero-trust principles and trust boundaries
+The lab demonstrates zero-trust principles through explicit identity, least privilege, and reviewable access decisions. A running service or an existing account is not evidence that every entitlement remains appropriate.
+
+- **Identity lifecycle:** group-based access and joiner, mover, and leaver workflows make grants and revocation explicit, including session and refresh-token revocation.
+- **Effective-access review:** the read-only RBAC simulator explains grants from live service state. Access-review campaigns retain decisions and remediation evidence.
+- **Scoped secrets access:** Vault ACL policies separate permissions by role rather than giving every identity administrative access.
+- **Separated service networks:** services join selected Compose networks; network placement and credential handling are documented alongside their limitations.
+- **Forward-auth at the edge:** Prometheus, Alertmanager and the Traefik dashboard require a Keycloak login via oauth2-proxy (`oauth.${LAB_DOMAIN}`); Grafana continues to scrape Prometheus on the internal network.
+
+This remains a local lab, not a complete enterprise zero-trust architecture. Shipped development credentials must be replaced before handling sensitive data. The host, service administrators, privileged monitoring, and components with direct Docker socket access remain trusted. Network separation alone does not authenticate a caller. See the [security model](docs/security.md) for the exact boundaries and deliberate development exceptions.
 
 This is a **development lab**, not a production deployment, and it is explicit about the difference.
 [`docs/security.md`](docs/security.md) is the full threat model. The short version:
@@ -655,192 +822,9 @@ The locally generated certificate files and `local-certificate.yml` are ignored 
 
 ---
 
-## Observability
-
-Grafana comes up already populated. There is no datasource to add and no dashboard to import.
-
-| Dashboard | Shows |
-| --- | --- |
-| **Lab Overview** | CPU, memory, network and disk per container; restart counts; host resources; recent errors |
-| **Lab Logs** | Log volume by service, error and warning rates, and a filterable log explorer |
-| **Lab Edge** | Request rate, latency percentiles and status codes per routed service, plus identity events |
-| **Identity Audit Trail** | Authentication failures, Keycloak admin changes, Vault secret access and the correlated evidence stream |
-
-Nine Prometheus rules cover availability, saturation and the edge. Two Loki
-rules detect repeated login failures and privileged Vault policy changes. Every
-rule carries a description and a `runbook_url`. Alertmanager groups by category
-and severity, inhibits container noise when the host is out of memory, and
-delivers to an in-lab webhook sink by default.
-
-Logs are collected through the Docker API rather than by tailing host paths, which is why log collection
-works identically on Linux, macOS and Windows. Details, plus how to enable Vault metrics and move Loki's
-chunks into MinIO, are in [`docs/observability.md`](docs/observability.md).
-
----
-
-## AI
-
-Open WebUI is wired to Ollama on first boot, and a model is downloaded automatically. The default is
-small by default (`llama3.2:1b`, about 1.3 GB) so the lab is usable within minutes rather than after a
-20 GB download.
-
-Bigger models are one variable away:
-
-```bash
-# .env
-OLLAMA_DEFAULT_MODELS=llama3.1:8b,mistral:7b,gemma2:9b
-```
-
-Then `docker compose up -d ollama-init`.
-
-### Prompts worth trying
-
-The point of running an LLM *next to* your infrastructure is that you can paste the infrastructure into it.
-
-```text
-Explain what this Docker Compose stack does, service by service, and identify
-which containers hold the most privilege.
-```
-
-```text
-Here are the last 200 lines of my Keycloak container logs. Summarise what
-happened, and tell me whether any of it indicates a real problem.
-```
-
-```text
-Review these Traefik middleware definitions. What attacks do they mitigate,
-and what do they not cover?
-```
-
-```text
-Given this Vault policy, what could a holder of this token actually do that
-the author probably did not intend?
-```
-
-A larger set covering infrastructure documentation, incident triage and security review, with notes on
-where small models fall down, is in [`docs/ai-prompts.md`](docs/ai-prompts.md).
-
----
-
-## Backups
-
-```bash
-make backup                          # → backups/20260803-141500/
-make restore                         # restore the newest
-make restore BACKUP=20260803-141500  # or a specific one
-```
-
-PostgreSQL is captured with `pg_dumpall`, not by copying its files. Copying a running database's data
-directory produces a backup that restores into a corrupt cluster. Everything else is a tar of the named
-volume, taken read-only, while the lab keeps running.
-
-Model weights, Prometheus data and Loki chunks are excluded on purpose: large, and either re-downloadable
-or stale on restore. The manifest in each backup says what was captured and what was not.
-
-**Credentials are not included.** Back up `.env` and `secrets/local/` separately, somewhere appropriate
-for secret material.
-
----
-
-## Troubleshooting
-
-`make health` first. It checks containers, provisioning jobs and HTTP routes separately, so it usually
-tells you which of the three is wrong.
-
-<details>
-<summary><strong>A service shows 502 in the browser</strong></summary>
-
-It is still starting. Keycloak runs database migrations on first boot and Open WebUI downloads an
-embedding model; both take a minute or two. `make health` distinguishes "starting" from "unhealthy".
-
-</details>
-
-<details>
-<summary><strong>Port 80 or 443 is already in use</strong></summary>
-
-```bash
-# .env
-LAB_HTTP_PORT=8080
-LAB_HTTPS_PORT=8443
-```
-
-Then `make restart`. The landing page derives every link from the address you visit it on, so the
-generated URLs follow automatically.
-
-</details>
-
-<details>
-<summary><strong><code>*.lab.localhost</code> does not resolve</strong></summary>
-
-Rare, but some corporate DNS setups intercept it. Add entries to your `hosts` file, or set `LAB_DOMAIN`
-to something you control.
-
-</details>
-
-<details>
-<summary><strong>A credential does not work</strong></summary>
-
-Almost always: `.env` was regenerated after the service already stored the old password in its volume.
-`make clean && make up` fixes it. `make creds` shows what the lab currently believes.
-
-</details>
-
-<details>
-<summary><strong>Everything is slow</strong></summary>
-
-Check Docker's memory allocation. 8 GB is the floor, and Ollama plus Keycloak will use most of it.
-Stopping the AI stack (`docker compose stop ollama open-webui`) frees the largest consumer.
-
-</details>
-
-More, including how to read the init-job logs and what each provisioning script actually does, in
-[`docs/troubleshooting.md`](docs/troubleshooting.md).
-
----
-
-## Roadmap
-
-| Version | Theme | Highlights |
-| --- | --- | --- |
-| **v1** | Foundation ✅ | The stack you are reading about |
-| **v2** | Identity governance ✅ | v2-1 JML ✅ · v2-2 RBAC ✅ · v2-3 access reviews ✅ · v2-4 SCIM ✅ · v2-5 audit pipeline ✅ · v2-6 Alertmanager ✅ · v2-7 forward-auth ✅ |
-| **v3** | Infrastructure as code | Terraform and Ansible deployments, a Kubernetes edition, AWS/Azure/GCP targets |
-| **v4** | AI operations | Log analysis, incident response copilot, automatic infrastructure documentation, RAG over your own runbooks |
-| **v5** | Homelab operations | Backup verification, external uptime monitoring and resource presets |
-
-**v2 roadmap work is complete (7/7).** Identity lifecycle automation, RBAC
-simulation, access review campaigns, SCIM provisioning, the identity audit
-pipeline, Alertmanager and forward-auth for Prometheus / Alertmanager / Traefik
-have shipped in [v2.0.0](https://github.com/chriswayneh/lab-in-a-box/releases/tag/v2.0.0).
-See
-[Identity lifecycle](#identity-lifecycle) above, or
-[`docs/identity-governance.md`](docs/identity-governance.md) for the full model.
-For a reviewer-friendly walkthrough, use the [10-minute demo](docs/demo.md).
-Screenshots in this README were captured from the local lab (see
-[`screenshots/README.md`](screenshots/README.md) for capture instructions).
-
-Full detail, including ready-to-file issues with acceptance criteria, is in
-[`roadmap/`](roadmap/README.md).
-
----
-
 ## Contributing
 
-Contributions are welcome, especially dashboards, hardening and documentation fixes where
-something was unclear.
-
-Start with [`CONTRIBUTING.md`](CONTRIBUTING.md). The short version: run `make validate` before opening a
-pull request, and if you add a service, give it a healthcheck.
-
-### Setting this up as your own
-
-Two placeholders need replacing after you fork:
-
-1. The owner in [`.github/CODEOWNERS`](.github/CODEOWNERS) → your GitHub username, if you fork the project
-1. `OWNER` in the clone URLs and badge links in this README and
-   [`.github/ISSUE_TEMPLATE/config.yml`](.github/ISSUE_TEMPLATE/config.yml)
-
----
+See [CONTRIBUTING.md](CONTRIBUTING.md), including how to credit AI tools in commits.
 
 ## License
 
@@ -848,9 +832,9 @@ Licensed under the MIT License. Use it, fork it, modify it, or build something o
 
 ---
 
-If this project helped you, a ⭐ is appreciated.
+If this project helped you, a star is appreciated.
 
-### Built with
+### Open-source services in the lab
 
 [Traefik](https://traefik.io) ·
 [PostgreSQL](https://www.postgresql.org) ·
@@ -869,3 +853,7 @@ If this project helped you, a ⭐ is appreciated.
 [Portainer](https://www.portainer.io) ·
 [pgAdmin](https://www.pgadmin.org) ·
 [Adminer](https://www.adminer.org)
+
+## Acknowledgments
+
+README layout adapted from [Best-README-Template](https://github.com/othneildrew/Best-README-Template) by Othneil Drew.
