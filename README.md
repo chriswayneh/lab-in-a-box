@@ -125,6 +125,7 @@ under [RFC 6761](https://www.rfc-editor.org/rfc/rfc6761#section-6.3). No `hosts`
 ## Features
 
 ### What this is
+
 **In plain words:** Lab-in-a-Box runs a small pretend company on one computer. It has a sign-in server (Keycloak) with seeded users and groups, a password vault (Vault), a Git server (Gitea), and dashboards (Grafana). Its lifecycle automation then adds, moves, and removes those users across all three systems. Other tools show what each person can reach and why, and run access reviews that keep evidence. It is for learning and demonstrating identity and access management (IAM), not for running real accounts.
 
 **What it shows:** joiner, mover, and leaver automation; group-based access control; access reviews; secrets management; and monitoring, all wired together with Docker Compose.
@@ -168,6 +169,7 @@ local lab and a production deployment.
 ---
 
 ### Services
+
 Full generated catalogue, including images, networks and privileges:
 **[`docs/SERVICES.md`](docs/SERVICES.md)** (`make docs` regenerates it from the compose project).
 
@@ -232,6 +234,7 @@ the whole point of RBAC, and it is what the Joiner/Mover/Leaver demo on the [roa
 ## Usage
 
 ### Screenshots
+
 > Screenshots below were captured from the local development lab. They use only the project's
 > local service names and demo interfaces.
 
@@ -252,6 +255,7 @@ the whole point of RBAC, and it is what the Joiner/Mover/Leaver demo on the [roa
 ---
 
 ### Commands
+
 `make` on its own prints all of them.
 
 | Command | Does | Without `make` |
@@ -296,6 +300,7 @@ the whole point of RBAC, and it is what the Joiner/Mover/Leaver demo on the [roa
 ---
 
 ### Identity lifecycle
+
 The realm models RBAC. These commands cover what happens to it over time:
 onboarding, role changes and offboarding.
 
@@ -383,6 +388,7 @@ security implications and limitations.
 ---
 
 ### Configuration
+
 Everything lives in one file. Copy the annotated template and edit nothing else:
 
 ```bash
@@ -416,6 +422,7 @@ with a GPU, keeping a model resident is cheap and reloading is the expensive par
 ---
 
 ### Observability
+
 Grafana comes up already populated. There is no datasource to add and no dashboard to import.
 
 | Dashboard | Shows |
@@ -438,6 +445,7 @@ chunks into MinIO, are in [`docs/observability.md`](docs/observability.md).
 ---
 
 ### AI
+
 Open WebUI is wired to Ollama on first boot, and a model is downloaded automatically. The default is
 small by default (`llama3.2:1b`, about 1.3 GB) so the lab is usable within minutes rather than after a
 20 GB download.
@@ -481,6 +489,7 @@ where small models fall down, is in [`docs/ai-prompts.md`](docs/ai-prompts.md).
 ---
 
 ### Backups
+
 ```bash
 make backup                          # → backups/20260803-141500/
 make restore                         # restore the newest
@@ -500,6 +509,7 @@ for secret material.
 ---
 
 ### Troubleshooting
+
 `make health` first. It checks containers, provisioning jobs and HTTP routes separately, so it usually
 tells you which of the three is wrong.
 
@@ -725,6 +735,7 @@ Full detail, including ready-to-file issues with acceptance criteria, is in
 See [SECURITY.md](SECURITY.md) for supported versions and how to report a vulnerability privately.
 
 ### Zero-trust principles and trust boundaries
+
 The lab demonstrates zero-trust principles through explicit identity, least privilege, and reviewable access decisions. A running service or an existing account is not evidence that every entitlement remains appropriate.
 
 - **Identity lifecycle:** group-based access and joiner, mover, and leaver workflows make grants and revocation explicit, including session and refresh-token revocation.
