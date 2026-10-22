@@ -18,9 +18,7 @@ def token() -> int:
         form_body={
             "grant_type": "client_credentials",
             "client_id": "lab-scim",
-            "client_secret": os.environ.get(
-                "KEYCLOAK_SCIM_CLIENT_SECRET", "scim-insecure-dev-only"
-            ),
+            "client_secret": os.environ["KEYCLOAK_SCIM_CLIENT_SECRET"],
         },
         retries=1,
     ) or {}

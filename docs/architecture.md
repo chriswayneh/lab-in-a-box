@@ -35,6 +35,11 @@ random values before Compose runs, with file-backed values kept in `secrets/loca
 The trade-off is stated plainly rather than hidden: the fallback passwords are in the repository, and
 `make creds` prints them in red until they are replaced.
 
+One deliberate exception narrows the constraint: no credential in `.env` has a fallback any more. The
+first run needs one step before Compose, `make up` (which runs `make secrets` automatically) or
+`bash scripts/generate-secrets.sh`. A one-shot `secrets-init` service fails closed when that step was
+skipped, so the documented command never starts the lab with a shared password.
+
 ---
 
 ## Compose structure

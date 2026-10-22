@@ -17,7 +17,7 @@ set -eu
 
 GITEA_APP_INI="${GITEA_APP_INI:-/data/gitea/conf/app.ini}"
 GITEA_ADMIN_USER="${GITEA_ADMIN_USER:-labadmin}"
-GITEA_ADMIN_PASSWORD="${GITEA_ADMIN_PASSWORD:-gitea-insecure-dev-only}"
+GITEA_ADMIN_PASSWORD="${GITEA_ADMIN_PASSWORD:?GITEA_ADMIN_PASSWORD is not set; run make secrets}"
 GITEA_ADMIN_EMAIL="${GITEA_ADMIN_EMAIL:-labadmin@lab.local}"
 
 log()  { printf '[gitea-init] %s\n' "$*"; }
