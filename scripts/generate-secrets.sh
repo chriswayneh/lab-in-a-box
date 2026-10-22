@@ -23,6 +23,8 @@
 # generate a credential the lab itself needs at parse time.
 # =============================================================================
 set -euo pipefail
+# Everything this script writes (.env, secrets/local/*) is private to the owner.
+umask 077
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 

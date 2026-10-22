@@ -73,9 +73,10 @@ problems=0
 for key in "${REQUIRED[@]}"; do
   value="$(effective_value "$key")"
   reason=""
+  value="${value//[[:space:]]/}"
   if [[ "$value" == INTERPOLATED ]]; then
     reason="refers to another variable (\${...}); set a literal value"
-  elif [[ -z "${value//[[:space:]]/}" ]]; then
+  elif [[ -z "$value" ]]; then
     reason="is missing or empty"
   elif [[ "$value" == CHANGEME_* ]]; then
     reason="is still the CHANGEME_ placeholder from .env.example"
@@ -100,7 +101,7 @@ for name in "${SECRET_FILES[@]}"; do
   if [[ ! -f "$path" ]]; then
     reason="is missing"
   else
-    content="$(tr -d ' \t\r\n' < "$path")"
+    content="$(tr -d '[:space:]' < "$path")"
     if [[ -z "$content" ]]; then reason="is empty"
     elif [[ "$content" == *insecure-dev-only || "$content" == CHANGEME_* ]]; then
       reason="still holds the shipped placeholder"

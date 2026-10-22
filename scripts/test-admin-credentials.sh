@@ -124,30 +124,80 @@ PY
   if [[ -n "$missing" ]]; then bad "$t" "secret-file consumers not gated: $missing"; else ok "$t"; fi
 }
 
+SECRET_FILE_NAMES="grafana_admin_password minio_root_password portainer_admin_password postgres_password"
+
+# Print one field of the rendered secrets-init service: mounts | files | command.
+secrets_init_field() {
+  (cd "$ROOT" && docker compose -f docker-compose.yml config --format json 2>/dev/null) | python3 -c '
+import json, sys
+svc = json.load(sys.stdin)["services"]["secrets-init"]
+field = sys.argv[1]
+if field == "mounts":
+    print(" ".join(sorted(s["source"] for s in svc.get("secrets") or [])))
+elif field == "files":
+    print(" ".join(sorted((svc.get("environment") or {}).get("REQUIRED_SECRET_FILES", "").split())))
+else:
+    print(svc["command"][0].replace("$$", "$"))' "$1"
+}
+
+test_secrets_init_mounts_exactly_the_file_secrets() {
+  local t=${FUNCNAME[0]} got
+  if ! docker compose version >/dev/null 2>&1; then bad "$t" "docker compose is not available"; return; fi
+  got="$(secrets_init_field mounts)"
+  if [[ "$got" == "$SECRET_FILE_NAMES" ]]; then ok "$t"; else bad "$t" "secrets-init mounts [$got], want [$SECRET_FILE_NAMES]"; fi
+}
+
+test_secrets_init_checks_every_file_secret() {
+  local t=${FUNCNAME[0]} got
+  if ! docker compose version >/dev/null 2>&1; then bad "$t" "docker compose is not available"; return; fi
+  got="$(secrets_init_field files)"
+  if [[ "$got" == "$SECRET_FILE_NAMES" ]]; then ok "$t"; else bad "$t" "REQUIRED_SECRET_FILES is [$got], want [$SECRET_FILE_NAMES]"; fi
+}
+
 test_secrets_init_script_behaviour() {
-  # Run the real secrets-init script (as Compose renders it) against fixtures.
-  local t=${FUNCNAME[0]} script dir
+  # Run the real secrets-init script and its REQUIRED_SECRET_FILES, as Compose renders them.
+  local t=${FUNCNAME[0]} script dir files f g
   if ! docker compose version >/dev/null 2>&1; then bad "$t" "docker compose is not available"; return; fi
   dir="$(mktemp -d "${TMPDIR:-/tmp}/lab-cred-test.XXXXXXXX")"
   script="$dir/secrets-init.sh"
-  (cd "$ROOT" && docker compose -f docker-compose.yml config --format json 2>/dev/null) \
-    | python3 -c 'import json,sys; print(json.load(sys.stdin)["services"]["secrets-init"]["command"][0].replace("$$","$"))' \
-    | sed "s#/run/secrets/#$dir/run/#g" > "$script"
+  secrets_init_field command | sed "s#/run/secrets/#$dir/run/#g" > "$script"
+  files="$(secrets_init_field files)"
   mkdir -p "$dir/run"
-  printf 'Fixture-File-1' > "$dir/run/f1"
-  run_si() { env -i PATH="$PATH" REQUIRED_SECRET_FILES="f1" REQUIRED_SECRETS="A B" "$@" sh "$script" >/dev/null 2>&1; }
+  good_files() { for g in $SECRET_FILE_NAMES; do printf 'Fixture-File-1' > "$dir/run/$g"; done; }
+  run_si() { env -i PATH="$PATH" REQUIRED_SECRET_FILES="$files" REQUIRED_SECRETS="A B" "$@" sh "$script" >/dev/null 2>&1; }
   local fails=""
+  good_files
   run_si A=good1 B=good2 || fails="$fails valid"
   run_si A=good1 B="  " && fails="$fails whitespace"
+  run_si A=good1 B="$(printf '\v\f ')" && fails="$fails vt-ff"
   run_si A=good1 B=CHANGEME_X && fails="$fails changeme"
   run_si A=good1 B="LabDemo""Pass1!" && fails="$fails demo-default"
   run_si A=good1 && fails="$fails unset"
-  printf 'x-insecure-dev-only\n' > "$dir/run/f1"
-  run_si A=good1 B=good2 && fails="$fails file-placeholder"
-  : > "$dir/run/f1"
-  run_si A=good1 B=good2 && fails="$fails file-empty"
+  for f in $SECRET_FILE_NAMES; do
+    good_files; printf 'x-insecure-dev-only\n' > "$dir/run/$f"
+    run_si A=good1 B=good2 && fails="$fails $f-placeholder"
+    good_files; printf '\v\f\n' > "$dir/run/$f"
+    run_si A=good1 B=good2 && fails="$fails $f-empty"
+    good_files; rm -f "$dir/run/$f"
+    run_si A=good1 B=good2 && fails="$fails $f-missing"
+  done
   rm -rf -- "$dir"
   if [[ -n "$fails" ]]; then bad "$t" "wrong result for:$fails"; else ok "$t"; fi
+}
+
+test_padded_placeholders_are_rejected() {
+  local t=${FUNCNAME[0]} key line old="LabDemo""Pass1!"
+  while IFS='|' read -r key line; do
+    new_fixture
+    good_env_except "$key"
+    printf '%s\n' "$line" >> "$FIX/.env"
+    if check >/dev/null 2>&1; then bad "$t" "accepted: $key (padded/commented old value)"; else ok "$t ($key)"; fi
+    cleanup
+  done <<EOF
+DEMO_USER_PASSWORD|DEMO_USER_PASSWORD=" ${old} "
+OPENWEBUI_SECRET_KEY|OPENWEBUI_SECRET_KEY=" CHANGEME_x"
+PGADMIN_PASSWORD|PGADMIN_PASSWORD=old-insecure-dev-only # note
+EOF
 }
 
 test_secrets_init_lists_every_required_name() {
@@ -345,7 +395,10 @@ test_whitespace_only_value_is_rejected
 test_old_demo_default_is_rejected
 test_placeholder_secret_files_are_rejected
 test_secret_file_consumers_wait_for_secrets_init
+test_secrets_init_mounts_exactly_the_file_secrets
+test_secrets_init_checks_every_file_secret
 test_secrets_init_script_behaviour
+test_padded_placeholders_are_rejected
 test_secrets_init_lists_every_required_name
 test_every_consumer_waits_for_secrets_init
 test_quoted_empty_with_comment_is_rejected

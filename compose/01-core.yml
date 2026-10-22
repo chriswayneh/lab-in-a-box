@@ -54,10 +54,10 @@ services:
     command:
       - |
         bad=""
-        # A value counts as missing when it is empty after removing spaces,
-        # tabs and line breaks, or is a placeholder or an old shared default.
+        # A value counts as missing when it is empty after removing all whitespace
+        # (spaces, tabs, line breaks, \v, \f), or is a placeholder or old default.
         rejected() {
-          trimmed="$$(printf '%s' "$$1" | tr -d ' \t\r\n')"
+          trimmed="$$(printf '%s' "$$1" | tr -d '[:space:]')"
           case "$$trimmed" in
             ""|CHANGEME_*|*insecure-dev-only|'LabDemoPass1!') return 0 ;;
           esac
