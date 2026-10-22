@@ -66,7 +66,7 @@ main() {
   row "Password" "$(env_value KEYCLOAK_ADMIN_PASSWORD "NOT CONFIGURED — run make secrets")"
   printf '  %-14s %s\n' "Realm" "$(env_value KEYCLOAK_REALM lab)"
   printf '  %-14s %s\n' "Demo users" "alice, bob, carol, dave"
-  row "Demo password" "$(env_value DEMO_USER_PASSWORD LabDemoPass1!)"
+  row "Demo password" "$(env_value DEMO_USER_PASSWORD "NOT CONFIGURED — run make secrets")"
 
   service "Vault" "vault"
   row "Root token" "$(env_value VAULT_DEV_ROOT_TOKEN "NOT CONFIGURED — run make secrets")"

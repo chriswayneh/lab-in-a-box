@@ -45,6 +45,109 @@ good_env_except() {
     for s in "$@"; do [[ "$n" == "$s" ]] && skip=1; done
     (( skip )) || printf '%s=Fixture-Good-%s-1\n' "$n" "${#n}" >> "$FIX/.env"
   done
+  good_secret_files
+}
+
+# Generated-looking file secrets in secrets/local, referenced from .env.
+good_secret_files() {
+  local f
+  mkdir -p "$FIX/secrets/local"
+  for f in postgres_password minio_root_password grafana_admin_password portainer_admin_password; do
+    printf 'Fixture-File-%s' "${#f}" > "$FIX/secrets/local/$f.txt"
+  done
+  printf 'LAB_SECRETS_DIR=./secrets/local\n' >> "$FIX/.env"
+}
+
+test_whitespace_only_value_is_rejected() {
+  local t=${FUNCNAME[0]}
+  new_fixture
+  good_env_except OPENWEBUI_SECRET_KEY
+  printf 'OPENWEBUI_SECRET_KEY="  \t "\n' >> "$FIX/.env"
+  if check >/dev/null 2>&1; then bad "$t" "a whitespace-only value was accepted"; else ok "$t"; fi
+  cleanup
+}
+
+test_old_demo_default_is_rejected() {
+  local t=${FUNCNAME[0]}
+  new_fixture
+  good_env_except DEMO_USER_PASSWORD
+  printf "DEMO_USER_PASSWORD='%s'\n" "LabDemo""Pass1!" >> "$FIX/.env"
+  if check >/dev/null 2>&1; then bad "$t" "the old published demo password was accepted"; else ok "$t"; fi
+  cleanup
+}
+
+test_placeholder_secret_files_are_rejected() {
+  local t=${FUNCNAME[0]} f mode
+  for f in postgres_password minio_root_password grafana_admin_password portainer_admin_password; do
+    for mode in placeholder empty missing; do
+      new_fixture
+      good_env_except
+      case $mode in
+        placeholder) printf 'changeme-%s-insecure-dev-only' "$f" > "$FIX/secrets/local/$f.txt" ;;
+        empty) printf ' \n' > "$FIX/secrets/local/$f.txt" ;;
+        missing) rm -f "$FIX/secrets/local/$f.txt" ;;
+      esac
+      if check >/dev/null 2>&1; then bad "$t" "$f $mode was accepted"
+      else ok "$t ($f $mode)"; fi
+      cleanup
+    done
+  done
+  # Without LAB_SECRETS_DIR the tracked placeholders in ./secrets are used: refuse.
+  new_fixture
+  good_env_except
+  sed -i '/^LAB_SECRETS_DIR=/d' "$FIX/.env"
+  cp "$ROOT"/secrets/*.txt "$FIX/secrets/"
+  if check >/dev/null 2>&1; then bad "$t" "the tracked placeholder files were accepted"
+  else ok "$t (tracked placeholders)"; fi
+  cleanup
+}
+
+test_secret_file_consumers_wait_for_secrets_init() {
+  local t=${FUNCNAME[0]} missing
+  missing="$(python3 - "$ROOT" <<'PY'
+import glob, re, sys
+root = sys.argv[1]
+names = ["postgres_password", "minio_root_password", "grafana_admin_password", "portainer_admin_password"]
+missing = []
+for path in sorted(glob.glob(root + "/compose/*.yml")):
+    for block in re.split(r"^  (?=[a-z0-9-]+:\s*$)", open(path).read(), flags=re.M)[1:]:
+        svc = block.split(":", 1)[0]
+        if svc == "secrets-init":
+            continue
+        m = re.search(r"^    secrets:\n((?:      - .*\n)+)", block, re.M)
+        if m and any(n in m.group(1) for n in names) and not re.search(
+                r"^      secrets-init:\n        condition: service_completed_successfully", block, re.M):
+            missing.append(svc)
+print(" ".join(missing))
+PY
+)"
+  if [[ -n "$missing" ]]; then bad "$t" "secret-file consumers not gated: $missing"; else ok "$t"; fi
+}
+
+test_secrets_init_script_behaviour() {
+  # Run the real secrets-init script (as Compose renders it) against fixtures.
+  local t=${FUNCNAME[0]} script dir
+  if ! docker compose version >/dev/null 2>&1; then bad "$t" "docker compose is not available"; return; fi
+  dir="$(mktemp -d "${TMPDIR:-/tmp}/lab-cred-test.XXXXXXXX")"
+  script="$dir/secrets-init.sh"
+  (cd "$ROOT" && docker compose -f docker-compose.yml config --format json 2>/dev/null) \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["services"]["secrets-init"]["command"][0].replace("$$","$"))' \
+    | sed "s#/run/secrets/#$dir/run/#g" > "$script"
+  mkdir -p "$dir/run"
+  printf 'Fixture-File-1' > "$dir/run/f1"
+  run_si() { env -i PATH="$PATH" REQUIRED_SECRET_FILES="f1" REQUIRED_SECRETS="A B" "$@" sh "$script" >/dev/null 2>&1; }
+  local fails=""
+  run_si A=good1 B=good2 || fails="$fails valid"
+  run_si A=good1 B="  " && fails="$fails whitespace"
+  run_si A=good1 B=CHANGEME_X && fails="$fails changeme"
+  run_si A=good1 B="LabDemo""Pass1!" && fails="$fails demo-default"
+  run_si A=good1 && fails="$fails unset"
+  printf 'x-insecure-dev-only\n' > "$dir/run/f1"
+  run_si A=good1 B=good2 && fails="$fails file-placeholder"
+  : > "$dir/run/f1"
+  run_si A=good1 B=good2 && fails="$fails file-empty"
+  rm -rf -- "$dir"
+  if [[ -n "$fails" ]]; then bad "$t" "wrong result for:$fails"; else ok "$t"; fi
 }
 
 test_secrets_init_lists_every_required_name() {
@@ -238,6 +341,11 @@ test_failures_do_not_disclose_credentials() {
 }
 
 test_compose_has_no_fallback_credentials
+test_whitespace_only_value_is_rejected
+test_old_demo_default_is_rejected
+test_placeholder_secret_files_are_rejected
+test_secret_file_consumers_wait_for_secrets_init
+test_secrets_init_script_behaviour
 test_secrets_init_lists_every_required_name
 test_every_consumer_waits_for_secrets_init
 test_quoted_empty_with_comment_is_rejected

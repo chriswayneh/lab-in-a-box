@@ -140,17 +140,22 @@ come from `.env`, which `make secrets` generates. Two layers enforce it:
 `docker compose config` still parses without `.env` (CI relies on that), which is why the check is a
 startup job rather than a `${VAR:?}` parse error.
 
-One value keeps a published default on purpose: `DEMO_USER_PASSWORD`, the shared **demo-only**
-password of the seeded accounts alice, bob, carol and dave. Those accounts exist to be shown, not
-protected; `make secrets` still replaces the password with a random one.
+`DEMO_USER_PASSWORD` is required like every other credential. It is not a throwaway: alice's
+Vault userpass login receives the `platform-admin` policy, and her Keycloak group grants the
+`platform-admin` realm role, which maps to Grafana Admin and passes the oauth2-proxy role gate.
+The old published value (`LabDemo` + `Pass1!`) is rejected by both guards.
 
-What remains below applies to the tracked file-backed secrets in `secrets/*.txt`.
+The four file-backed secrets (`postgres_password`, `minio_root_password`, `grafana_admin_password`,
+`portainer_admin_password`) are checked too. `secrets-init` mounts the four files and fails when one
+is empty, whitespace-only or ends in `insecure-dev-only`, and every service that reads one waits for
+it. `check-admin-credentials.sh` applies the same file checks to `LAB_SECRETS_DIR` before `make up`,
+`make update` and `make restore`. Both guards trim whitespace before testing a value.
 
-This is a conscious trade. The project's central promise is that `docker compose up -d` works with no
-prior step; Compose resolves secret file paths at parse time, so a missing file is a hard error before
-any container starts. Shipping placeholders is what makes the promise true.
+The tracked `secrets/*.txt` placeholders remain only because Compose resolves secret file paths at
+parse time, so a missing file would break `docker compose config` in CI before any check runs. The
+runtime checks above keep the placeholders from being used.
 
-The mitigations are visibility, not obscurity:
+Other mitigations for the placeholder files:
 
 - Every default contains the literal string `insecure-dev-only`
 - `make creds` prints them in red with a fix command
@@ -159,6 +164,14 @@ The mitigations are visibility, not obscurity:
 - `scripts/check-secrets.sh`, CI and the optional pre-commit hook reject a replacement of any tracked
   fallback secret
 - CI runs Gitleaks over the full history to catch a *real* credential being committed
+
+### Residual risk: bypassing the startup job
+
+The fail-closed gate is a Compose dependency, so a caller can skip it. `docker compose up --no-deps
+<service>`, `docker compose run --no-deps`, or starting a container with plain `docker run` does not
+run `secrets-init`, and the service then starts with whatever value it was given, including an empty
+one or a placeholder file. Use `make up` or `make update`, which also run the host-side guard, and do
+not use `--no-deps` on a lab whose credentials you have not generated.
 
 ---
 

@@ -40,6 +40,9 @@ services:
   portainer:
     <<: [*defaults, *hardened]
     image: portainer/portainer-ce:lts
+    depends_on:
+      secrets-init:
+        condition: service_completed_successfully
     container_name: ${COMPOSE_PROJECT_NAME:-lab}-portainer
     command:
       - -H

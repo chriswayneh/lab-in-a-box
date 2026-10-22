@@ -36,7 +36,9 @@ SUBJECT = "jmltest"
 TOKEN_SUBJECT = "jmltoken"
 
 ENGINE = "/engine/jml.py"
-PASSWORD = os.environ.get("DEMO_USER_PASSWORD", "LabDemoPass1!")
+# Test-only fixture when the lab's own value is not exported. Set it in the
+# environment so the jml.py subprocesses provision with the same value.
+PASSWORD = os.environ.setdefault("DEMO_USER_PASSWORD", "JmlFixtureOnly7x")
 KEYCLOAK_URL = os.environ.get("KEYCLOAK_URL", "http://keycloak:8080")
 REALM = os.environ.get("KEYCLOAK_REALM", "lab")
 

@@ -178,6 +178,9 @@ services:
     <<: [*defaults, *hardened]
     # Community images were withdrawn. Build verified official source locally.
     image: lab-in-a-box/minio:2025-10-15-source1
+    depends_on:
+      secrets-init:
+        condition: service_completed_successfully
     pull_policy: build
     build:
       context: ./images/minio
@@ -258,5 +261,7 @@ services:
     networks:
       - lab_edge
     depends_on:
+      secrets-init:
+        condition: service_completed_successfully
       minio:
         condition: service_healthy

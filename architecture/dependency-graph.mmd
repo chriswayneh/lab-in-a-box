@@ -56,11 +56,14 @@ graph TD
     loki --> grafana
     prometheus --> grafana
     secrets_init --> grafana
+    secrets_init --> grafana_secrets_init
     postgres --> keycloak
     secrets_init --> keycloak
     keycloak --> keycloak_init
     secrets_init --> keycloak_init
+    secrets_init --> minio
     minio --> minio_init
+    secrets_init --> minio_init
     keycloak --> oauth2_proxy
     secrets_init --> oauth2_proxy
     ollama --> ollama_init
@@ -68,6 +71,7 @@ graph TD
     secrets_init --> open_webui
     postgres --> pgadmin
     secrets_init --> pgadmin
+    secrets_init --> portainer
     secrets_init --> postgres
     alertmanager --> prometheus
     cadvisor --> prometheus

@@ -21,12 +21,10 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 ENV_FILE="${LAB_ROOT}/.env"
 # Every credential that has no built-in default in compose/. Keep in step
 # with REQUIRED_SECRETS in compose/01-core.yml (secrets-init).
-# DEMO_USER_PASSWORD is deliberately absent: it is the shared, demo-only
-# password of the seeded alice/bob/carol/dave accounts and keeps a published
-# default (see docs/security.md). make secrets still randomises it.
 REQUIRED=(
   KEYCLOAK_ADMIN_PASSWORD
   VAULT_DEV_ROOT_TOKEN
+  DEMO_USER_PASSWORD
   KEYCLOAK_DB_PASSWORD
   GITEA_DB_PASSWORD
   REDIS_PASSWORD
@@ -81,11 +79,35 @@ for key in "${REQUIRED[@]}"; do
     reason="is missing or empty"
   elif [[ "$value" == CHANGEME_* ]]; then
     reason="is still the CHANGEME_ placeholder from .env.example"
-  elif [[ "$value" == *insecure-dev-only ]]; then
+  elif [[ "$value" == *insecure-dev-only || "$value" == 'LabDemoPass1!' ]]; then
     reason="is an old shared development default"
   fi
   if [[ -n "$reason" ]]; then
     error "${key} ${reason}"
+    (( problems++ )) || true
+  fi
+done
+
+# File-backed Docker secrets. The tracked secrets/*.txt placeholders only let
+# Compose parse; the lab must run with the generated files in LAB_SECRETS_DIR.
+SECRET_FILES=(postgres_password minio_root_password grafana_admin_password portainer_admin_password)
+secrets_dir="$(effective_value LAB_SECRETS_DIR)"
+[[ -n "$secrets_dir" && "$secrets_dir" != INTERPOLATED ]] || secrets_dir="./secrets"
+[[ "$secrets_dir" == /* ]] || secrets_dir="${LAB_ROOT}/${secrets_dir#./}"
+for name in "${SECRET_FILES[@]}"; do
+  path="${secrets_dir}/${name}.txt"
+  reason=""
+  if [[ ! -f "$path" ]]; then
+    reason="is missing"
+  else
+    content="$(tr -d ' \t\r\n' < "$path")"
+    if [[ -z "$content" ]]; then reason="is empty"
+    elif [[ "$content" == *insecure-dev-only || "$content" == CHANGEME_* ]]; then
+      reason="still holds the shipped placeholder"
+    fi
+  fi
+  if [[ -n "$reason" ]]; then
+    error "secret file ${name}.txt ${reason}"
     (( problems++ )) || true
   fi
 done
@@ -97,4 +119,4 @@ if (( problems > 0 )); then
   log "                  Keycloak password in .env alone does not change it in Keycloak."
   exit 1
 fi
-success "all ${#REQUIRED[@]} required credentials are set"
+success "all ${#REQUIRED[@]} required credentials and ${#SECRET_FILES[@]} secret files are set"

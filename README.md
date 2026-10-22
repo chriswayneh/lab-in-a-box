@@ -160,10 +160,11 @@ more.
 
 The first run builds MinIO from checksum-verified official source because upstream community images are unavailable. Build dependencies are pinned; no host Go installation or registry login is needed. Allow extra build time and internet access on first run. Later runs reuse build layers. See [MinIO builds](docs/minio-builds.md).
 
-This is enough to use the complete local lab. The passwords, tokens and client secrets in `.env` are
-unique to your machine. The four file-based secrets (PostgreSQL, MinIO, Grafana, Portainer) use the
-clearly marked placeholders in `secrets/` until you run `make secrets`, which is why `make up` is
-recommended below. The lab is intended only for a trusted local network. HTTP, HTTPS, and Gitea SSH bind to all interfaces
+Every password, token and client secret must be generated for your machine before the lab
+starts, including the demo users' password and the four file-based secrets (PostgreSQL, MinIO,
+Grafana, Portainer). The `secrets/*.txt` files in the repo are only placeholders so Compose can read
+its files; a startup job refuses them. The simplest path is `make up` below, which runs `make secrets`
+for you. The lab is intended only for a trusted local network. HTTP, HTTPS, and Gitea SSH bind to all interfaces
 by default; `*.lab.localhost` names do not restrict network access. Keep the lab off untrusted
 networks and read the [security model](docs/security.md) before exposing it beyond this computer.
 
@@ -179,6 +180,7 @@ then starts the lab. `make update` and `make restore` run the same check before 
 
 > **Got "REDIS_PASSWORD is missing or empty" (or another name), or "Missing, empty or placeholder
 > credentials" from `secrets-init`?** Your `.env` predates this check or was copied by hand.
+> The message names what is wrong (never the value). `name(file)` means a file in `secrets/local/`.
 > On a fresh lab, run `make secrets`. On a lab you already use, add the missing names to `.env` with the
 > values the lab is actually running with. Changing a password in `.env` alone does not change it inside
 > a service that already stored it, such as Keycloak, PostgreSQL or Gitea.

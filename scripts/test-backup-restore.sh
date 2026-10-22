@@ -34,6 +34,11 @@ new_fixture() {
   # A valid value for every required credential, so restore's guard passes.
   sed -n '/^REQUIRED=(/,/^)/p' "$HERE/check-admin-credentials.sh" | sed '1d;$d' | tr -d ' ' \
     | while IFS= read -r n; do printf '%s=Fixture-Restore-%s\n' "$n" "${#n}"; done >> "$FIX/repo/.env"
+  mkdir -p "$FIX/repo/secrets/local"
+  for f in postgres_password minio_root_password grafana_admin_password portainer_admin_password; do
+    printf 'Fixture-File-%s' "${#f}" > "$FIX/repo/secrets/local/$f.txt"
+  done
+  printf 'LAB_SECRETS_DIR=./secrets/local\n' >> "$FIX/repo/.env"
   : > "$FIX/calls"
   cat > "$FIX/bin/docker" <<'SH'
 #!/usr/bin/env bash
