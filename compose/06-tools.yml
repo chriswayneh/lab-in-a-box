@@ -89,7 +89,7 @@ services:
     environment:
       TZ: ${LAB_TZ:-UTC}
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-labadmin@lab.example.com}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-pgadmin-insecure-dev-only}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-}
       # Default is 80, which the container's unprivileged user cannot bind.
       PGADMIN_LISTEN_PORT: "5050"
       # Skips the "set a master password" prompt on every session. The lab is
@@ -108,6 +108,8 @@ services:
       - lab_edge
       - lab_data
     depends_on:
+      secrets-init:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
     healthcheck:

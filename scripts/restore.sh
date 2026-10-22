@@ -90,7 +90,17 @@ restore_volume() {
 # Drop only the two statements pg_dumpall writes for the restoring superuser.
 strip_bootstrap_role() {
   local role="$1"
-  sed -E "/^(DROP ROLE IF EXISTS|CREATE ROLE) \"?${role}\"?;\$/d"
+  # Exact whole-line string comparison: no regex, so a role name cannot
+  # widen the match. validate_role_name has already restricted the name.
+  awk -v drop1="DROP ROLE IF EXISTS ${role};" -v drop2="CREATE ROLE ${role};" \
+    '$0 != drop1 && $0 != drop2'
+}
+
+# PostgreSQL identifiers pg_dumpall writes unquoted. Anything else is refused
+# rather than guessed at.
+validate_role_name() {
+  [[ "$1" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] \
+    || die "POSTGRES_USER '$1' is not a plain identifier ([A-Za-z_][A-Za-z0-9_]*); refusing to restore"
 }
 
 # -----------------------------------------------------------------------------
@@ -108,6 +118,7 @@ restore_postgres() {
   # too short on a cold start or wasteful on a warm one.
   local user attempt=1
   user="$(env_value POSTGRES_USER lab)"
+  validate_role_name "$user"
   until compose exec -T postgres pg_isready -U "$user" >/dev/null 2>&1; do
     (( attempt > 30 )) && { error "PostgreSQL did not become ready"; return 1; }
     sleep 2
@@ -151,6 +162,12 @@ main() {
     exit 1
   fi
 
+  # The lab is restarted at the end, so refuse now, while it is still
+  # running, if .env is missing a required credential.
+  bash "${LAB_SCRIPT_DIR}/check-admin-credentials.sh" \
+    || die "fix the credentials above first — nothing was changed"
+  validate_role_name "$(env_value POSTGRES_USER lab)"
+
   log ""
   warn "This will STOP the lab and OVERWRITE current data."
   warn "Anything created since ${BACKUP_NAME} will be lost."
@@ -173,7 +190,10 @@ main() {
   restore_postgres || (( failures++ )) || true
 
   info "bringing the lab back up"
-  compose up -d >/dev/null 2>&1
+  if ! compose up -d >/dev/null 2>&1; then
+    error "the lab did not start again after the restore — check with: make ps"
+    (( failures++ )) || true
+  fi
 
   log ""
   if (( failures == 0 )); then

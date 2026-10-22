@@ -27,10 +27,13 @@ skip() { printf 'skip %s (%s)\n' "$1" "$2"; (( SKIPS++ )) || true; }
 new_fixture() {
   FIX="$(mktemp -d "${TMPDIR:-/tmp}/lab-br-test.XXXXXXXX")"
   mkdir -p "$FIX/repo/scripts/lib" "$FIX/bin"
-  cp "$HERE/backup.sh" "$HERE/restore.sh" "$FIX/repo/scripts/"
+  cp "$HERE/backup.sh" "$HERE/restore.sh" "$HERE/check-admin-credentials.sh" "$FIX/repo/scripts/"
   cp "$HERE/lib/common.sh" "$FIX/repo/scripts/lib/"
   printf 'services: {}\n' > "$FIX/repo/docker-compose.yml"
-  printf 'POSTGRES_USER=lab\nCOMPOSE_PROJECT_NAME=lab\n' > "$FIX/repo/.env"
+  printf 'POSTGRES_USER=%s\nCOMPOSE_PROJECT_NAME=lab\n' "${FIX_PG_USER:-lab}" > "$FIX/repo/.env"
+  # A valid value for every required credential, so restore's guard passes.
+  sed -n '/^REQUIRED=(/,/^)/p' "$HERE/check-admin-credentials.sh" | sed '1d;$d' | tr -d ' ' \
+    | while IFS= read -r n; do printf '%s=Fixture-Restore-%s\n' "$n" "${#n}"; done >> "$FIX/repo/.env"
   : > "$FIX/calls"
   cat > "$FIX/bin/docker" <<'SH'
 #!/usr/bin/env bash
@@ -44,6 +47,7 @@ if [[ "$1" == compose ]]; then
   case "$args" in
     *" ps --status running --services "*) echo postgres; exit 0 ;;
     *" up -d postgres "*) exit "${FAKE_PG_UP_RC:-0}" ;;
+    *" up -d ") exit "${FAKE_UP_RC:-0}" ;;
     *" pg_isready "*) exit 0 ;;
     *" pg_dumpall "*)
       [[ -n "${FAKE_DUMP_FAIL:-}" ]] && exit 1
@@ -91,7 +95,8 @@ run_backup() {
   ( PATH="$FIX/bin:$PATH" BACKUP_KEEP=3 NO_COLOR=1 bash "$FIX/repo/scripts/backup.sh" ) >"$FIX/out" 2>&1
 }
 run_restore() {
-  ( PATH="$FIX/bin:$PATH" ASSUME_YES=1 NO_COLOR=1 BACKUP="$1" bash "$FIX/repo/scripts/restore.sh" ) \
+  ( unset KEYCLOAK_ADMIN_PASSWORD VAULT_DEV_ROOT_TOKEN
+    PATH="$FIX/bin:$PATH" ASSUME_YES=1 NO_COLOR=1 BACKUP="$1" bash "$FIX/repo/scripts/restore.sh" ) \
     </dev/null >"$FIX/out" 2>&1
 }
 count_old() { find "$FIX/repo/backups" -maxdepth 1 -mindepth 1 -type d -name '2020*' | wc -l | tr -d ' '; }
@@ -246,6 +251,57 @@ test_sql_errors_do_not_leak_data() {
   cleanup_fixture; stop_real_pg
 }
 
+test_role_with_dot_is_refused_not_matched() {
+  # POSTGRES_USER=lab.x must not strip "CREATE ROLE labax;" (regex dot) and
+  # must be refused outright before the lab is touched.
+  local t=${FUNCNAME[0]}; FIX_PG_USER=lab.x new_fixture; unset FIX_PG_USER
+  make_backup b1 $'CREATE ROLE labax;'
+  run_restore b1; local rc=$?
+  if (( rc == 0 )); then bad "$t" "restore ran with POSTGRES_USER=lab.x"
+  elif grep -qE ' down| psql ' "$FIX/calls"; then bad "$t" "the lab was touched before refusing"
+  elif ! grep -q "not a plain identifier" "$FIX/out"; then bad "$t" "no clear refusal message"
+  else ok "$t"; fi
+  cleanup_fixture
+}
+
+test_role_with_slash_is_refused() {
+  local t=${FUNCNAME[0]}; FIX_PG_USER='lab/x' new_fixture; unset FIX_PG_USER
+  make_backup b1
+  run_restore b1; local rc=$?
+  if (( rc == 0 )); then bad "$t" "restore ran with POSTGRES_USER=lab/x"
+  elif grep -qE ' down| psql ' "$FIX/calls"; then bad "$t" "the lab was touched before refusing"
+  else ok "$t"; fi
+  cleanup_fixture
+}
+
+test_strip_is_exact_string_match() {
+  local t=${FUNCNAME[0]}; new_fixture
+  make_backup b1 $'CREATE ROLE labax;\nDROP ROLE IF EXISTS lab ;\nCREATE ROLE lab;\n  CREATE ROLE lab;'
+  run_restore b1
+  if [[ "$(cat "$FIX/psql_stdin" 2>/dev/null)" == $'CREATE ROLE labax;\nDROP ROLE IF EXISTS lab ;\n  CREATE ROLE lab;' ]]; then ok "$t"
+  else bad "$t" "lines other than the exact bootstrap statements were removed"; fi
+  cleanup_fixture
+}
+
+test_missing_credential_refuses_before_stopping_lab() {
+  local t=${FUNCNAME[0]}; new_fixture; make_backup b1
+  sed -i '/^REDIS_PASSWORD=/d' "$FIX/repo/.env"
+  run_restore b1; local rc=$?
+  if (( rc == 0 )); then bad "$t" "restore ran with REDIS_PASSWORD missing"
+  elif grep -qE ' down| psql ' "$FIX/calls"; then bad "$t" "the lab was stopped before refusing"
+  else ok "$t"; fi
+  cleanup_fixture
+}
+
+test_final_compose_up_failure_fails_restore() {
+  local t=${FUNCNAME[0]}; new_fixture; make_backup b1
+  FAKE_UP_RC=1 run_restore b1; local rc=$?
+  if (( rc == 0 )); then bad "$t" "exit 0 when the lab did not start again"
+  elif grep -q "restore complete" "$FIX/out"; then bad "$t" "success was reported"
+  else ok "$t"; fi
+  cleanup_fixture
+}
+
 # -- real PostgreSQL cases (optional) ------------------------------------------
 pg_bin() {
   local d
@@ -317,6 +373,11 @@ test_postgres_start_failure_is_reported
 test_successful_restore_reports_success
 test_only_bootstrap_role_lines_are_stripped
 test_missing_dump_fails_before_changes
+test_role_with_dot_is_refused_not_matched
+test_role_with_slash_is_refused
+test_strip_is_exact_string_match
+test_missing_credential_refuses_before_stopping_lab
+test_final_compose_up_failure_fails_restore
 test_legacy_archive_only_backup_fails
 test_real_sql_error_stops_before_later_statement
 test_lookalike_error_is_not_filtered

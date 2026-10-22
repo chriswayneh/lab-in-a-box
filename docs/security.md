@@ -122,15 +122,29 @@ surfaces much later as a confusing provisioning failure rather than an obvious r
 
 ### The shipped defaults
 
-The repository contains fallback credentials (`changeme-postgres-insecure-dev-only` and similar) in
-the tracked `secrets/*.txt` files and as `${VAR:-default}` expressions in the compose files.
+The repository contains placeholder credentials (`changeme-postgres-insecure-dev-only` and similar) in
+the tracked `secrets/*.txt` files.
 
-**Exception: the Keycloak admin password and the Vault root token have no fallback.** They control
-every identity and every secret in the lab, so they must come from `.env`, which `make secrets`
-generates. `scripts/check-admin-credentials.sh` runs before `make up` and after `make secrets`, and
-refuses a missing or empty value, a `CHANGEME_` placeholder, or an old `insecure-dev-only` default.
-A bare `docker compose up -d` without `.env` still parses, but Keycloak and Vault come up with no
-usable admin credential instead of a published one.
+**No `.env` credential has a fallback any more.** The Keycloak admin, database and client secrets,
+the Vault root token, Redis, Gitea, Open WebUI, pgAdmin, and oauth2-proxy must all
+come from `.env`, which `make secrets` generates. Two layers enforce it:
+
+- `scripts/check-admin-credentials.sh` runs in `make up`, `make update`, `make restore` (before the
+  lab is stopped) and after `make secrets`. It refuses a missing or empty value (including
+  `KEY="" # comment`), a value that refers to another variable (`${...}`), a `CHANGEME_` placeholder
+  or an old `insecure-dev-only` default, and prints only variable names.
+- The one-shot `secrets-init` service in `compose/01-core.yml` repeats the check inside Compose. Every
+  service that uses one of these values depends on it, so even a direct `docker compose up -d` stops
+  with "run make secrets" instead of starting with an empty or shared credential.
+
+`docker compose config` still parses without `.env` (CI relies on that), which is why the check is a
+startup job rather than a `${VAR:?}` parse error.
+
+One value keeps a published default on purpose: `DEMO_USER_PASSWORD`, the shared **demo-only**
+password of the seeded accounts alice, bob, carol and dave. Those accounts exist to be shown, not
+protected; `make secrets` still replaces the password with a random one.
+
+What remains below applies to the tracked file-backed secrets in `secrets/*.txt`.
 
 This is a conscious trade. The project's central promise is that `docker compose up -d` works with no
 prior step; Compose resolves secret file paths at parse time, so a missing file is a hard error before

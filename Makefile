@@ -373,6 +373,7 @@ pull: ## Pull upstream images and build pinned MinIO without applying them
 update: ## Pull the latest images and recreate changed containers
 	@printf '$(BOLD)Updating the lab$(RESET)\n'
 	@bash scripts/check-secret-files.sh
+	@bash scripts/check-admin-credentials.sh
 	@$(COMPOSE) pull --ignore-buildable
 	@$(COMPOSE) build minio minio-init
 	@$(COMPOSE) up -d --remove-orphans

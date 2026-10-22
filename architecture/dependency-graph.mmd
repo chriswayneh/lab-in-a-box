@@ -49,26 +49,39 @@ graph TD
     alert_webhook --> alertmanager
     postgres --> gitea
     redis --> gitea
+    secrets_init --> gitea
     gitea --> gitea_init
+    secrets_init --> gitea_init
     grafana_secrets_init --> grafana
     loki --> grafana
     prometheus --> grafana
+    secrets_init --> grafana
     postgres --> keycloak
+    secrets_init --> keycloak
     keycloak --> keycloak_init
+    secrets_init --> keycloak_init
     minio --> minio_init
     keycloak --> oauth2_proxy
+    secrets_init --> oauth2_proxy
     ollama --> ollama_init
     ollama --> open_webui
+    secrets_init --> open_webui
     postgres --> pgadmin
+    secrets_init --> pgadmin
+    secrets_init --> postgres
     alertmanager --> prometheus
     cadvisor --> prometheus
     loki --> promtail
     socket_proxy --> promtail
+    secrets_init --> redis
     gitea --> scim_provisioner
     grafana --> scim_provisioner
     keycloak_init --> scim_provisioner
+    secrets_init --> scim_provisioner
     socket_proxy --> traefik
+    secrets_init --> vault
+    secrets_init --> vault_init
     vault --> vault_init
 
     classDef initJob fill:#1e293b,stroke:#64748b,stroke-width:1px,color:#cbd5e1;
-    class gitea_init,grafana_secrets_init,keycloak_init,minio_init,ollama_init,vault_init initJob;
+    class gitea_init,grafana_secrets_init,keycloak_init,minio_init,ollama_init,secrets_init,vault_init initJob;

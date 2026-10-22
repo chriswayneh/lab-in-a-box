@@ -67,7 +67,7 @@ services:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
       KC_DB_USERNAME: keycloak
-      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak-insecure-dev-only}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-}
 
       # --- Initial admin ----------------------------------------------------
       # Renamed from KEYCLOAK_ADMIN in Keycloak 26. Only consulted the first
@@ -108,6 +108,8 @@ services:
       - lab_data
       - lab_observability
     depends_on:
+      secrets-init:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
     healthcheck:
@@ -155,15 +157,17 @@ services:
       KC_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KC_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-}
       DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-LabDemoPass1!}
-      GRAFANA_CLIENT_SECRET: ${KEYCLOAK_GRAFANA_CLIENT_SECRET:-grafana-insecure-dev-only}
-      OAUTH2_PROXY_CLIENT_SECRET: ${KEYCLOAK_OAUTH2_PROXY_CLIENT_SECRET:-oauth2-proxy-insecure-dev-only}
-      SCIM_CLIENT_SECRET: ${KEYCLOAK_SCIM_CLIENT_SECRET:-scim-insecure-dev-only}
+      GRAFANA_CLIENT_SECRET: ${KEYCLOAK_GRAFANA_CLIENT_SECRET:-}
+      OAUTH2_PROXY_CLIENT_SECRET: ${KEYCLOAK_OAUTH2_PROXY_CLIENT_SECRET:-}
+      SCIM_CLIENT_SECRET: ${KEYCLOAK_SCIM_CLIENT_SECRET:-}
       LAB_DOMAIN: ${LAB_DOMAIN:-lab.localhost}
     volumes:
       - ./scripts/init-keycloak.sh:/scripts/init-keycloak.sh:ro
     networks:
       - lab_edge
     depends_on:
+      secrets-init:
+        condition: service_completed_successfully
       keycloak:
         condition: service_healthy
 
@@ -196,7 +200,7 @@ services:
       - --upstream=static://202
       - --provider=keycloak-oidc
       - --client-id=oauth2-proxy
-      - --client-secret=${KEYCLOAK_OAUTH2_PROXY_CLIENT_SECRET:-oauth2-proxy-insecure-dev-only}
+      - --client-secret=${KEYCLOAK_OAUTH2_PROXY_CLIENT_SECRET:-}
       # Issuer matches Keycloak's public hostname (token `iss` claim). Discovery
       # is skipped so token/JWKS calls stay on the internal HTTP address and
       # never depend on the self-signed edge certificate — same pattern as
@@ -216,7 +220,7 @@ services:
       - --allowed-role=developer
       - --allowed-role=security-analyst
       - --allowed-role=auditor
-      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET:-oauth2proxyinsecuredevonlyckseed}
+      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET:-}
       - --cookie-domain=.${LAB_DOMAIN:-lab.localhost}
       - --cookie-secure=true
       - --cookie-samesite=lax
@@ -232,6 +236,8 @@ services:
     networks:
       - lab_edge
     depends_on:
+      secrets-init:
+        condition: service_completed_successfully
       keycloak:
         condition: service_started
     healthcheck:
@@ -281,10 +287,10 @@ services:
       TZ: ${LAB_TZ:-UTC}
       KEYCLOAK_URL: http://keycloak:8080
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-lab}
-      KEYCLOAK_SCIM_CLIENT_SECRET: ${KEYCLOAK_SCIM_CLIENT_SECRET:-scim-insecure-dev-only}
+      KEYCLOAK_SCIM_CLIENT_SECRET: ${KEYCLOAK_SCIM_CLIENT_SECRET:-}
       GITEA_URL: http://gitea:3000
       GITEA_ADMIN_USER: ${GITEA_ADMIN_USER:-labadmin}
-      GITEA_ADMIN_PASSWORD: ${GITEA_ADMIN_PASSWORD:-gitea-insecure-dev-only}
+      GITEA_ADMIN_PASSWORD: ${GITEA_ADMIN_PASSWORD:-}
       GRAFANA_URL: http://grafana:3000
       GRAFANA_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GRAFANA_ADMIN_PASSWORD_FILE: /run/secrets/grafana_admin_password
@@ -302,6 +308,8 @@ services:
     networks:
       - lab_edge
     depends_on:
+      secrets-init:
+        condition: service_completed_successfully
       keycloak-init:
         condition: service_completed_successfully
       gitea:
@@ -327,6 +335,9 @@ services:
   vault:
     <<: *defaults
     image: hashicorp/vault:1.18
+    depends_on:
+      secrets-init:
+        condition: service_completed_successfully
     container_name: ${COMPOSE_PROJECT_NAME:-lab}-vault
     environment:
       TZ: ${LAB_TZ:-UTC}
@@ -390,5 +401,7 @@ services:
     networks:
       - lab_edge
     depends_on:
+      secrets-init:
+        condition: service_completed_successfully
       vault:
         condition: service_healthy

@@ -88,12 +88,12 @@ main() {
 
   service "Gitea" "git"
   row "Admin user" "$(env_value GITEA_ADMIN_USER labadmin)"
-  row "Password" "$(env_value GITEA_ADMIN_PASSWORD gitea-insecure-dev-only)"
+  row "Password" "$(env_value GITEA_ADMIN_PASSWORD "NOT CONFIGURED — run make secrets")"
   printf '  %-14s %s\n' "SSH" "ssh://git@${DOMAIN}:$(env_value GITEA_SSH_PORT 2222)"
 
   service "pgAdmin" "pgadmin"
   row "Email" "$(env_value PGADMIN_EMAIL labadmin@lab.local)"
-  row "Password" "$(env_value PGADMIN_PASSWORD pgadmin-insecure-dev-only)"
+  row "Password" "$(env_value PGADMIN_PASSWORD "NOT CONFIGURED — run make secrets")"
 
   printf '\n%s%s%s\n' "$C_CYAN" "PostgreSQL" "$C_RESET"
   printf '  %-14s %s\n' "Host" "localhost:$(env_value POSTGRES_PORT 5432)"
@@ -103,7 +103,7 @@ main() {
 
   printf '\n%s%s%s\n' "$C_CYAN" "Redis" "$C_RESET"
   printf '  %-14s %s\n' "Host" "localhost:$(env_value REDIS_PORT 6379)"
-  row "Password" "$(env_value REDIS_PASSWORD redis-insecure-dev-only)"
+  row "Password" "$(env_value REDIS_PASSWORD "NOT CONFIGURED — run make secrets")"
 
   service "Portainer" "portainer"
   row "User" "admin"

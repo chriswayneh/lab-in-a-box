@@ -25,9 +25,8 @@ provision_service() {
   local password="${!password_var:-}"
 
   if [[ -z "$password" ]]; then
-    log "WARNING: $password_var is unset; falling back to a derived value."
-    log "         Run 'make secrets' for cryptographically random credentials."
-    password="${role}-insecure-dev-only"
+    log "ERROR: $password_var is not set. Run 'make secrets' and start again."
+    exit 1
   fi
 
   log "provisioning database '$db' owned by role '$role'"

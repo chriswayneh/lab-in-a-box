@@ -15,7 +15,7 @@ action from someone with an existing lab**: a `make clean`, a manual migration, 
 
 ### Changed
 
-- **Action needed only if you start the lab without `.env`:** the Keycloak admin password and the Vault root token no longer have a built-in development default. `make up` generates them on first run; with plain `docker compose up -d`, run `bash scripts/generate-secrets.sh` once first. A new check, `scripts/check-admin-credentials.sh`, runs before `make up` and after `make secrets` and refuses missing, empty, placeholder or old default values without printing them. Existing labs with a generated `.env` need no action.
+- **Action needed only if you start the lab without a generated `.env`:** no password, token or client secret in `.env` has a built-in development default any more (Keycloak admin/DB/clients, Vault root token, Redis, Gitea admin/DB, Open WebUI, pgAdmin, oauth2-proxy cookie). `make up` generates them on first run; with plain `docker compose up -d`, run `bash scripts/generate-secrets.sh` once first. A new `secrets-init` startup job makes every consumer fail closed, and `scripts/check-admin-credentials.sh` runs in `make up`, `make update`, `make restore` and `make secrets`, refusing missing, empty, `${...}`, placeholder or old default values without printing them. Existing labs with a generated `.env` need no action.
 
 ### Security
 

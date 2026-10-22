@@ -382,7 +382,7 @@ services:
       GF_AUTH_GENERIC_OAUTH_NAME: Keycloak
       GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP: "true"
       GF_AUTH_GENERIC_OAUTH_CLIENT_ID: grafana
-      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: ${KEYCLOAK_GRAFANA_CLIENT_SECRET:-grafana-insecure-dev-only}
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: ${KEYCLOAK_GRAFANA_CLIENT_SECRET:-}
       GF_AUTH_GENERIC_OAUTH_SCOPES: "openid email profile roles"
       GF_AUTH_GENERIC_OAUTH_AUTH_URL: https://keycloak.${LAB_DOMAIN:-lab.localhost}/realms/${KEYCLOAK_REALM:-lab}/protocol/openid-connect/auth
       # Token and userinfo calls travel container-to-container, so they use the
@@ -410,6 +410,8 @@ services:
       - lab_edge
       - lab_observability
     depends_on:
+      secrets-init:
+        condition: service_completed_successfully
       prometheus:
         condition: service_healthy
       loki:

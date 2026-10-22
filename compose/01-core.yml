@@ -28,6 +28,72 @@ x-hardened: &hardened
 services:
 
   # ---------------------------------------------------------------------------
+  # secrets-init — refuse to start the lab without generated credentials
+  #
+  # None of the passwords, tokens and client secrets below has a built-in
+  # default. They come from .env, which `make secrets` (or
+  # `bash scripts/generate-secrets.sh`) generates. Every service that uses one
+  # depends on this job, so even a direct `docker compose up -d` stops here
+  # with a clear message instead of starting with an empty or shared value.
+  # Only variable names are ever printed, never values.
+  # ---------------------------------------------------------------------------
+  secrets-init:
+    image: postgres:17-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-lab}-secrets-init
+    restart: "no"
+    network_mode: none
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "1"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        bad=""
+        for name in $$REQUIRED_SECRETS; do
+          eval "value=\$${$$name:-}"
+          case "$$value" in
+            ""|CHANGEME_*|*insecure-dev-only) bad="$$bad $$name" ;;
+          esac
+        done
+        if [ -n "$$bad" ]; then
+          echo "Missing, empty or placeholder credentials:$$bad" >&2
+          echo "Run 'make secrets' (or 'bash scripts/generate-secrets.sh') and start again." >&2
+          exit 1
+        fi
+        echo "all required credentials are set"
+    environment:
+      REQUIRED_SECRETS: >-
+        KEYCLOAK_DB_PASSWORD
+        GITEA_DB_PASSWORD
+        REDIS_PASSWORD
+        KEYCLOAK_ADMIN_PASSWORD
+        KEYCLOAK_GRAFANA_CLIENT_SECRET
+        KEYCLOAK_OAUTH2_PROXY_CLIENT_SECRET
+        OAUTH2_PROXY_COOKIE_SECRET
+        KEYCLOAK_SCIM_CLIENT_SECRET
+        GITEA_ADMIN_PASSWORD
+        VAULT_DEV_ROOT_TOKEN
+        OPENWEBUI_SECRET_KEY
+        PGADMIN_PASSWORD
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-}
+      GITEA_DB_PASSWORD: ${GITEA_DB_PASSWORD:-}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-}
+      KEYCLOAK_GRAFANA_CLIENT_SECRET: ${KEYCLOAK_GRAFANA_CLIENT_SECRET:-}
+      KEYCLOAK_OAUTH2_PROXY_CLIENT_SECRET: ${KEYCLOAK_OAUTH2_PROXY_CLIENT_SECRET:-}
+      OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH2_PROXY_COOKIE_SECRET:-}
+      KEYCLOAK_SCIM_CLIENT_SECRET: ${KEYCLOAK_SCIM_CLIENT_SECRET:-}
+      GITEA_ADMIN_PASSWORD: ${GITEA_ADMIN_PASSWORD:-}
+      VAULT_DEV_ROOT_TOKEN: ${VAULT_DEV_ROOT_TOKEN:-}
+      OPENWEBUI_SECRET_KEY: ${OPENWEBUI_SECRET_KEY:-}
+      PGADMIN_PASSWORD: ${PGADMIN_PASSWORD:-}
+
+  # ---------------------------------------------------------------------------
   # Docker socket proxy
   #
   # Traefik needs the Docker API to discover routes. Handing it the raw socket
@@ -177,6 +243,9 @@ services:
   postgres:
     <<: [*defaults, *hardened]
     image: postgres:17-alpine
+    depends_on:
+      secrets-init:
+        condition: service_completed_successfully
     container_name: ${COMPOSE_PROJECT_NAME:-lab}-postgres
     command:
       - postgres
@@ -201,8 +270,8 @@ services:
       POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
       POSTGRES_HOST_AUTH_METHOD: scram-sha-256
       # Consumed by 01-create-service-databases.sh to provision per-service roles.
-      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak-insecure-dev-only}
-      GITEA_DB_PASSWORD: ${GITEA_DB_PASSWORD:-gitea-insecure-dev-only}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-}
+      GITEA_DB_PASSWORD: ${GITEA_DB_PASSWORD:-}
     secrets:
       - postgres_password
     volumes:
@@ -227,6 +296,9 @@ services:
   redis:
     <<: [*defaults, *hardened]
     image: redis:7.4-alpine
+    depends_on:
+      secrets-init:
+        condition: service_completed_successfully
     container_name: ${COMPOSE_PROJECT_NAME:-lab}-redis
     # `redis` user, not root. The official image ships the account already.
     user: redis
@@ -238,7 +310,7 @@ services:
       # `rename-command X ""` directives, whose empty second argument cannot be
       # expressed reliably as a compose command argument.
       - --requirepass
-      - ${REDIS_PASSWORD:-redis-insecure-dev-only}
+      - ${REDIS_PASSWORD:-}
     volumes:
       - redis_data:/data
       - ./configs/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
@@ -247,14 +319,14 @@ services:
     ports:
       - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD:-redis-insecure-dev-only}\" ping | grep -q PONG"]
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 10s
     environment:
       TZ: ${LAB_TZ:-UTC}
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis-insecure-dev-only}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
 
   # ---------------------------------------------------------------------------
   # Landing page — the front door at http://${LAB_DOMAIN}
