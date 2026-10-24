@@ -12,7 +12,7 @@ they produce, and the README stays about the project.
 | --- | --- | --- |
 | `landing-page-live.png` | <https://lab.localhost> | The full service index with status dots settled green |
 | `grafana-overview-live.png` | Grafana → Lab Overview | Populated panels. Leave the lab running an hour first; an empty graph shows nothing |
-| `keycloak-admin-desktop.png` | Keycloak administrator console after sign-in | The master realm welcome page. The project README shows this file, not the sign-in page. |
+| `keycloak-admin-desktop.png` | Keycloak administrator console after sign-in | The Lab-in-a-Box realm Users list (alice, bob, carol, dave). The project README shows this file, not the sign-in page. |
 | `keycloak-login-desktop.png` | Keycloak administrator sign-in | The sign-in page. The project README does not use this file. |
 | `open-webui-live.png` | <https://chat.lab.localhost> | The local first-run sign-in page. The project README does not use this file. |
 | `traefik-dashboard.png` | <https://traefik.lab.localhost> | The HTTP Routers view, showing the discovered services with a green status. The project README shows this file. Current capture: Oct 12, 2026, after demo-user sign-in. |
