@@ -8,7 +8,7 @@
 
 Every container in the lab, grouped by the compose fragment that defines it. Hostnames assume `LAB_DOMAIN=lab.localhost`.
 
-**32 available services** across **6 layers**. **30 start by default**; `qdrant`, `watchtower` require their optional Compose profiles. Services whose name ends in `-init` are one-shot provisioning jobs: they run once, do their work, and exit. A stopped `-init` container is a success, not a fault.
+**33 available services** across **6 layers**. **31 start by default**; `qdrant`, `watchtower` require their optional Compose profiles. Services whose name ends in `-init` are one-shot provisioning jobs: they run once, do their work, and exit. A stopped `-init` container is a success, not a fault.
 
 ## Core
 
@@ -90,6 +90,7 @@ _Not yet categorised_
 | Service | Image | URL | Host ports | Networks | Health | Privileges |
 | --- | --- | --- | --- | --- | :---: | --- |
 | `grafana-secrets-init` | `grafana/grafana:11.5.0` | — | — | — | n/a | uid `0:0`, read-only fs |
+| `secrets-init` | `postgres:17-alpine` | — | — | — | n/a | read-only fs |
 
 ## Networks
 

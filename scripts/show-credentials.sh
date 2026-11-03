@@ -63,13 +63,13 @@ main() {
 
   service "Keycloak" "keycloak"
   row "Admin user" "$(env_value KEYCLOAK_ADMIN admin)"
-  row "Password" "$(env_value KEYCLOAK_ADMIN_PASSWORD admin-insecure-dev-only)"
+  row "Password" "$(env_value KEYCLOAK_ADMIN_PASSWORD "NOT CONFIGURED — run make secrets")"
   printf '  %-14s %s\n' "Realm" "$(env_value KEYCLOAK_REALM lab)"
   printf '  %-14s %s\n' "Demo users" "alice, bob, carol, dave"
-  row "Demo password" "$(env_value DEMO_USER_PASSWORD LabDemoPass1!)"
+  row "Demo password" "$(env_value DEMO_USER_PASSWORD "NOT CONFIGURED — run make secrets")"
 
   service "Vault" "vault"
-  row "Root token" "$(env_value VAULT_DEV_ROOT_TOKEN vault-root-insecure-dev-only)"
+  row "Root token" "$(env_value VAULT_DEV_ROOT_TOKEN "NOT CONFIGURED — run make secrets")"
   printf '  %-14s %s\n' "userpass" "alice / bob / carol (same demo password)"
 
   service "Grafana" "grafana"
@@ -88,12 +88,12 @@ main() {
 
   service "Gitea" "git"
   row "Admin user" "$(env_value GITEA_ADMIN_USER labadmin)"
-  row "Password" "$(env_value GITEA_ADMIN_PASSWORD gitea-insecure-dev-only)"
+  row "Password" "$(env_value GITEA_ADMIN_PASSWORD "NOT CONFIGURED — run make secrets")"
   printf '  %-14s %s\n' "SSH" "ssh://git@${DOMAIN}:$(env_value GITEA_SSH_PORT 2222)"
 
   service "pgAdmin" "pgadmin"
   row "Email" "$(env_value PGADMIN_EMAIL labadmin@lab.local)"
-  row "Password" "$(env_value PGADMIN_PASSWORD pgadmin-insecure-dev-only)"
+  row "Password" "$(env_value PGADMIN_PASSWORD "NOT CONFIGURED — run make secrets")"
 
   printf '\n%s%s%s\n' "$C_CYAN" "PostgreSQL" "$C_RESET"
   printf '  %-14s %s\n' "Host" "localhost:$(env_value POSTGRES_PORT 5432)"
@@ -103,7 +103,7 @@ main() {
 
   printf '\n%s%s%s\n' "$C_CYAN" "Redis" "$C_RESET"
   printf '  %-14s %s\n' "Host" "localhost:$(env_value REDIS_PORT 6379)"
-  row "Password" "$(env_value REDIS_PASSWORD redis-insecure-dev-only)"
+  row "Password" "$(env_value REDIS_PASSWORD "NOT CONFIGURED — run make secrets")"
 
   service "Portainer" "portainer"
   row "User" "admin"

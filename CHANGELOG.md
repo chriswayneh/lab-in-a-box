@@ -13,6 +13,11 @@ action from someone with an existing lab**: a `make clean`, a manual migration, 
 
 ## [Unreleased]
 
+### Changed
+
+- **Action needed if your `.env` has no `DEMO_USER_PASSWORD`, or still uses the old published one:** the demo users' password is now required (alice is a platform admin in Vault and Grafana). Run `make secrets`, or set your own value in `.env`. The four file secrets are also refused at startup while they hold the shipped `insecure-dev-only` placeholders or are empty, and values that are only whitespace are refused everywhere. Starting single services with `--no-deps` skips this check; see docs/security.md.
+- **Action needed only if you start the lab without a generated `.env`:** no password, token or client secret in `.env` has a built-in development default any more (Keycloak admin/DB/clients, Vault root token, Redis, Gitea admin/DB, Open WebUI, pgAdmin, oauth2-proxy cookie). `make up` generates them on first run; with plain `docker compose up -d`, run `bash scripts/generate-secrets.sh` once first. A new `secrets-init` startup job makes every consumer fail closed, and `scripts/check-admin-credentials.sh` runs in `make up`, `make update`, `make restore` and `make secrets`, refusing missing, empty, `${...}`, placeholder or old default values without printing them. Existing labs with a generated `.env` need no action.
+
 ### Security
 
 - Build MinIO with Go 1.27.3 (was 1.27.2) and github.com/klauspost/compress v1.18.7 (was v1.18.5) in both the server and client builds. Fixes CVE-2026-111943 (crypto/x509) and CVE-2026-63209 reported by the image scan. No action needed for existing labs; the next `make up` rebuilds MinIO.
@@ -22,6 +27,9 @@ action from someone with an existing lab**: a `make clean`, a manual migration, 
 
 ### Fixed
 
+- `make backup` no longer deletes older backups when any part of the current backup failed.
+- `make restore` now stops at the first SQL error (`ON_ERROR_STOP`), fails on a corrupt dump or when PostgreSQL cannot start, and exits non-zero with a clear failure message instead of a warning.
+- New failure-path tests: `scripts/test-backup-restore.sh` and `scripts/test-admin-credentials.sh`, also run by `make validate`.
 - Identity engine fails safe: Keycloak users are listed with pagination (was capped at 500, so the SCIM worker could deprovision users beyond the first page); a failed post-change verification now marks the run failed instead of SUCCESS; Vault policy changes (movers) revoke existing tokens; access-review remediation is only VERIFIED after an authoritative read of the service; Gitea reactivation also clears `prohibit_login`.
 
 ### Known issues

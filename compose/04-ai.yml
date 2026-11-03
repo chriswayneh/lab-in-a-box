@@ -138,7 +138,7 @@ services:
       ENABLE_OPENAI_API: "false"
 
       # --- Auth -------------------------------------------------------------
-      WEBUI_SECRET_KEY: ${OPENWEBUI_SECRET_KEY:-openwebui-insecure-dev-only}
+      WEBUI_SECRET_KEY: ${OPENWEBUI_SECRET_KEY:-}
       WEBUI_AUTH: ${OPENWEBUI_AUTH:-true}
       # The first account created becomes the administrator. Signup is left on
       # so that first run works; turn it off once you have your account.
@@ -167,6 +167,8 @@ services:
       - lab_ai
       - lab_edge
     depends_on:
+      secrets-init:
+        condition: service_completed_successfully
       ollama:
         condition: service_healthy
     healthcheck:

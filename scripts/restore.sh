@@ -87,17 +87,38 @@ restore_volume() {
 }
 
 # -----------------------------------------------------------------------------
+# Drop only the two statements pg_dumpall writes for the restoring superuser.
+strip_bootstrap_role() {
+  local role="$1"
+  # Exact whole-line string comparison: no regex, so a role name cannot
+  # widen the match. validate_role_name has already restricted the name.
+  awk -v drop1="DROP ROLE IF EXISTS ${role};" -v drop2="CREATE ROLE ${role};" \
+    '$0 != drop1 && $0 != drop2'
+}
+
+# PostgreSQL identifiers pg_dumpall writes unquoted. Anything else is refused
+# rather than guessed at.
+validate_role_name() {
+  [[ "$1" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] \
+    || die "POSTGRES_USER '$1' is not a plain identifier ([A-Za-z_][A-Za-z0-9_]*); refusing to restore"
+}
+
+# -----------------------------------------------------------------------------
 restore_postgres() {
   local dump="${BACKUP_DIR}/postgres.sql.gz"
-  [[ -f "$dump" ]] || { log "  ${C_DIM}no postgres.sql.gz in this backup${C_RESET}"; return 0; }
+  [[ -f "$dump" ]] || { error "no postgres.sql.gz in this backup"; return 1; }
 
   info "starting PostgreSQL to receive the dump"
-  compose up -d postgres >/dev/null 2>&1
+  if ! compose up -d postgres >/dev/null 2>&1; then
+    error "could not start PostgreSQL for the restore"
+    return 1
+  fi
 
   # Wait for readiness rather than sleeping a fixed interval, which is either
   # too short on a cold start or wasteful on a warm one.
   local user attempt=1
   user="$(env_value POSTGRES_USER lab)"
+  validate_role_name "$user"
   until compose exec -T postgres pg_isready -U "$user" >/dev/null 2>&1; do
     (( attempt > 30 )) && { error "PostgreSQL did not become ready"; return 1; }
     sleep 2
@@ -106,12 +127,24 @@ restore_postgres() {
 
   info "loading the dump"
   # The dump was written with --clean --if-exists, so it drops and recreates
-  # each object itself. ON_ERROR_STOP is off: a dump legitimately contains
-  # statements that fail harmlessly, such as dropping a role that is not there.
-  if gunzip -c "$dump" | compose exec -T postgres psql -U "$user" -d postgres >/dev/null 2>&1; then
+  # each object itself. psql runs with ON_ERROR_STOP, so the first SQL error
+  # stops the restore and fails it, and pipefail (set above) also fails it on
+  # a corrupt archive.
+  #
+  # pg_dumpall always emits `DROP ROLE IF EXISTS <us>;` and `CREATE ROLE <us>;`
+  # for the superuser running the restore. Postgres refuses both (it cannot
+  # drop or recreate the role it is connected as), so exactly those two lines
+  # are removed before loading. The superuser's ALTER ROLE, and every other
+  # statement, still runs under ON_ERROR_STOP. SQL output stays suppressed
+  # because a dump contains credential-bearing statements.
+  if gunzip -c "$dump" \
+       | strip_bootstrap_role "$user" \
+       | compose exec -T postgres psql -X -q -v ON_ERROR_STOP=1 -U "$user" -d postgres \
+           >/dev/null 2>&1; then
     success "PostgreSQL restored"
   else
-    warn "psql reported errors during the restore — inspect the databases before trusting them"
+    error "PostgreSQL restore failed — the databases may be only partly restored"
+    return 1
   fi
 }
 
@@ -119,6 +152,21 @@ restore_postgres() {
 main() {
   resolve_backup
   list_contents
+
+  # Refuse before anything is stopped or overwritten. A backup without a SQL
+  # dump (for example an old one that only has a postgres_data file copy)
+  # would restore every other service and leave PostgreSQL behind.
+  if [[ ! -s "${BACKUP_DIR}/postgres.sql.gz" ]]; then
+    error "backup ${BACKUP_NAME} has no PostgreSQL dump (postgres.sql.gz) — refusing to restore"
+    log "  ${C_DIM}Nothing was changed. Pick a backup made by 'make backup' that includes postgres.sql.gz.${C_RESET}"
+    exit 1
+  fi
+
+  # The lab is restarted at the end, so refuse now, while it is still
+  # running, if .env is missing a required credential.
+  bash "${LAB_SCRIPT_DIR}/check-admin-credentials.sh" \
+    || die "fix the credentials above first — nothing was changed"
+  validate_role_name "$(env_value POSTGRES_USER lab)"
 
   log ""
   warn "This will STOP the lab and OVERWRITE current data."
@@ -142,13 +190,16 @@ main() {
   restore_postgres || (( failures++ )) || true
 
   info "bringing the lab back up"
-  compose up -d >/dev/null 2>&1
+  if ! compose up -d >/dev/null 2>&1; then
+    error "the lab did not start again after the restore — check with: make ps"
+    (( failures++ )) || true
+  fi
 
   log ""
   if (( failures == 0 )); then
     success "restore complete from ${BACKUP_NAME}"
   else
-    warn "restore finished with ${failures} problem(s)"
+    error "restore FAILED with ${failures} problem(s) — do not trust the restored data until you have checked it"
   fi
 
   log ""

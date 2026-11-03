@@ -243,7 +243,12 @@ def initial_password() -> str:
     already give the seeded users, so a provisioned identity behaves exactly like
     alice or bob. `make creds` prints it. It is never written to an artifact.
     """
-    return env("DEMO_USER_PASSWORD", "LabDemoPass1!")
+    password = env("DEMO_USER_PASSWORD")
+    if not password:
+        # No published fallback: alice's Vault login is platform-admin, so a
+        # shared default would hand anyone that access.
+        raise ValidationError("DEMO_USER_PASSWORD is not set; run make secrets")
+    return password
 
 
 def guard_protected(username: str, operation: str) -> None:

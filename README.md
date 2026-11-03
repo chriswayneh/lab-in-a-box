@@ -45,8 +45,11 @@ dashboard provisioning, secrets policies, and service integrations.
 ```bash
 git clone https://github.com/chriswayneh/lab-in-a-box.git
 cd lab-in-a-box
-docker compose up -d
+make up        # or: bash scripts/generate-secrets.sh && docker compose up -d
 ```
+
+The first step creates your own `.env` with fresh random passwords. Without it the lab refuses to start
+and tells you to run `make secrets`.
 
 <https://lab.localhost> is the front door and links to everything else.
 
@@ -140,19 +143,28 @@ need `sudo` for every command.
 
 ### Run it
 
-**Windows / easiest path.** Open PowerShell and paste these three lines. Docker Desktop must be
-running first.
+**Windows / easiest path.** Open PowerShell and paste these four lines. Docker Desktop must be
+running first, and Git for Windows provides the `bash` command used in step three.
 
 ```powershell
 git clone https://github.com/chriswayneh/lab-in-a-box.git
 cd lab-in-a-box
+bash scripts/generate-secrets.sh
 docker compose up -d
 ```
 
+Step three creates your own `.env` file with fresh random passwords. You only run it once; running it
+again keeps your existing passwords. Skip it and the lab stops right away with a message naming the
+missing passwords: none of the service passwords, tokens or client secrets has a built-in default any
+more.
+
 The first run builds MinIO from checksum-verified official source because upstream community images are unavailable. Build dependencies are pinned; no host Go installation or registry login is needed. Allow extra build time and internet access on first run. Later runs reuse build layers. See [MinIO builds](docs/minio-builds.md).
 
-This is enough to use the complete local lab. It uses the published development passwords,
-which are intended only for a trusted local lab. HTTP, HTTPS, and Gitea SSH bind to all interfaces
+Every password, token and client secret must be generated for your machine before the lab
+starts, including the demo users' password and the four file-based secrets (PostgreSQL, MinIO,
+Grafana, Portainer). The `secrets/*.txt` files in the repo are only placeholders so Compose can read
+its files; a startup job refuses them. The simplest path is `make up` below, which runs `make secrets`
+for you. The lab is intended only for a trusted local network. HTTP, HTTPS, and Gitea SSH bind to all interfaces
 by default; `*.lab.localhost` names do not restrict network access. Keep the lab off untrusted
 networks and read the [security model](docs/security.md) before exposing it beyond this computer.
 
@@ -162,8 +174,16 @@ networks and read the [security model](docs/security.md) before exposing it beyo
 make up
 ```
 
-`make up` generates unique credentials before starting and keeps file-backed ones in the git-ignored
-`secrets/local/` directory.
+`make up` generates unique credentials on the first run, checks that every required credential is set,
+then starts the lab. `make update` and `make restore` run the same check before they change anything. File-backed credentials live in the git-ignored
+`secrets/local/` directory. See them any time with `make creds`.
+
+> **Got "REDIS_PASSWORD is missing or empty" (or another name), or "Missing, empty or placeholder
+> credentials" from `secrets-init`?** Your `.env` predates this check or was copied by hand.
+> The message names what is wrong (never the value). `name(file)` means a file in `secrets/local/`.
+> On a fresh lab, run `make secrets`. On a lab you already use, add the missing names to `.env` with the
+> values the lab is actually running with. Changing a password in `.env` alone does not change it inside
+> a service that already stored it, such as Keycloak, PostgreSQL or Gitea.
 
 If you already started with the shipped defaults, use the following only to reinitialize a disposable lab with generated credentials:
 
@@ -534,11 +554,14 @@ security implications and limitations.
 
 ## Configuration
 
-Everything lives in one file. Copy the annotated template and edit nothing else:
+Everything lives in one file, `.env`. Generate it from the annotated template:
 
 ```bash
-cp .env.example .env    # or: make secrets
+make secrets            # or: bash scripts/generate-secrets.sh
 ```
+
+It keeps an existing `.env` as it is. If you copy `.env.example` by hand instead, replace every
+`CHANGEME_*` value before starting; the lab refuses to start with a placeholder.
 
 Highlights:
 
@@ -601,7 +624,7 @@ This is a **development lab**, not a production deployment, and it is explicit a
 | **Self-signed TLS** | HTTPS works with zero setup | A real certificate. See below |
 | **Portainer holds the Docker socket** | You cannot debug a lab you cannot exec into | Restricted access, or drop it |
 | **cAdvisor is privileged** | It genuinely needs cgroup access to produce container metrics | Same, but treat the host as inside the trust boundary |
-| Fallback passwords are **in this repo** | Makes `docker compose up -d` genuinely work with no prior step | `make secrets`, always |
+| File secret placeholders are **in this repo** | `secrets/*.txt` let Compose parse with no prior step; every `.env` credential has no fallback and must be generated | `make secrets`, always |
 
 > **Warning**
 > Do not expose this lab to the internet as-is. Ports 80, 443, and 2222 already bind all interfaces, not localhost only. If you need it on a network you do not trust,

@@ -178,7 +178,15 @@ main() {
   done
 
   write_manifest
-  prune_old_backups
+
+  # Retention only runs after a fully successful backup. If anything failed,
+  # this run's directory is incomplete and the older backups may be the only
+  # good copies left, so none of them are deleted.
+  if (( failures == 0 )); then
+    prune_old_backups
+  else
+    warn "backup incomplete — keeping every older backup (nothing pruned)"
+  fi
 
   local total
   total="$(du -sh "$BACKUP_DIR" 2>/dev/null | cut -f1)"

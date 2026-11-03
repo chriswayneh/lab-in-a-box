@@ -68,7 +68,7 @@ def keycloak_events() -> tuple[Keycloak, str]:
     keycloak = Keycloak(
         KEYCLOAK_URL,
         os.environ.get("KEYCLOAK_ADMIN", "admin"),
-        os.environ.get("KEYCLOAK_ADMIN_PASSWORD", "admin-insecure-dev-only"),
+        os.environ["KEYCLOAK_ADMIN_PASSWORD"],
         REALM,
     )
     keycloak._call(

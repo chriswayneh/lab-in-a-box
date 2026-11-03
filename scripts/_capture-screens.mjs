@@ -19,7 +19,8 @@ function fileValue(rel, fallback = '') {
 }
 const adminUser = envValue('KEYCLOAK_ADMIN', 'admin');
 const adminPass = envValue('KEYCLOAK_ADMIN_PASSWORD');
-const demoPass = envValue('DEMO_USER_PASSWORD', 'LabDemoPass1!');
+const demoPass = envValue('DEMO_USER_PASSWORD');
+if (!demoPass) throw new Error('DEMO_USER_PASSWORD is not set; run make secrets');
 const grafanaUser = envValue('GRAFANA_ADMIN_USER', 'admin');
 const grafanaPass = fileValue('secrets/grafana_admin_password.txt');
 const vaultToken = envValue('VAULT_DEV_ROOT_TOKEN');
