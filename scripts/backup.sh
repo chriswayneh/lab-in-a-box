@@ -30,11 +30,12 @@ BACKUP_ROOT="${LAB_ROOT}/backups"
 BACKUP_DIR="${BACKUP_ROOT}/${TIMESTAMP}"
 
 # Volumes worth capturing. Deliberately excluded:
+#   postgres_data       captured logically by pg_dumpall; a tar of a live
+#                       cluster's files is not a consistent backup
 #   ollama_models       many gigabytes, re-downloadable in one command
 #   prometheus_data     time-series data that is stale the moment it is restored
 #   loki_data           same
 VOLUMES=(
-  postgres_data
   redis_data
   keycloak_data
   grafana_data
@@ -65,8 +66,15 @@ backup_postgres() {
   # pg_dumpall captures roles and grants as well as data, which pg_dump alone
   # would silently omit — restoring without them leaves every service unable
   # to log in.
-  if compose exec -T postgres pg_dumpall -U "$user" --clean --if-exists 2>/dev/null \
+  # Local socket auth is scram-sha-256, so supply the superuser password from
+  # the Docker secret inside the container. It never reaches this shell.
+  # pipefail (set above) makes a failed dump fail the pipeline.
+  # shellcheck disable=SC2016  # expanded inside the container, not here
+  if compose exec -T postgres sh -c \
+       'PGPASSWORD="$(cat /run/secrets/postgres_password)" exec pg_dumpall -U "$1" --clean --if-exists' \
+       sh "$user" 2>"${BACKUP_DIR}/.pg_dumpall.err" \
        | gzip -9 > "${BACKUP_DIR}/postgres.sql.gz"; then
+    rm -f "${BACKUP_DIR}/.pg_dumpall.err"
     local size
     size="$(du -h "${BACKUP_DIR}/postgres.sql.gz" 2>/dev/null | cut -f1)"
     success "postgres.sql.gz ${C_DIM}(${size:-unknown})${C_RESET}"
@@ -74,7 +82,8 @@ backup_postgres() {
   fi
 
   error "the PostgreSQL dump failed"
-  rm -f "${BACKUP_DIR}/postgres.sql.gz"
+  sed 's/^/    /' "${BACKUP_DIR}/.pg_dumpall.err" 2>/dev/null | head -5 >&2
+  rm -f "${BACKUP_DIR}/postgres.sql.gz" "${BACKUP_DIR}/.pg_dumpall.err"
   return 1
 }
 

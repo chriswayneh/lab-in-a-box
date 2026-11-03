@@ -106,13 +106,29 @@ restore_postgres() {
 
   info "loading the dump"
   # The dump was written with --clean --if-exists, so it drops and recreates
-  # each object itself. ON_ERROR_STOP is off: a dump legitimately contains
-  # statements that fail harmlessly, such as dropping a role that is not there.
-  if gunzip -c "$dump" | compose exec -T postgres psql -U "$user" -d postgres >/dev/null 2>&1; then
-    success "PostgreSQL restored"
-  else
-    warn "psql reported errors during the restore — inspect the databases before trusting them"
+  # each object itself. ON_ERROR_STOP stays off because pg_dumpall --clean
+  # always emits a few statements that fail harmlessly against the running
+  # superuser (it cannot drop or recreate itself). Every other error fails
+  # the restore instead of being discarded.
+  local errlog
+  errlog="$(mktemp)"
+  local psql_status=0
+  # shellcheck disable=SC2016  # expanded inside the container, not here
+  gunzip -c "$dump" | compose exec -T postgres sh -c \
+    'PGPASSWORD="$(cat /run/secrets/postgres_password)" exec psql -X -q -U "$1" -d postgres' \
+    sh "$user" >/dev/null 2>"$errlog" || psql_status=$?
+
+  local unexpected
+  unexpected="$(grep -E '^(psql:.*)?(ERROR|FATAL)' "$errlog" \
+    | grep -vE "current user cannot be dropped|role \"${user}\" already exists" || true)"
+  rm -f "$errlog"
+
+  if (( psql_status != 0 )) || [[ -n "$unexpected" ]]; then
+    error "PostgreSQL restore failed (psql exit ${psql_status})"
+    [[ -n "$unexpected" ]] && printf '%s\n' "$unexpected" | head -10 | sed 's/^/    /' >&2
+    return 1
   fi
+  success "PostgreSQL restored"
 }
 
 # -----------------------------------------------------------------------------
@@ -136,6 +152,12 @@ main() {
   for archive in "${BACKUP_DIR}"/*.tar.gz; do
     [[ -e "$archive" ]] || continue
     volume="$(basename "$archive" .tar.gz)"
+    # Older backups also tarred the live postgres_data volume. Those files
+    # may be inconsistent; the logical dump below is authoritative.
+    if [[ "$volume" == "postgres_data" ]]; then
+      warn "skipping postgres_data.tar.gz (file copy); restoring from the SQL dump instead"
+      continue
+    fi
     restore_volume "$volume" || (( failures++ )) || true
   done
 
