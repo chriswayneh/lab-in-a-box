@@ -11,15 +11,14 @@ real hostnames are used. Timing is adjusted for README readability.
 ### What the GIF shows
 
 1. `make help` — the operator surface (lifecycle, RBAC, access review, validate).
-2. `docker compose … config --quiet` — Compose project parses on the client.
-3. `pytest scripts/identity/unit` — 139 pure unit tests for the identity engine.
+1. `docker compose … config --quiet` — Compose project parses on the client.
+1. `pytest scripts/identity/unit` — 139 pure unit tests for the identity engine.
 
 Full `make validate` / `make up` still need a working Docker daemon and are
 covered by the walkthrough below. Re-record with `./scripts/record-demo.sh`
 (requires `vhs`, `ttyd`, `make`, and the Docker CLI; stages via `mktemp -d`).
 
 ## Ten-minute portfolio walkthrough
-
 
 This walkthrough is for a technical reviewer, interviewer or teammate who wants
 to see the engineering decisions rather than tour a list of product logos. It
