@@ -18,6 +18,6 @@ The official Go builder is discarded from runtime images. Alpine Linux is the pi
 installed package licenses remain under their upstream terms.
 
 Security updates address the HIGH/CRITICAL image-scan findings present in the upstream
-release graph. go-jose additionally uses v4.1.5 for its September 2026 upstream advisory.
+release graph. go-jose additionally uses v4.1.6 for CVE-2026-116587.
 The input manifest records the exact replacement file hashes. No application source
 or existing object storage format is modified.
