@@ -87,6 +87,12 @@ The lab demonstrates zero-trust principles through explicit identity, least priv
 
 This remains a local lab, not a complete enterprise zero-trust architecture. Shipped development credentials must be replaced before handling sensitive data. The host, service administrators, privileged monitoring, and components with direct Docker socket access remain trusted. Network separation alone does not authenticate a caller. See the [security model](docs/security.md) for the exact boundaries and deliberate development exceptions.
 
+## Demo
+
+<p align="center"><img src="docs/assets/demo.gif" alt="Lab-in-a-Box demo recorded on main after v2.0.2: make help, compose config, and identity unit tests offline" width="100%"></p>
+
+The GIF was recorded on main after v2.0.2 (offline checks: `make help`, Compose config, identity unit tests; 139 passed). No full lab stack. [Run the demo](docs/demo.md).
+
 ## Screenshots
 
 > Screenshots below were captured from the local development lab. They use only the project's

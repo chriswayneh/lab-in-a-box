@@ -1,4 +1,36 @@
-# Ten-minute portfolio demo
+# Demo
+
+## Terminal recording
+
+The README GIF was recorded on **main after v2.0.2** on 2026-11-05
+(America/Chicago). It uses only cheap offline checks: `make help`, a client-side
+`docker compose config`, and the identity engine unit tests (139 passed on
+main). No containers are started, no kind cluster is created, and no cloud
+credentials or real hostnames are used. Timing is adjusted for README
+readability.
+
+### What the GIF shows
+
+1. `make help` — the operator surface (lifecycle, RBAC, access review, validate).
+1. `docker compose … config --quiet` — Compose project parses on the client.
+1. `pytest scripts/identity/unit` — 139 pure unit tests for the identity engine.
+
+### Run it yourself
+
+From a checkout of this repository (no Docker daemon required for these three
+commands):
+
+```bash
+make help | sed -n '1,28p'
+docker compose -f docker-compose.yml config --quiet && echo 'compose: OK (client-side, no daemon required for config)'
+python3 -m pytest -q -p no:cacheprovider scripts/identity/unit
+```
+
+Full `make validate` / `make up` still need a working Docker daemon and are
+covered by the walkthrough below. Re-record with `./scripts/record-demo.sh`
+(requires `vhs`, `ttyd`, `make`, and the Docker CLI; stages via `mktemp -d`).
+
+## Ten-minute portfolio walkthrough
 
 This walkthrough is for a technical reviewer, interviewer or teammate who wants
 to see the engineering decisions rather than tour a list of product logos. It
