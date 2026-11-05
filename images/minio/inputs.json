@@ -22,8 +22,8 @@
   },
   "security_manifests": {
     "server": {
-      "go.mod": "40d08da2ac3f1761f773faa66d0ea7204fafa4211266859a89d069fd29da0439",
-      "go.sum": "3fa9b1152d891c6d96a8ec9fe991e176b7d779381ce9f98ba7bb8cd5a47a1e47"
+      "go.mod": "3e6a7feb10b5663ccdaebdd6eeddbae8f32be5121bc0a19de31bacf64c7fa747",
+      "go.sum": "f76fc5ca2c2e239bdc48120322555644263fd63a97a429966914296e6c80be1e"
     },
     "client": {
       "go.mod": "e48b8d8add3b3c969f124889bcfe89cf5681cf39460a288a635a2fe7c41a523b",
