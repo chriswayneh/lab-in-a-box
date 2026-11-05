@@ -89,9 +89,9 @@ This remains a local lab, not a complete enterprise zero-trust architecture. Shi
 
 ## Demo
 
-<p align="center"><img src="docs/assets/demo.gif" alt="Lab-in-a-Box v2.0.2 demo: make help, compose config, and identity unit tests offline" width="100%"></p>
+<p align="center"><img src="docs/assets/demo.gif" alt="Lab-in-a-Box demo recorded on main after v2.0.2: make help, compose config, and identity unit tests offline" width="100%"></p>
 
-The GIF replays real v2.0.2 offline checks (`make help`, Compose config, identity unit tests). No full lab stack. [Run the demo](docs/demo.md).
+The GIF was recorded on main after v2.0.2 (offline checks: `make help`, Compose config, identity unit tests; 139 passed). No full lab stack. [Run the demo](docs/demo.md).
 
 ## Screenshots
 
